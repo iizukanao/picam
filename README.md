@@ -14,7 +14,7 @@
 - Start/stop recording and MPEG-TS file output via file hooks
 - Start recording from 5 seconds before
 - Mute/unmute via file hooks
-- Supports Audio+Video and Video-only recording
+- Supports audio+video and video-only recording
 - Auto exposure adjustment
 - Send H.264/AAC data with timestamp via UNIX domain socket to another process
 
