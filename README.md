@@ -2,9 +2,20 @@
 
 #### Features
 
-- Capture video from Raspberry Pi Camera
-- Capture audio from USB microphone
+- Capture video from Raspberry Pi Camera (up to 720p)
+- Encode the video to H.264 using hardware encoder
+- Capture audio from USB microphone via ALSA
+- Encode the audio to AAC-LC using libavcodec
 - Mux video and audio stream into MPEG-TS format
+- Segment MPEG-TS and produce the files for HTTP Live Streaming
+- Optional encryption for HTTP Live Streaming
+- PTS/DTS alignment
+- Start/stop recording and MPEG-TS file output via file hooks
+- Start recording from 5 seconds before
+- Mute/unmute via file hooks
+- Supports Audio+Video and Video-only recording
+- Auto exposure adjustment
+- Send H.264/AAC data with timestamp via UNIX domain socket to another process
 
 ### Required hardware
 
