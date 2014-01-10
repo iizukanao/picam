@@ -10,6 +10,7 @@
 - Segment MPEG-TS and produce the files for HTTP Live Streaming
 - Optional encryption for HTTP Live Streaming
 - PTS/DTS alignment
+- Audio/video sync within 30 milliseconds on normal condition
 - Start/stop recording and MPEG-TS file output via file hooks
 - Start recording from 5 seconds before
 - Mute/unmute via file hooks
