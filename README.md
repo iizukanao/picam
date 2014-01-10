@@ -16,7 +16,7 @@
 - Mute/unmute via file hooks
 - Supports audio+video and video-only recording
 - Auto exposure adjustment
-- Send H.264/AAC data with timestamp via UNIX domain socket to another process
+- Send H.264/AAC data with timestamps via UNIX domain socket to another process
 
 ### Required hardware
 
@@ -25,6 +25,8 @@
 - USB microphone (see [Recommended hardware](#recommended-hardware))
 
 ### Installation
+
+(Documentation is in progress)
 
 #### Install libraries
 
