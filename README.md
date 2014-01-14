@@ -48,7 +48,31 @@ On a Raspberry Pi, issue the following command:
     $ git clone https://github.com/iizukanao/picam.git
     $ cd picam
     $ make
+
+### Starting the process
+
+Create the output directory for HTTP Live Streaming:
+
+    $ mkdir /run/shm/video
+
+Then run the process:
+
+    $ cd picam
     $ ./stream.bin
+
+### Recording
+
+#### Start recording
+
+    $ cd picam
+    $ touch hooks/start_record
+
+#### Stop recording
+
+    $ cd picam
+    $ touch hooks/stop_record
+
+Recorded MPEG-TS file will go in `archive` directory.
 
 ### Recommended hardware
 
