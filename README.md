@@ -72,6 +72,16 @@ Then run the process:
     $ cd picam
     $ touch hooks/stop_record
 
+### Mute/Unmute
+
+To mute:
+
+    $ touch hooks/mute
+
+To unmute:
+
+    $ touch hooks/unmute
+
 Recorded MPEG-TS file will go in `archive` directory.
 
 ### Recommended hardware
