@@ -76,7 +76,7 @@ extern "C" {
 #include "httplivestreaming.h"
 #include "state.h"
 
-// What color should we use to fill borders? (in YUV)
+// Color for filling borders
 #define FILL_COLOR_Y 0
 #define FILL_COLOR_U 128
 #define FILL_COLOR_V 128
@@ -84,29 +84,35 @@ extern "C" {
 // ALSA buffer size (frames) is multiplied by this number
 #define ALSA_BUFFER_MULTIPLY 20
 
-#define AVAIL_AUDIO 2
-
-// Enable video preview output
+// Whether or not to enable video preview output
 #define ENABLE_PREVIEW 0
 
-// Enable clock OMX component
+// Whether or not to enable clock OMX component
 #define ENABLE_CLOCK 1
 
-// Both PTS and DTS are 33 bit and wraps around to zero.
+// Both PTS and DTS are 33 bit and wraps around to zero
 #define PTS_MODULO 8589934592
 
+// Initial values for audio/video PTS
 #define AUDIO_PTS_START 0
 #define VIDEO_PTS_START 0
 
+// Directory name for state files
 #define STATE_DIR "state"
 
+// Number of keyframes to be buffered for recording
 #define RECORD_BUFFER_KEYFRAMES 5
 
+// Whether or not to use encryption in HTTP Live Streaming
 #define ENABLE_HLS_ENCRYPTION 0
+
+// Internal flag indicates that audio is available for read
+#define AVAIL_AUDIO 2
 
 static int64_t video_current_pts = 0;
 static int64_t audio_current_pts = 0;
 
+// Pace of PTS
 typedef enum {
   PTS_SPEED_NORMAL,
   PTS_SPEED_UP,
