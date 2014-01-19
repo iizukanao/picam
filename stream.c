@@ -121,18 +121,20 @@ typedef enum {
 
 pts_mode_t pts_mode = PTS_SPEED_NORMAL;
 
+// Counter for PTS speed up/down
+static int speed_up_count = 0;
+static int speed_down_count = 0;
+
 // Each video frame's PTS is incremented by this in normal condition
 // 90000 / 3014 = 29.860650299 FPS
 #define VIDEO_PTS_STEP 3014
 
 static int audio_pts_step_base;
-static int speed_up_count = 0;
-static int speed_down_count = 0;
 
-// If we increase this value, audio gets faster than video
-#define N_BUFFER_COUNT_ACTUAL 1  // For 1280x720 with new mic
+// If this value is increased, audio gets faster than video
+#define N_BUFFER_COUNT_ACTUAL 1
 
-// If we increase this value, video gets faster than audio
+// If this value is increased, video gets faster than audio
 #define AUDIO_BUFFER_CHUNKS 0
 
 #if AUDIO_BUFFER_CHUNKS > 0
@@ -150,6 +152,7 @@ static int disable_audio_capturing = 0;
 
 static pthread_t audio_nop_thread;
 
+// Whether or not to amplify audio
 #define ENABLE_AUDIO_AMPLIFICATION 0
 
 #define AUDIO_VOLUME_MULTIPLY 2.0
@@ -158,7 +161,7 @@ static pthread_t audio_nop_thread;
 
 static const int fr_q16 = (TARGET_FPS) * 65536;
 
-// function prototypes
+// Function prototypes
 static void encode_and_send_image();
 static void encode_and_send_audio();
 void start_record();
@@ -196,12 +199,20 @@ static TUNNEL_T tunnel[4];
 static int n_tunnel = 0;
 #endif
 
+// Whether or not to enable auto exposure (day/night) mode
 #define USE_AUTO_EXPOSURE 0
+
+// enum
 #define EXPOSURE_AUTO 0
 #define EXPOSURE_NIGHT 1
+
+// When average Y goes below this number, the camera will go into night mode
 #define EXPOSURE_NIGHT_Y_THRESHOLD 40
+
+// When average Y goes above this number, the camera will go into day mode
 #define EXPOSURE_AUTO_Y_THRESHOLD 50
 
+// Number of packets to chase recording for each cycle
 #define REC_CHASE_PACKETS 10
 
 // UNIX domain sockets provided by node-rtsp-rtmp-server
@@ -210,9 +221,11 @@ static int n_tunnel = 0;
 #define SOCK_PATH_AUDIO "/tmp/node_rtsp_rtmp_audioReceiver"
 #define SOCK_PATH_AUDIO_CONTROL "/tmp/node_rtsp_rtmp_audioControl"
 
+// Directory name for hooks files
 #define HOOKS_DIR "hooks"
 
 static int current_exposure_mode = EXPOSURE_AUTO;
+
 static long long previous_capture_frame = 0;
 static long long previous_previous_capture_frame = 0;
 
