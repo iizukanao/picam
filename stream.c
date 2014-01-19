@@ -145,7 +145,7 @@ int is_audio_buffer_filled = 0;
 
 #define PTS_DIFF_TOO_LARGE 45000  // 90000 == 1 second
 
-#define DISABLE_RTSP 1  // default: 0
+#define DISABLE_RTSP 0  // default: 0
 
 // If this value is 1, audio capturing is always disabled.
 static int disable_audio_capturing = 0;
