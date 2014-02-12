@@ -220,10 +220,10 @@ static int n_tunnel = 0;
 #define SOCK_PATH_AUDIO_CONTROL "/tmp/node_rtsp_rtmp_audioControl"
 
 // Disable output to RTSP server via UNIX domain sockets
-#define DISABLE_UNIX_SOCKETS_OUTPUT 1  // default: 0
+#define DISABLE_UNIX_SOCKETS_OUTPUT 0  // default: 0
 // Enable MPEG-TS output via TCP socket
-#define ENABLE_TCP_OUTPUT 1
-// Where to send MPEG-TS stream
+#define ENABLE_TCP_OUTPUT 0 // default: 0
+// Where to send MPEG-TS stream if ENABLE_TCP_OUTPUT is 1
 #define TCP_OUTPUT_DEST "tcp://127.0.0.1:8181"
 
 #if ENABLE_TCP_OUTPUT
