@@ -2172,7 +2172,10 @@ static int video_encode_startup() {
     exit(1);
   }
 
+  // Number of P frames between I frames
   avctype.nPFrames = GOP_SIZE - 1;
+
+  // Number of B frames between I frames
   avctype.nBFrames = 0;
 
   avctype.eProfile = OMX_VIDEO_AVCProfileConstrainedBaseline; // Main profile is not playable on Android
