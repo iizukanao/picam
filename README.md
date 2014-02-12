@@ -32,9 +32,9 @@
 
 Build and install these libraries for a Raspberry Pi:
 
-- ffmpeg
-- libasound
-- libfdk-aac
+- [FFmpeg](http://www.ffmpeg.org/)
+- [alsa-lib](http://www.alsa-project.org/main/index.php/Main_Page)
+- [fdk-aac](http://sourceforge.net/projects/opencore-amr/)
 
 #### Compile libilclient
 
@@ -48,7 +48,41 @@ On a Raspberry Pi, issue the following command:
     $ git clone https://github.com/iizukanao/picam.git
     $ cd picam
     $ make
+
+### Starting the process
+
+Create the output directory for HTTP Live Streaming:
+
+    $ mkdir /run/shm/video
+
+Then run the process:
+
+    $ cd picam
     $ ./stream.bin
+
+### Recording
+
+#### Start recording
+
+    $ cd picam
+    $ touch hooks/start_record
+
+#### Stop recording
+
+    $ cd picam
+    $ touch hooks/stop_record
+
+### Mute/Unmute
+
+To mute:
+
+    $ touch hooks/mute
+
+To unmute:
+
+    $ touch hooks/unmute
+
+Recorded MPEG-TS file will go in `archive` directory.
 
 ### Recommended hardware
 
