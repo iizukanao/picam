@@ -933,7 +933,7 @@ static int64_t get_next_audio_write_time() {
 
 static void print_audio_timing() {
   struct timespec ts;
-  clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+  clock_gettime(CLOCK_MONOTONIC, &ts);
   int64_t cur_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
   int64_t video_pts = video_current_pts;
   int64_t audio_pts = audio_current_pts;
@@ -1598,7 +1598,7 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
           is_video_recording_started = 1;
           if (is_audio_recording_started == 1) {
             struct timespec ts;
-            clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+            clock_gettime(CLOCK_MONOTONIC, &ts);
             video_start_time = audio_start_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
             send_audio_control_info();
             send_video_control_info();
@@ -1970,7 +1970,7 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
 
         // calculate FPS and display it
         if (tsBegin.tv_sec != 0 && tsBegin.tv_nsec != 0) {
-          clock_gettime(CLOCK_MONOTONIC_RAW, &tsEnd);
+          clock_gettime(CLOCK_MONOTONIC, &tsEnd);
           timespec_subtract(&tsDiff, &tsEnd, &tsBegin);
           unsigned long long wait_nsec = tsDiff.tv_sec * INT64_C(1000000000) + tsDiff.tv_nsec;
           float divisor = (float)wait_nsec / (float)frame_count / 1000000000;
@@ -1987,7 +1987,7 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
           current_audio_frames = 0;
           frame_count = 0;
         }
-        clock_gettime(CLOCK_MONOTONIC_RAW, &tsBegin);
+        clock_gettime(CLOCK_MONOTONIC, &tsBegin);
       } else { // inter frame
         if (nal_unit_type != 9) { // Exclude nal_unit_type 9 (Access unit delimiter)
           int consume_time = 0;
@@ -2529,7 +2529,7 @@ static void *audio_nop_loop() {
   while (keepRunning) {
     if (is_video_recording_started) {
       encode_and_send_audio();
-      clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+      clock_gettime(CLOCK_MONOTONIC, &ts);
       int64_t diff_time = get_next_audio_write_time() - (ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec);
       if (diff_time > 0) {
         ts.tv_sec = diff_time / 1000000000;
@@ -2594,7 +2594,7 @@ static void audio_loop_poll_mmap() {
           is_audio_recording_started = 1;
           if (is_video_recording_started == 1) {
             struct timespec ts;
-            clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+            clock_gettime(CLOCK_MONOTONIC, &ts);
             video_start_time = audio_start_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
             send_audio_control_info();
             send_video_control_info();
