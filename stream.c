@@ -137,8 +137,6 @@ int is_audio_buffer_filled = 0;
 
 #define PTS_DIFF_TOO_LARGE 45000  // 90000 == 1 second
 
-#define DISABLE_RTSP 1  // default: 0
-
 // If this value is 1, audio capturing is always disabled.
 static int disable_audio_capturing = 0;
 
@@ -204,6 +202,9 @@ static int n_tunnel = 0;
 #define SOCK_PATH_AUDIO "/tmp/node_rtsp_rtmp_audioReceiver"
 #define SOCK_PATH_AUDIO_CONTROL "/tmp/node_rtsp_rtmp_audioControl"
 
+// Disable output to RTSP server via UNIX domain sockets
+#define DISABLE_UNIX_SOCKETS_OUTPUT 1  // default: 0
+
 #define HOOKS_DIR "hooks"
 
 static int current_exposure_mode = EXPOSURE_AUTO;
@@ -244,12 +245,12 @@ static int channels = 1;
 static pthread_mutex_t mutex_writing = PTHREAD_MUTEX_INITIALIZER;
 
 // UNIX domain sockets
-#if !(DISABLE_RTSP)
+#if !(DISABLE_UNIX_SOCKETS_OUTPUT)
 static int sockfd_video;
 static int sockfd_video_control;
 static int sockfd_audio;
 static int sockfd_audio_control;
-#endif
+#endif // !(DISABLE_UNIX_SOCKETS_OUTPUT)
 
 static uint8_t *encbuf = NULL;
 static int encbuf_size = -1;
@@ -737,7 +738,7 @@ void on_file_create(char *filename, char *content) {
 
 // Send audio packet to node-rtsp-rtmp-server
 static void send_audio_control_info() {
-#if !(DISABLE_RTSP)
+#if !(DISABLE_UNIX_SOCKETS_OUTPUT)
   int64_t logical_start_time = audio_start_time;
   uint8_t sendbuf[9] = {
     // header
@@ -757,12 +758,12 @@ static void send_audio_control_info() {
     exit(1);
   }
   fprintf(stderr, "audio control info sent: %lld\n", logical_start_time);
-#endif
+#endif // !(DISABLE_UNIX_SOCKETS_OUTPUT)
 }
 
 // Send video packet to node-rtsp-rtmp-server
 static void send_video_control_info() {
-#if !(DISABLE_RTSP)
+#if !(DISABLE_UNIX_SOCKETS_OUTPUT)
   int64_t logical_start_time = video_start_time;
   uint8_t sendbuf[9] = {
     // header
@@ -782,14 +783,15 @@ static void send_video_control_info() {
     exit(1);
   }
   fprintf(stderr, "video control info sent: %lld\n", logical_start_time);
-#endif
+#endif // !(DISABLE_UNIX_SOCKETS_OUTPUT)
 }
 
 static void setup_socks() {
-#if !(DISABLE_RTSP)
-  int len;
+#if !(DISABLE_UNIX_SOCKETS_OUTPUT)
   struct sockaddr_un remote_video;
   struct sockaddr_un remote_audio;
+
+  int len;
   struct sockaddr_un remote_video_control;
   struct sockaddr_un remote_audio_control;
 
@@ -848,16 +850,16 @@ static void setup_socks() {
     exit(1);
   }
   fprintf(stderr, "audio_control server connected\n");
-#endif
+#endif // !(DISABLE_UNIX_SOCKETS_OUTPUT)
 }
 
 static void teardown_socks() {
-#if !(DISABLE_RTSP)
+#if !(DISABLE_UNIX_SOCKETS_OUTPUT)
   close(sockfd_video);
   close(sockfd_video_control);
   close(sockfd_audio);
   close(sockfd_audio_control);
-#endif
+#endif // !(DISABLE_UNIX_SOCKETS_OUTPUT)
 }
 
 static int64_t get_next_audio_pts() {
@@ -948,7 +950,7 @@ static void print_audio_timing() {
 }
 
 static void send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts) {
-#if !(DISABLE_RTSP)
+#if !(DISABLE_UNIX_SOCKETS_OUTPUT)
   int payload_size = databuflen - 1;  // -7(ADTS header) +6(pts)
   int total_size = payload_size + 3;  // more 3 bytes for payload length
   uint8_t *sendbuf = malloc(total_size);
@@ -971,11 +973,11 @@ static void send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts) {
     exit(1);
   }
   free(sendbuf);
-#endif
+#endif // !(DISABLE_UNIX_SOCKETS_OUTPUT)
 }
 
 static void send_video_frame(uint8_t *databuf, int databuflen, int64_t pts) {
-#if !(DISABLE_RTSP)
+#if !(DISABLE_UNIX_SOCKETS_OUTPUT)
   int payload_size = databuflen + 2;  // -4(start code) +6(pts)
   int total_size = payload_size + 3;  // more 3 bytes for payload length
   uint8_t *sendbuf = malloc(total_size);
@@ -997,7 +999,7 @@ static void send_video_frame(uint8_t *databuf, int databuflen, int64_t pts) {
     perror("send video error");
   }
   free(sendbuf);
-#endif
+#endif // !(DISABLE_UNIX_SOCKETS_OUTPUT)
 }
 
 // send keyframe (nal_unit_type 5)
