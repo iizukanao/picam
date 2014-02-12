@@ -204,6 +204,15 @@ static int n_tunnel = 0;
 
 // Disable output to RTSP server via UNIX domain sockets
 #define DISABLE_UNIX_SOCKETS_OUTPUT 1  // default: 0
+// Enable MPEG-TS output via TCP socket
+#define ENABLE_TCP_OUTPUT 1
+// Where to send MPEG-TS stream
+#define TCP_OUTPUT_DEST "tcp://127.0.0.1:8181"
+
+#if ENABLE_TCP_OUTPUT
+static AVFormatContext *tcp_ctx;
+static pthread_mutex_t tcp_mutex = PTHREAD_MUTEX_INITIALIZER;
+#endif
 
 #define HOOKS_DIR "hooks"
 
@@ -1072,6 +1081,12 @@ static int send_keyframe(uint8_t *data, size_t data_len, int consume_time) {
     pthread_mutex_unlock(&rec_mutex);
   }
 
+#if ENABLE_TCP_OUTPUT
+  pthread_mutex_lock(&tcp_mutex);
+  av_write_frame(tcp_ctx, &pkt);
+  pthread_mutex_unlock(&tcp_mutex);
+#endif
+
   pthread_mutex_lock(&mutex_writing);
   int split;
   if (video_frame_count == 1) {
@@ -1145,6 +1160,12 @@ static int send_pframe(uint8_t *data, size_t data_len, int consume_time) {
     pthread_cond_signal(&rec_cond);
     pthread_mutex_unlock(&rec_mutex);
   }
+
+#if ENABLE_TCP_OUTPUT
+  pthread_mutex_lock(&tcp_mutex);
+  av_write_frame(tcp_ctx, &pkt);
+  pthread_mutex_unlock(&tcp_mutex);
+#endif
 
   pthread_mutex_lock(&mutex_writing);
   ret = hls_write_packet(hls, &pkt, 0);
@@ -2331,6 +2352,24 @@ static void encode_and_send_audio() {
       pthread_mutex_unlock(&rec_mutex);
     }
 
+#if ENABLE_TCP_OUTPUT
+    // Setup AVPacket
+    AVPacket tcp_pkt;
+    av_init_packet(&tcp_pkt);
+    tcp_pkt.size = pkt.size;
+    tcp_pkt.data = av_malloc(pkt.size);
+    memcpy(tcp_pkt.data, pkt.data, pkt.size);
+    tcp_pkt.stream_index = pkt.stream_index;
+    tcp_pkt.pts = tcp_pkt.dts = pkt.pts;
+
+    // Send the AVPacket
+    pthread_mutex_lock(&tcp_mutex);
+    av_write_frame(tcp_ctx, &tcp_pkt);
+    pthread_mutex_unlock(&tcp_mutex);
+
+    av_free_packet(&tcp_pkt);
+#endif
+
     pthread_mutex_lock(&mutex_writing);
     ret = hls_write_packet(hls, &pkt, 0);
     pthread_mutex_unlock(&mutex_writing);
@@ -2621,7 +2660,26 @@ static void audio_loop_poll_mmap() {
   } // end of while loop (keepRunning)
 }
 
+#if ENABLE_TCP_OUTPUT
+static void setup_tcp_output() {
+  avformat_network_init();
+  tcp_ctx = mpegts_create_context(&codec_settings);
+  mpegts_open_stream(tcp_ctx, TCP_OUTPUT_DEST, 0);
+}
+
+static void teardown_tcp_output() {
+  mpegts_close_stream(tcp_ctx);
+  mpegts_destroy_context(tcp_ctx);
+  pthread_mutex_destroy(&tcp_mutex);
+}
+#endif
+
 int main(int argc, char **argv) {
+  codec_settings.audio_sample_rate = AUDIO_SAMPLE_RATE;
+  codec_settings.audio_bit_rate = AAC_BIT_RATE;
+  codec_settings.audio_channels = 1;
+  codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
+
   check_record_directory();
   state_set(STATE_DIR, "record", "false");
 
@@ -2632,6 +2690,10 @@ int main(int argc, char **argv) {
 
   fprintf(stderr, "setup_socks\n");
   setup_socks();
+
+#if ENABLE_TCP_OUTPUT
+  setup_tcp_output();
+#endif
 
 #if ENABLE_PREVIEW || ENABLE_CLOCK
   memset(tunnel, 0, sizeof(tunnel));
@@ -2664,11 +2726,6 @@ int main(int argc, char **argv) {
   }
 
   av_log_set_level(AV_LOG_INFO);
-
-  codec_settings.audio_sample_rate = AUDIO_SAMPLE_RATE;
-  codec_settings.audio_bit_rate = AAC_BIT_RATE;
-  codec_settings.audio_channels = 1;
-  codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
 
   if (!disable_audio_capturing) {
     fprintf(stderr, "open_audio_capture_device\n");
@@ -2800,6 +2857,10 @@ int main(int argc, char **argv) {
   pthread_mutex_destroy(&mutex_writing);
   pthread_mutex_destroy(&rec_mutex);
   pthread_mutex_destroy(&rec_write_mutex);
+
+#if ENABLE_TCP_OUTPUT
+  teardown_tcp_output();
+#endif
 
   teardown_socks();
 
