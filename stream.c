@@ -76,16 +76,11 @@ extern "C" {
 #include "httplivestreaming.h"
 #include "state.h"
 
-// Color for filling borders
-#define FILL_COLOR_Y 0
-#define FILL_COLOR_U 128
-#define FILL_COLOR_V 128
+// Audio-only stream is created if this is 1 (for debugging)
+#define AUDIO_ONLY 0
 
 // ALSA buffer size (frames) is multiplied by this number
 #define ALSA_BUFFER_MULTIPLY 20
-
-// Whether or not to enable video preview output
-#define ENABLE_PREVIEW 0
 
 // Whether or not to enable clock OMX component
 #define ENABLE_CLOCK 1
@@ -97,17 +92,29 @@ extern "C" {
 #define AUDIO_PTS_START 0
 #define VIDEO_PTS_START 0
 
-// Directory name for state files
-#define STATE_DIR "state"
-
-// Number of keyframes to be buffered for recording
-#define RECORD_BUFFER_KEYFRAMES 5
-
-// Whether or not to use encryption in HTTP Live Streaming
-#define ENABLE_HLS_ENCRYPTION 0
-
 // Internal flag indicates that audio is available for read
 #define AVAIL_AUDIO 2
+
+// Each video frame's PTS is incremented by this in normal condition
+// 90000 / 3014 = 29.860650299 FPS
+#define VIDEO_PTS_STEP 3014
+
+// If this value is increased, audio gets faster than video
+#define N_BUFFER_COUNT_ACTUAL 1
+
+// If this value is increased, video gets faster than audio
+#define AUDIO_BUFFER_CHUNKS 0
+
+// How much PTS difference between audio and video is
+// considered to be too large
+#define PTS_DIFF_TOO_LARGE 45000  // 90000 == 1 second
+
+// enum
+#define EXPOSURE_AUTO 0
+#define EXPOSURE_NIGHT 1
+
+// Number of packets to chase recording for each cycle
+#define REC_CHASE_PACKETS 10
 
 static int64_t video_current_pts = 0;
 static int64_t audio_current_pts = 0;
@@ -125,17 +132,7 @@ pts_mode_t pts_mode = PTS_SPEED_NORMAL;
 static int speed_up_count = 0;
 static int speed_down_count = 0;
 
-// Each video frame's PTS is incremented by this in normal condition
-// 90000 / 3014 = 29.860650299 FPS
-#define VIDEO_PTS_STEP 3014
-
 static int audio_pts_step_base;
-
-// If this value is increased, audio gets faster than video
-#define N_BUFFER_COUNT_ACTUAL 1
-
-// If this value is increased, video gets faster than audio
-#define AUDIO_BUFFER_CHUNKS 0
 
 #if AUDIO_BUFFER_CHUNKS > 0
 uint16_t *audio_buffer[AUDIO_BUFFER_CHUNKS];
@@ -143,19 +140,10 @@ int audio_buffer_index = 0;
 int is_audio_buffer_filled = 0;
 #endif
 
-#define PTS_DIFF_TOO_LARGE 45000  // 90000 == 1 second
-
 // If this value is 1, audio capturing is always disabled.
 static int disable_audio_capturing = 0;
 
 static pthread_t audio_nop_thread;
-
-// Whether or not to amplify audio
-#define ENABLE_AUDIO_AMPLIFICATION 0
-
-#define AUDIO_VOLUME_MULTIPLY 2.0
-#define AUDIO_MIN_VALUE -16384
-#define AUDIO_MAX_VALUE 16383
 
 static const int fr_q16 = (TARGET_FPS) * 65536;
 
@@ -197,42 +185,10 @@ static TUNNEL_T tunnel[4];
 static int n_tunnel = 0;
 #endif
 
-// Whether or not to enable auto exposure (day/night) mode
-#define USE_AUTO_EXPOSURE 0
-
-// enum
-#define EXPOSURE_AUTO 0
-#define EXPOSURE_NIGHT 1
-
-// When average Y goes below this number, the camera will go into night mode
-#define EXPOSURE_NIGHT_Y_THRESHOLD 40
-
-// When average Y goes above this number, the camera will go into day mode
-#define EXPOSURE_AUTO_Y_THRESHOLD 50
-
-// Number of packets to chase recording for each cycle
-#define REC_CHASE_PACKETS 10
-
-// UNIX domain sockets provided by node-rtsp-rtmp-server
-#define SOCK_PATH_VIDEO "/tmp/node_rtsp_rtmp_videoReceiver"
-#define SOCK_PATH_VIDEO_CONTROL "/tmp/node_rtsp_rtmp_videoControl"
-#define SOCK_PATH_AUDIO "/tmp/node_rtsp_rtmp_audioReceiver"
-#define SOCK_PATH_AUDIO_CONTROL "/tmp/node_rtsp_rtmp_audioControl"
-
-// Disable output to RTSP server via UNIX domain sockets
-#define DISABLE_UNIX_SOCKETS_OUTPUT 0  // default: 0
-// Enable MPEG-TS output via TCP socket
-#define ENABLE_TCP_OUTPUT 0 // default: 0
-// Where to send MPEG-TS stream if ENABLE_TCP_OUTPUT is 1
-#define TCP_OUTPUT_DEST "tcp://127.0.0.1:8181"
-
 #if ENABLE_TCP_OUTPUT
 static AVFormatContext *tcp_ctx;
 static pthread_mutex_t tcp_mutex = PTHREAD_MUTEX_INITIALIZER;
 #endif
-
-// Directory name for hooks files
-#define HOOKS_DIR "hooks"
 
 static int current_exposure_mode = EXPOSURE_AUTO;
 
@@ -273,12 +229,12 @@ static int channels = 1;
 static pthread_mutex_t mutex_writing = PTHREAD_MUTEX_INITIALIZER;
 
 // UNIX domain sockets
-#if !(DISABLE_UNIX_SOCKETS_OUTPUT)
+#if ENABLE_UNIX_SOCKETS_OUTPUT
 static int sockfd_video;
 static int sockfd_video_control;
 static int sockfd_audio;
 static int sockfd_audio_control;
-#endif // !(DISABLE_UNIX_SOCKETS_OUTPUT)
+#endif // ENABLE_UNIX_SOCKETS_OUTPUT
 
 static uint8_t *encbuf = NULL;
 static int encbuf_size = -1;
@@ -766,7 +722,7 @@ void on_file_create(char *filename, char *content) {
 
 // Send audio packet to node-rtsp-rtmp-server
 static void send_audio_control_info() {
-#if !(DISABLE_UNIX_SOCKETS_OUTPUT)
+#if ENABLE_UNIX_SOCKETS_OUTPUT
   int64_t logical_start_time = audio_start_time;
   uint8_t sendbuf[9] = {
     // header
@@ -786,12 +742,12 @@ static void send_audio_control_info() {
     exit(1);
   }
   fprintf(stderr, "audio control info sent: %lld\n", logical_start_time);
-#endif // !(DISABLE_UNIX_SOCKETS_OUTPUT)
+#endif // ENABLE_UNIX_SOCKETS_OUTPUT
 }
 
 // Send video packet to node-rtsp-rtmp-server
 static void send_video_control_info() {
-#if !(DISABLE_UNIX_SOCKETS_OUTPUT)
+#if ENABLE_UNIX_SOCKETS_OUTPUT
   int64_t logical_start_time = video_start_time;
   uint8_t sendbuf[9] = {
     // header
@@ -811,11 +767,11 @@ static void send_video_control_info() {
     exit(1);
   }
   fprintf(stderr, "video control info sent: %lld\n", logical_start_time);
-#endif // !(DISABLE_UNIX_SOCKETS_OUTPUT)
+#endif // ENABLE_UNIX_SOCKETS_OUTPUT
 }
 
 static void setup_socks() {
-#if !(DISABLE_UNIX_SOCKETS_OUTPUT)
+#if ENABLE_UNIX_SOCKETS_OUTPUT
   struct sockaddr_un remote_video;
   struct sockaddr_un remote_audio;
 
@@ -878,16 +834,16 @@ static void setup_socks() {
     exit(1);
   }
   fprintf(stderr, "audio_control server connected\n");
-#endif // !(DISABLE_UNIX_SOCKETS_OUTPUT)
+#endif // ENABLE_UNIX_SOCKETS_OUTPUT
 }
 
 static void teardown_socks() {
-#if !(DISABLE_UNIX_SOCKETS_OUTPUT)
+#if ENABLE_UNIX_SOCKETS_OUTPUT
   close(sockfd_video);
   close(sockfd_video_control);
   close(sockfd_audio);
   close(sockfd_audio_control);
-#endif // !(DISABLE_UNIX_SOCKETS_OUTPUT)
+#endif // ENABLE_UNIX_SOCKETS_OUTPUT
 }
 
 static int64_t get_next_audio_pts() {
@@ -978,7 +934,7 @@ static void print_audio_timing() {
 }
 
 static void send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts) {
-#if !(DISABLE_UNIX_SOCKETS_OUTPUT)
+#if ENABLE_UNIX_SOCKETS_OUTPUT
   int payload_size = databuflen - 1;  // -7(ADTS header) +6(pts)
   int total_size = payload_size + 3;  // more 3 bytes for payload length
   uint8_t *sendbuf = malloc(total_size);
@@ -1001,11 +957,11 @@ static void send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts) {
     exit(1);
   }
   free(sendbuf);
-#endif // !(DISABLE_UNIX_SOCKETS_OUTPUT)
+#endif // ENABLE_UNIX_SOCKETS_OUTPUT
 }
 
 static void send_video_frame(uint8_t *databuf, int databuflen, int64_t pts) {
-#if !(DISABLE_UNIX_SOCKETS_OUTPUT)
+#if ENABLE_UNIX_SOCKETS_OUTPUT
   int payload_size = databuflen + 2;  // -4(start code) +6(pts)
   int total_size = payload_size + 3;  // more 3 bytes for payload length
   uint8_t *sendbuf = malloc(total_size);
@@ -1027,7 +983,7 @@ static void send_video_frame(uint8_t *databuf, int databuflen, int64_t pts) {
     perror("send video error");
   }
   free(sendbuf);
-#endif // !(DISABLE_UNIX_SOCKETS_OUTPUT)
+#endif // ENABLE_UNIX_SOCKETS_OUTPUT
 }
 
 // send keyframe (nal_unit_type 5)
@@ -1551,7 +1507,7 @@ static void set_exposure_to_auto() {
   current_exposure_mode = EXPOSURE_AUTO;
 }
 
-#if USE_AUTO_EXPOSURE
+#if ENABLE_AUTO_EXPOSURE
 static void set_exposure_to_night() {
   OMX_CONFIG_EXPOSURECONTROLTYPE exposure_type;
   OMX_ERRORTYPE error;
@@ -2316,7 +2272,7 @@ static void encode_and_send_image() {
     }
   }
 
-#if USE_AUTO_EXPOSURE
+#if ENABLE_AUTO_EXPOSURE
   if (video_frame_count > 0 && video_frame_count % TARGET_FPS == 0) {
     auto_select_exposure(WIDTH, HEIGHT, last_video_buffer);
   }
@@ -2780,7 +2736,7 @@ int main(int argc, char **argv) {
   hls = hls_create(2, &codec_settings); // 2 == num_recent_files
 #endif
   fprintf(stderr, "hls created\n");
-  hls->dir = "/run/shm/video";
+  hls->dir = HLS_OUTPUT_DIR;
   hls->target_duration = 1;
   hls->num_retained_old_files = 10;
 #if ENABLE_HLS_ENCRYPTION
