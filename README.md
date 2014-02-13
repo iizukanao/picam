@@ -60,6 +60,8 @@ Then run the process:
     $ cd picam
     $ ./stream.bin
 
+Make sure that [node-rtsp-rtmp-server](https://github.com/iizukanao/node-rtsp-rtmp-server) is running before starting stream.bin.
+
 ### Recording
 
 #### Start recording
@@ -83,6 +85,33 @@ To unmute:
     $ touch hooks/unmute
 
 Recorded MPEG-TS file will go in `archive` directory.
+
+### Use with nginx-rtmp-module
+
+To use with [nginx-rtmp-module](https://github.com/arut/nginx-rtmp-module), make changes to the two constants in config.h like this:
+
+    #define ENABLE_UNIX_SOCKETS_OUTPUT 0
+    #define ENABLE_TCP_OUTPUT 1
+
+Run `make` to build stream.bin. Add the following lines to nginx.conf:
+
+    rtmp {
+        server {
+            listen 1935;
+            chunk_size 4000;
+            application webcam {
+                live on;
+
+                exec_static /path/to/ffmpeg -i tcp://127.0.0.1:8181?listen
+                                            -c:v copy -ar 44100 -ab 40000
+                                            -f flv rtmp://localhost:1935/webcam/mystream;
+            }
+        }
+    }
+
+Note that `/path/to/ffmpeg` should be replaced with the actual absolute path to ffmpeg command.
+
+Run nginx server, then start stream.bin. You can access the RTMP stream at `rtmp://YOUR_RASPBERRYPI_IP/webcam/mystream`.
 
 ### Recommended hardware
 
