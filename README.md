@@ -113,6 +113,10 @@ Note that `/path/to/ffmpeg` should be replaced with the actual absolute path to 
 
 Run nginx server, then start stream.bin. You can access the RTMP stream at `rtmp://YOUR_RASPBERRYPI_IP/webcam/mystream`.
 
+### HTTP Live Streaming
+
+HTTP Live Streaming files are generated in `/run/shm/video`. You can change the output directory by changing HLS_OUTPUT_DIR in `config.h`.
+
 ### Recommended hardware
 
 #### USB microphone
