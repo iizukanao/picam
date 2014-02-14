@@ -111,7 +111,7 @@ Run `make` to build stream.bin. Add the following lines to nginx.conf:
 
 Note that `/path/to/ffmpeg` should be replaced with the actual absolute path to ffmpeg command.
 
-Run nginx server, then start stream.bin. You can access the RTMP stream at `rtmp://YOUR_RASPBERRYPI_IP/webcam/mystream`.
+Start nginx server, then run stream.bin. You can access the RTMP stream at `rtmp://YOUR_RASPBERRYPI_IP/webcam/mystream`.
 
 ### HTTP Live Streaming
 
