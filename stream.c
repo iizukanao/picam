@@ -80,7 +80,7 @@ extern "C" {
 #define AUDIO_ONLY 0
 
 // ALSA buffer size (frames) is multiplied by this number
-#define ALSA_BUFFER_MULTIPLY 20
+#define ALSA_BUFFER_MULTIPLY 100
 
 // Whether or not to enable clock OMX component
 #define ENABLE_CLOCK 1
