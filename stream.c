@@ -2618,6 +2618,42 @@ static void teardown_tcp_output() {
 }
 #endif
 
+// Check if HLS_OUTPUT_DIR is accessible.
+// Also create HLS output directory if it doesn't exist.
+static void ensure_hls_dir_exists() {
+  struct stat st;
+  int err;
+
+  err = stat(HLS_OUTPUT_DIR, &st);
+  if (err == -1) {
+    if (errno == ENOENT) {
+      // create directory
+      if (mkdir(HLS_OUTPUT_DIR, 0755) == 0) { // success
+        fprintf(stderr, "created HLS output directory: %s\n", HLS_OUTPUT_DIR);
+      } else { // error
+        fprintf(stderr, "error creating HLS_OUTPUT_DIR (%s): %s\n",
+            HLS_OUTPUT_DIR, strerror(errno));
+        exit(1);
+      }
+    } else {
+      perror("stat error");
+      exit(1);
+    }
+  } else {
+    if (!S_ISDIR(st.st_mode)) {
+      fprintf(stderr, "HLS_OUTPUT_DIR (%s) is not a directory\n",
+          HLS_OUTPUT_DIR);
+      exit(1);
+    }
+  }
+
+  if (access(HLS_OUTPUT_DIR, R_OK) != 0) {
+    fprintf(stderr, "Can't access HLS_OUTPUT_DIR (%s): %s\n",
+        HLS_OUTPUT_DIR, strerror(errno));
+    exit(1);
+  }
+}
+
 int main(int argc, char **argv) {
   codec_settings.audio_sample_rate = AUDIO_SAMPLE_RATE;
   codec_settings.audio_bit_rate = AAC_BIT_RATE;
@@ -2625,6 +2661,7 @@ int main(int argc, char **argv) {
   codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
 
   check_record_directory();
+  ensure_hls_dir_exists();
   state_set(STATE_DIR, "record", "false");
 
   if (clear_hooks(HOOKS_DIR) != 0) {
