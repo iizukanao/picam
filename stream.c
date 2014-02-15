@@ -313,7 +313,6 @@ static void prepare_encoded_packets() {
   encoded_packets_size = TARGET_FPS * RECORD_BUFFER_KEYFRAMES * 2 +
     (audio_fps + 1) * RECORD_BUFFER_KEYFRAMES * 2 + 100;
 
-  fprintf(stderr, "prepare_encoded_packets: limit=%d\n", encoded_packets_size);
   int malloc_size = sizeof(EncodedPacket *) * encoded_packets_size;
   encoded_packets = malloc(malloc_size);
   if (encoded_packets == NULL) {
@@ -416,7 +415,6 @@ void setup_av_frame(AVFormatContext *format_ctx) {
 
   av_frame->sample_rate = audio_codec_ctx->sample_rate;
   av_frame->nb_samples = audio_codec_ctx->frame_size;
-  fprintf(stderr, "audio nb_samples: %d\n", av_frame->nb_samples);
   av_frame->format = audio_codec_ctx->sample_fmt;
   av_frame->channel_layout = audio_codec_ctx->channel_layout;
 
@@ -441,8 +439,6 @@ void setup_av_frame(AVFormatContext *format_ctx) {
   period_size = buffer_size / channels / sizeof(short);
   audio_pts_step_base = 90000.0 * period_size / AUDIO_SAMPLE_RATE;
   fprintf(stderr, "audio_pts_step_base: %d\n", audio_pts_step_base);
-  fprintf(stderr, "buffer_size=%d period_size=%d\n", buffer_size, period_size);
-  fprintf(stderr, "channels=%d frame_size=%d sample_fmt=%d buffer_size=%d period_size=%d sizeof(short)=%d\n", channels, audio_codec_ctx->frame_size, audio_codec_ctx->sample_fmt, buffer_size, period_size, sizeof(short));
 
   ret = avcodec_fill_audio_frame(av_frame, audio_codec_ctx->channels, audio_codec_ctx->sample_fmt,
       (const uint8_t*)samples, buffer_size, 0);
@@ -741,7 +737,6 @@ static void send_audio_control_info() {
     perror("send audio_control");
     exit(1);
   }
-  fprintf(stderr, "audio control info sent: %lld\n", logical_start_time);
 #endif // ENABLE_UNIX_SOCKETS_OUTPUT
 }
 
@@ -766,7 +761,6 @@ static void send_video_control_info() {
     perror("send video_control");
     exit(1);
   }
-  fprintf(stderr, "video control info sent: %lld\n", logical_start_time);
 #endif // ENABLE_UNIX_SOCKETS_OUTPUT
 }
 
@@ -778,6 +772,8 @@ static void setup_socks() {
   int len;
   struct sockaddr_un remote_video_control;
   struct sockaddr_un remote_audio_control;
+
+  fprintf(stderr, "connecting to UNIX domain sockets\n");
 
   // Setup sockfd_video
   if ((sockfd_video = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
@@ -791,7 +787,6 @@ static void setup_socks() {
     perror("Failed to connect to RTSP video socket (perhaps RTSP server is not running?)");
     exit(1);
   }
-  fprintf(stderr, "video server connected\n");
 
   // Setup sockfd_video_control
   if ((sockfd_video_control = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
@@ -805,7 +800,6 @@ static void setup_socks() {
     perror("connect video_control");
     exit(1);
   }
-  fprintf(stderr, "video control server connected\n");
 
   // Setup sockfd_audio
   if ((sockfd_audio = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
@@ -819,7 +813,6 @@ static void setup_socks() {
     perror("connect audio");
     exit(1);
   }
-  fprintf(stderr, "audio server connected\n");
 
   // Setup sockfd_audio_control
   if ((sockfd_audio_control = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
@@ -833,7 +826,6 @@ static void setup_socks() {
     perror("connect audio_control");
     exit(1);
   }
-  fprintf(stderr, "audio_control server connected\n");
 #endif // ENABLE_UNIX_SOCKETS_OUTPUT
 }
 
@@ -929,8 +921,8 @@ static void print_audio_timing() {
   // (cur_time - audio_start_time) * INT64_C(90000) / INT64_C(1000000000);
   int64_t clock_pts = (cur_time - audio_start_time) * 90000.0 / 1000000000.0;
 
-  fprintf(stderr, " vp=%lld ap=%lld a-v=%lld c-a=%lld u=%d d=%d\n",
-      video_pts, audio_pts, avdiff, clock_pts - audio_pts, speed_up_count, speed_down_count);
+  fprintf(stderr, " a-v=%lld c-a=%lld u=%d d=%d\n",
+      avdiff, clock_pts - audio_pts, speed_up_count, speed_down_count);
 }
 
 static void send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts) {
@@ -1297,19 +1289,7 @@ static int configure_audio_capture_device() {
     fprintf(stderr, "microphone: Failed to get rate (%s)\n", snd_strerror(err));
     exit(1);
   }
-  fprintf(stderr, "actual rate=%u dir=%d\n", actual_rate, actual_dir);
-
-  if ((err = snd_pcm_hw_params_get_rate_max(hw_params, &actual_rate, &actual_dir)) < 0) {
-    fprintf(stderr, "microphone: Failed to get rate max (%s)\n", snd_strerror(err));
-    exit(1);
-  }
-  fprintf(stderr, "max rate=%u dir=%d\n", actual_rate, actual_dir);
-
-  if ((err = snd_pcm_hw_params_get_rate_min(hw_params, &actual_rate, &actual_dir)) < 0) {
-    fprintf(stderr, "microphone: Failed to get rate min (%s)\n", snd_strerror(err));
-    exit(1);
-  }
-  fprintf(stderr, "min rate=%u dir=%d\n", actual_rate, actual_dir);
+  fprintf(stderr, "actual sample rate=%u dir=%d\n", actual_rate, actual_dir);
 
   // set the number of channels
   if ((err = snd_pcm_hw_params_set_channels (capture_handle, hw_params, channels)) < 0) {
@@ -1347,7 +1327,7 @@ static int configure_audio_capture_device() {
         snd_strerror (err));
     exit(1);
   }
-  fprintf(stderr, "actual_period_size: %lu\n", actual_period_size);
+  fprintf(stderr, "actual_period_size=%lu dir=%d\n", actual_period_size, dir);
 
   // apply the hardware configuration
   if ((err = snd_pcm_hw_params (capture_handle, hw_params)) < 0) {
@@ -1394,10 +1374,7 @@ static void teardown_audio_encode() {
   int got_output, i, ret;
   AVPacket pkt;
 
-  fprintf(stderr, "teardown_audio\n");
-
   // get the delayed frames
-  fprintf(stderr, "waiting for the delayed frames\n");
   for (got_output = 1; got_output; i++) {
     av_init_packet(&pkt);
     pkt.data = NULL; // packet data will be allocated by the encoder
@@ -1408,7 +1385,6 @@ static void teardown_audio_encode() {
       fprintf(stderr, "Error encoding frame\n");
       exit(1);
     }
-    fprintf(stderr, "ret=%d got_output=%d\n", ret, got_output);
     av_free_packet(&pkt);
   }
 
@@ -1438,7 +1414,7 @@ static int timespec_subtract(struct timespec *result, struct timespec *t2, struc
 
 void stopSignalHandler(int signo) {
   keepRunning = 0;
-  fprintf(stderr, "[%d] stop requested\n", signo);
+  fprintf(stderr, "stop requested (signal=%d)\n", signo);
 }
 
 static void shutdown_video() {
@@ -1450,7 +1426,6 @@ static void shutdown_video() {
 
 static void shutdown_openmax() {
 #if ENABLE_PREVIEW || ENABLE_CLOCK
-  fprintf(stderr, "flush_tunnels\n");
   ilclient_flush_tunnels(tunnel, 0);
 #endif
 
@@ -1496,7 +1471,7 @@ static void set_exposure_to_auto() {
   exposure_type.nPortIndex = OMX_ALL;
   exposure_type.eExposureControl = OMX_ExposureControlAuto;
 
-  fprintf(stderr, "set to auto exposure mode\n");
+  fprintf(stderr, "exposure mode: auto\n");
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexConfigCommonExposure, &exposure_type);
   if (error != OMX_ErrorNone) {
@@ -1518,7 +1493,7 @@ static void set_exposure_to_night() {
   exposure_type.nPortIndex = OMX_ALL;
   exposure_type.eExposureControl = OMX_ExposureControlNight;
 
-  fprintf(stderr, "set to night exposure mode\n");
+  fprintf(stderr, "exposure mode: night\n");
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexConfigCommonExposure, &exposure_type);
   if (error != OMX_ErrorNone) {
@@ -1600,7 +1575,6 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
             video_start_time = audio_start_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
             send_audio_control_info();
             send_video_control_info();
-            fprintf(stderr, "audio/video start_time (V): tv_sec=%lld tv_nsec=%lld\n", (long long)ts.tv_sec, (long long)ts.tv_nsec);
           }
         }
 
@@ -1614,8 +1588,6 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
             previous_previous_capture_frame = previous_capture_frame;
             previous_capture_frame = video_frame_count;
           }
-        } else {
-          fprintf(stderr, "audio recording is not started yet\n");
         }
       } else {
         fprintf(stderr, "\nNot an end of a frame\n");
@@ -1683,9 +1655,7 @@ static int openmax_cam_open() {
     exit(1);
   }
 
-  // Port 71
-  fprintf(stderr, "portdefinition 71\n");
-
+  // Configure port 71
   cam_def.format.video.nFrameWidth = WIDTH;
   cam_def.format.video.nFrameHeight = HEIGHT;
 
@@ -1712,7 +1682,7 @@ static int openmax_cam_open() {
     exit(1);
   }
 
-  fprintf(stderr, "framerate\n");
+  // Set frame rate
   memset(&framerate, 0, sizeof(OMX_CONFIG_FRAMERATETYPE));
   framerate.nSize = sizeof(OMX_CONFIG_FRAMERATETYPE);
   framerate.nVersion.nVersion = OMX_VERSION;
@@ -1727,7 +1697,7 @@ static int openmax_cam_open() {
     exit(1);
   }
 
-  fprintf(stderr, "timestamp\n");
+  // Set timestamp mode (unnecessary?)
   memset(&timestamp_mode, 0, sizeof(OMX_PARAM_TIMESTAMPMODETYPE));
   timestamp_mode.nSize = sizeof(OMX_PARAM_TIMESTAMPMODETYPE);
   timestamp_mode.nVersion.nVersion = OMX_VERSION;
@@ -1743,7 +1713,7 @@ static int openmax_cam_open() {
 
   set_exposure_to_auto();
 
-  fprintf(stderr, "capture to idle...\n");
+  // Set camera component to idle state
   if (ilclient_change_component_state(camera_component, OMX_StateIdle) == -1) {
     fprintf
       (stderr, "%s:%d: ilclient_change_component_state(camera_component, OMX_StateIdle) failed\n",
@@ -1762,7 +1732,7 @@ static int openmax_cam_open() {
   }
   component_list[n_component_list++] = clock_component;
 
-  fprintf(stderr, "clock state\n");
+  // Set clock state
   OMX_TIME_CONFIG_CLOCKSTATETYPE clock_state;
   memset(&clock_state, 0, sizeof(OMX_TIME_CONFIG_CLOCKSTATETYPE));
   clock_state.nSize = sizeof(OMX_TIME_CONFIG_CLOCKSTATETYPE);
@@ -1848,12 +1818,12 @@ static int openmax_cam_open() {
 #endif
 
 #if ENABLE_PREVIEW
-  fprintf(stderr, "render to executing...\n");
+  // Set render component to executing state
   ilclient_change_component_state(render_component, OMX_StateExecuting);
 #endif
 
 #if ENABLE_CLOCK
-  fprintf(stderr, "clock to executing...\n");
+  // Set clock component to executing state
   ilclient_change_component_state(clock_component, OMX_StateExecuting);
 #endif
 
@@ -1876,7 +1846,7 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
     return 0;
   }
   if (encbuf != NULL) {
-    fprintf(stderr, "m(%d,%d)", out->nFlags, out->nFilledLen + encbuf_size);
+    // merge the previous buffer
     concat_buf = realloc(encbuf, encbuf_size + out->nFilledLen);
     if (concat_buf == NULL) {
       fprintf(stderr, "Can't allocate concat_buf; size=%d\n", encbuf_size + out->nFilledLen);
@@ -1890,9 +1860,10 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
     buf = out->pBuffer;
     buf_len = out->nFilledLen;
   }
-  if (!(out->nFlags & OMX_BUFFERFLAG_ENDOFFRAME) && !(out->nFlags & OMX_BUFFERFLAG_CODECCONFIG)) { // incomplete buffer
+  if (!(out->nFlags & OMX_BUFFERFLAG_ENDOFFRAME) &&
+      !(out->nFlags & OMX_BUFFERFLAG_CODECCONFIG)) {
+    // There is remaining buffer for the current frame
     nal_unit_type = buf[4] & 0x1f;
-    fprintf(stderr, "~(%d,%d,%d,%d)", out->nFlags, nal_unit_type, out->nFilledLen, buf_len);
     encbuf_size = buf_len;
     if (concat_buf != NULL) {
       encbuf = concat_buf;
@@ -1979,8 +1950,7 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
             fps = 1 / divisor;
           }
           keyframes_count++;
-          fprintf(stderr, " v=%d a=%d (%5.2f fps) k=%d",
-              frame_count, current_audio_frames, fps, keyframes_count);
+          fprintf(stderr, " %5.2f fps k=%d", fps, keyframes_count);
           print_audio_timing();
           current_audio_frames = 0;
           frame_count = 0;
@@ -2063,7 +2033,6 @@ static int video_encode_startup() {
   // See http://www.khronos.org/files/openmax_il_spec_1_0.pdf for details.
   portdef.format.video.eColorFormat = OMX_COLOR_FormatYUV420PackedPlanar;
 
-  fprintf(stderr, "portdefinition\n");
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamPortDefinition, &portdef);
   if (error != OMX_ErrorNone) {
@@ -2086,10 +2055,9 @@ static int video_encode_startup() {
     exit(1);
   }
 
-  // Port 201
+  // Configure port 201
   portdef_201.nBufferCountActual = N_BUFFER_COUNT_ACTUAL;
 
-  fprintf(stderr, "portdefinition 201\n");
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamPortDefinition, &portdef_201);
   if (error != OMX_ErrorNone) {
@@ -2099,7 +2067,6 @@ static int video_encode_startup() {
     exit(1);
   }
 
-  fprintf(stderr, "portformat\n");
   memset(&format, 0, sizeof(OMX_VIDEO_PARAM_PORTFORMATTYPE));
   format.nSize = sizeof(OMX_VIDEO_PARAM_PORTFORMATTYPE);
   format.nVersion.nVersion = OMX_VERSION;
@@ -2152,7 +2119,7 @@ static int video_encode_startup() {
   avctype.bEntropyCodingCABAC = OMX_FALSE;  // FALSE is required by BP
 //  avctype.nWeightedBipredicitonMode = 0;    // not sure
 
-  fprintf(stderr, "videoavc\n");
+  // Set AVC parameter
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamVideoAvc, &avctype);
   if (error != OMX_ErrorNone) {
@@ -2170,7 +2137,7 @@ static int video_encode_startup() {
   bitrate_type.eControlRate = OMX_Video_ControlRateVariable; // TODO: Is this OK?
   bitrate_type.nTargetBitrate = H264_BIT_RATE; // in bits per second
 
-  fprintf(stderr, "bitrate\n");
+  // Set bitrate
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamVideoBitrate, &bitrate_type);
   if (error != OMX_ErrorNone) {
@@ -2186,7 +2153,6 @@ static int video_encode_startup() {
   boolean_type.nVersion.nVersion = OMX_VERSION;
   boolean_type.bEnabled = 1;
 
-  fprintf(stderr, "nalseparate\n");
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamBrcmNALSSeparate, &boolean_type);
   if (error != OMX_ErrorNone) {
@@ -2196,35 +2162,35 @@ static int video_encode_startup() {
     exit(1);
   }
 
-  fprintf(stderr, "encode to idle...\n");
+  // Set video_encode component to idle state
   if (ilclient_change_component_state(video_encode, OMX_StateIdle) == -1) {
     fprintf
       (stderr, "%s:%d: ilclient_change_component_state(video_encode, OMX_StateIdle) failed\n",
        __FUNCTION__, __LINE__);
   }
 
-  fprintf(stderr, "enabling port buffers for 71...\n");
+  // Enable port buffers for port 71
   if (ilclient_enable_port_buffers(camera_component, 71, NULL, NULL, NULL) != 0) {
     fprintf(stderr, "enabling port buffers for 71 failed!\n");
     exit(1);
   }
 
-  fprintf(stderr, "enabling port buffers for 200...\n");
+  // Enable port buffers for port 200
   if (ilclient_enable_port_buffers(video_encode, 200, NULL, NULL, NULL) != 0) {
     fprintf(stderr, "enabling port buffers for 200 failed!\n");
     exit(1);
   }
 
-  fprintf(stderr, "enabling port buffers for 201...\n");
+  // Enable port buffers for port 201
   if (ilclient_enable_port_buffers(video_encode, 201, NULL, NULL, NULL) != 0) {
     fprintf(stderr, "enabling port buffers for 201 failed!\n");
     exit(1);
   }
 
-  fprintf(stderr, "camera to executing...\n");
+  // Set camera component to executing state
   ilclient_change_component_state(camera_component, OMX_StateExecuting);
 
-  fprintf(stderr, "encode to executing...\n");
+  // Set video_encode component to executing state
   ilclient_change_component_state(video_encode, OMX_StateExecuting);
 
   return 0;
@@ -2267,8 +2233,8 @@ static void encode_and_send_image() {
 
     if (out->nFlags & OMX_BUFFERFLAG_ENDOFFRAME) {
       break;
-    } else {
-      fprintf(stderr, "T(%d)", out->nFlags);
+      // If out->nFlags doesn't have ENDOFFRAME,
+      // there is remaining buffer for this frame.
     }
   }
 
@@ -2513,7 +2479,6 @@ static void start_openmax_capturing() {
   }
 
 #if ENABLE_CLOCK
-  fprintf(stderr, "start_openmax_clock\n");
   start_openmax_clock();
 #endif
 }
@@ -2524,16 +2489,13 @@ static void openmax_cam_loop() {
 
   start_openmax_capturing();
 
-  fprintf(stderr, "ilclient_get_output_buffer\n");
+  fprintf(stderr, "waiting for the first video buffer\n");
   out = ilclient_get_output_buffer(camera_component, 71, 1);
 
-  fprintf(stderr, "FillThisBuffer\n");
   error = OMX_FillThisBuffer(ILC_GET_HANDLE(camera_component), out);
   if (error != OMX_ErrorNone) {
     fprintf(stderr, "Error filling buffer (camera-1): %x\n", error);
   }
-
-  fprintf(stderr, "end of openmax_cam_loop\n");
 }
 
 void *video_thread_loop() {
@@ -2577,7 +2539,6 @@ static void audio_loop_poll_mmap() {
 
   while (keepRunning) {
     if (is_first_audio) {
-      fprintf(stderr, "is_first_audio\n");
       read_audio_poll_mmap();
       // We ignore the first audio frame.
       // Because there is always a big delay after
@@ -2617,7 +2578,6 @@ static void audio_loop_poll_mmap() {
             video_start_time = audio_start_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
             send_audio_control_info();
             send_video_control_info();
-            fprintf(stderr, "audio/video start_time (A): tv_sec=%lld tv_nsec=%lld\n", (long long)ts.tv_sec, (long long)ts.tv_nsec);
           }
         }
         if (is_video_recording_started == 1) {
@@ -2630,8 +2590,6 @@ static void audio_loop_poll_mmap() {
             }
             encode_and_send_audio();
           }
-        } else {
-          fprintf(stderr, "video recording is not started yet\n");
         }
       }
     }
@@ -2666,7 +2624,6 @@ int main(int argc, char **argv) {
   }
   start_watching_hooks(&hooks_thread, HOOKS_DIR, on_file_create, 1);
 
-  fprintf(stderr, "setup_socks\n");
   setup_socks();
 
 #if ENABLE_TCP_OUTPUT
@@ -2678,10 +2635,8 @@ int main(int argc, char **argv) {
 #endif
 
   int ret;
-  fprintf(stderr, "bcm_host_init\n");
   bcm_host_init();
 
-  fprintf(stderr, "OMX_Init\n");
   ret = OMX_Init();
   if (ret != OMX_ErrorNone) {
     fprintf(stderr, "OMX_Init failed with error code: 0x%x\n", ret);
@@ -2690,13 +2645,11 @@ int main(int argc, char **argv) {
   }
   memset(component_list, 0, sizeof(component_list));
 
-  fprintf(stderr, "openmax_cam_open\n");
   ret = openmax_cam_open();
   if (ret != 0) {
     fprintf(stderr, "openmax_cam_open failed: %d\n", ret);
     return ret;
   }
-  fprintf(stderr, "video_encode_startup\n");
   ret = video_encode_startup();
   if (ret != 0) {
     fprintf(stderr, "video_encode_startup failed: %d\n", ret);
@@ -2706,7 +2659,6 @@ int main(int argc, char **argv) {
   av_log_set_level(AV_LOG_INFO);
 
   if (!disable_audio_capturing) {
-    fprintf(stderr, "open_audio_capture_device\n");
     ret = open_audio_capture_device();
     if (ret == -1) {
       fprintf(stderr, "### WARNING: audio device is not available ###\n");
@@ -2721,8 +2673,6 @@ int main(int argc, char **argv) {
     codec_settings.audio_bit_rate = 1000;
   }
 
-  fprintf(stderr, "setup hls\n");
-
   // From http://tools.ietf.org/html/draft-pantos-http-live-streaming-12#section-6.2.1
   //
   // The server MUST NOT remove a media segment from the Playlist file if
@@ -2735,7 +2685,6 @@ int main(int argc, char **argv) {
 #else
   hls = hls_create(2, &codec_settings); // 2 == num_recent_files
 #endif
-  fprintf(stderr, "hls created\n");
   hls->dir = HLS_OUTPUT_DIR;
   hls->target_duration = 1;
   hls->num_retained_old_files = 10;
@@ -2775,14 +2724,12 @@ int main(int argc, char **argv) {
   memcpy(hls->encryption_iv, tmp_iv, 16);
 #endif
 
-  fprintf(stderr, "setup_av_frame\n");
   setup_av_frame(hls->format_ctx);
 
   if (disable_audio_capturing) {
     memset(samples, 0, period_size * sizeof(short) * channels);
     is_audio_recording_started = 1;
   } else {
-    fprintf(stderr, "configure_audio_capture_device\n");
     ret = configure_audio_capture_device();
     if (ret != 0) {
       fprintf(stderr, "configure_audio_capture_device error: ret=%d\n", ret);
@@ -2790,17 +2737,12 @@ int main(int argc, char **argv) {
     }
   }
 
-  fprintf(stderr, "prepare_encoded_packets\n");
   prepare_encoded_packets();
 
-  fprintf(stderr, "open_cam\n");
-
-  fprintf(stderr, "setup signals\n");
   struct sigaction int_handler = {.sa_handler = stopSignalHandler};
   sigaction(SIGINT, &int_handler, NULL);
   sigaction(SIGTERM, &int_handler, NULL);
 
-  fprintf(stderr, "openmax_cam_loop start\n");
   openmax_cam_loop();
 
   if (disable_audio_capturing) {
@@ -2809,7 +2751,6 @@ int main(int argc, char **argv) {
     pthread_join(audio_nop_thread, NULL);
     fprintf(stderr, "audio_nop_thread has exited\n");
   } else {
-    fprintf(stderr, "audio_loop_poll_mmap\n");
     audio_loop_poll_mmap();
   }
 
@@ -2829,7 +2770,6 @@ int main(int argc, char **argv) {
     teardown_audio_capture_device();
   }
 
-  fprintf(stderr, "hls_destroy\n");
   hls_destroy(hls);
 
   pthread_mutex_destroy(&mutex_writing);
@@ -2842,11 +2782,9 @@ int main(int argc, char **argv) {
 
   teardown_socks();
 
-  fprintf(stderr, "free_encoded_packets\n");
   free_encoded_packets();
 
   stop_watching_hooks();
-  fprintf(stderr, "waiting for hooks_thread to exit\n");
   pthread_join(hooks_thread, NULL);
 
   fprintf(stderr, "shutdown successful\n");
