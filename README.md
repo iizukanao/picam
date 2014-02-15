@@ -51,12 +51,6 @@ On a Raspberry Pi, issue the following command:
 
 ### Starting the process
 
-Create the output directory for HTTP Live Streaming:
-
-    $ mkdir /run/shm/video
-
-Then run the process:
-
     $ cd picam
     $ ./stream.bin
 
