@@ -784,7 +784,9 @@ static void setup_socks() {
   strcpy(remote_video.sun_path, SOCK_PATH_VIDEO);
   len = strlen(remote_video.sun_path) + sizeof(remote_video.sun_family);
   if (connect(sockfd_video, (struct sockaddr *)&remote_video, len) == -1) {
-    perror("Failed to connect to RTSP video socket (perhaps RTSP server is not running?)");
+    fprintf(stderr, "failed to connect to video socket (%s): %s\n"
+        "perhaps RTSP server is not running?\n",
+        SOCK_PATH_VIDEO, strerror(errno));
     exit(1);
   }
 
@@ -797,7 +799,9 @@ static void setup_socks() {
   strcpy(remote_video_control.sun_path, SOCK_PATH_VIDEO_CONTROL);
   len = strlen(remote_video_control.sun_path) + sizeof(remote_video_control.sun_family);
   if (connect(sockfd_video_control, (struct sockaddr *)&remote_video_control, len) == -1) {
-    perror("connect video_control");
+    fprintf(stderr, "failed to connect to video_control socket (%s): %s\n"
+        "perhaps RTSP server is not running?\n",
+        SOCK_PATH_VIDEO_CONTROL, strerror(errno));
     exit(1);
   }
 
@@ -810,7 +814,9 @@ static void setup_socks() {
   strcpy(remote_audio.sun_path, SOCK_PATH_AUDIO);
   len = strlen(remote_audio.sun_path) + sizeof(remote_audio.sun_family);
   if (connect(sockfd_audio, (struct sockaddr *)&remote_audio, len) == -1) {
-    perror("connect audio");
+    fprintf(stderr, "failed to connect to audio socket (%s): %s\n"
+        "perhaps RTSP server is not running?\n",
+        SOCK_PATH_AUDIO, strerror(errno));
     exit(1);
   }
 
@@ -823,7 +829,9 @@ static void setup_socks() {
   strcpy(remote_audio_control.sun_path, SOCK_PATH_AUDIO_CONTROL);
   len = strlen(remote_audio_control.sun_path) + sizeof(remote_audio_control.sun_family);
   if (connect(sockfd_audio_control, (struct sockaddr *)&remote_audio_control, len) == -1) {
-    perror("connect audio_control");
+    fprintf(stderr, "failed to connect to audio_control socket (%s): %s\n"
+        "perhaps RTSP server is not running?\n",
+        SOCK_PATH_AUDIO_CONTROL, strerror(errno));
     exit(1);
   }
 #endif // ENABLE_UNIX_SOCKETS_OUTPUT
@@ -1286,7 +1294,7 @@ static int configure_audio_capture_device() {
   unsigned int actual_rate;
   int actual_dir;
   if ((err = snd_pcm_hw_params_get_rate(hw_params, &actual_rate, &actual_dir)) < 0) {
-    fprintf(stderr, "microphone: Failed to get rate (%s)\n", snd_strerror(err));
+    fprintf(stderr, "microphone: failed to get rate (%s)\n", snd_strerror(err));
     exit(1);
   }
   fprintf(stderr, "actual sample rate=%u dir=%d\n", actual_rate, actual_dir);
@@ -1300,14 +1308,14 @@ static int configure_audio_capture_device() {
 
   // set the buffer size
   if ( (err = snd_pcm_hw_params_set_buffer_size(capture_handle, hw_params, buffer_size * ALSA_BUFFER_MULTIPLY)) < 0) {
-    fprintf (stderr, "microphone: Failed to set buffer size (%s)\n",
+    fprintf (stderr, "microphone: failed to set buffer size (%s)\n",
         snd_strerror (err));
     exit(1);
   }
 
   // check the value of the buffer size
   if ( (err = snd_pcm_hw_params_get_buffer_size(hw_params, &real_buffer_size)) < 0) {
-    fprintf (stderr, "microphone: Failed to get buffer size (%s)\n",
+    fprintf (stderr, "microphone: failed to get buffer size (%s)\n",
         snd_strerror (err));
     exit(1);
   }
@@ -1382,7 +1390,7 @@ static void teardown_audio_encode() {
 
     ret = avcodec_encode_audio2(ctx, &pkt, NULL, &got_output);
     if (ret < 0) {
-      fprintf(stderr, "Error encoding frame\n");
+      fprintf(stderr, "error encoding frame\n");
       exit(1);
     }
     av_free_packet(&pkt);
@@ -1604,7 +1612,7 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
   if (keepRunning) {
     error = OMX_FillThisBuffer(ILC_GET_HANDLE(camera_component), out);
     if (error != OMX_ErrorNone) {
-      fprintf(stderr, "Error filling buffer (camera-2): %x\n", error);
+      fprintf(stderr, "error filling buffer (camera-2): %x\n", error);
     }
   } else {
     shutdown_openmax();
@@ -2213,7 +2221,7 @@ static void encode_and_send_image() {
   // OMX_EmptyThisBuffer takes 22000-27000 usec at 1920x1080
   error = OMX_EmptyThisBuffer(ILC_GET_HANDLE(video_encode), buf);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "Error emptying buffer: %x\n", error);
+    fprintf(stderr, "error emptying buffer: %x\n", error);
   }
 
   out = ilclient_get_output_buffer(video_encode, 201, 1);
@@ -2221,7 +2229,7 @@ static void encode_and_send_image() {
   while (1) {
     error = OMX_FillThisBuffer(ILC_GET_HANDLE(video_encode), out);
     if (error != OMX_ErrorNone) {
-      fprintf(stderr, "Error filling buffer (video_encode-4): %x\n", error);
+      fprintf(stderr, "error filling buffer (video_encode-4): %x\n", error);
     }
 
     if (out->nFilledLen > 0) {
@@ -2262,7 +2270,7 @@ static void encode_and_send_audio() {
   // encode the samples
   ret = avcodec_encode_audio2(ctx, &pkt, av_frame, &got_output);
   if (ret < 0) {
-    fprintf(stderr, "Error encoding audio frame\n");
+    fprintf(stderr, "error encoding audio frame\n");
     exit(1);
   }
   if (got_output) {
@@ -2494,7 +2502,7 @@ static void openmax_cam_loop() {
 
   error = OMX_FillThisBuffer(ILC_GET_HANDLE(camera_component), out);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "Error filling buffer (camera-1): %x\n", error);
+    fprintf(stderr, "error filling buffer (camera-1): %x\n", error);
   }
 }
 
