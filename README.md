@@ -80,9 +80,9 @@ To unmute:
 
 Recorded MPEG-TS file will go in `archive` directory.
 
-### Use with nginx-rtmp-module
+### Using picam in combination with nginx-rtmp-module
 
-To use with [nginx-rtmp-module](https://github.com/arut/nginx-rtmp-module), make changes to the two constants in config.h like this:
+To use picam with [nginx-rtmp-module](https://github.com/arut/nginx-rtmp-module), make changes to the two constants in config.h like this:
 
     #define ENABLE_UNIX_SOCKETS_OUTPUT 0
     #define ENABLE_TCP_OUTPUT 1
