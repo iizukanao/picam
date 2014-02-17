@@ -29,6 +29,9 @@ extern "C" {
 // Audio (AAC LC) bitrate in bits per second
 #define AAC_BIT_RATE 40000  // 40 Kbps
 
+// Enable HTTP Live Streaming output or not
+#define ENABLE_HLS_OUTPUT  1  // default: 1
+
 // Output directory for HTTP Live Streaming files
 #define HLS_OUTPUT_DIR  "/run/shm/video"
 

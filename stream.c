@@ -205,9 +205,10 @@ static int n_codec_configs = 0;
 static struct timespec tsBegin = { .tv_sec = 0, .tv_nsec = 0 };
 
 static AVFormatContext *rec_format_ctx;
-static HTTPLiveStreaming *hls;
 static int flush_recording_seconds = 5; // Flush recording data every 5 seconds
 static time_t rec_start_time;
+
+static HTTPLiveStreaming *hls;
 
 // NAL unit type 9
 static uint8_t access_unit_delimiter[] = {
@@ -1062,6 +1063,7 @@ static int send_keyframe(uint8_t *data, size_t data_len, int consume_time) {
   pthread_mutex_unlock(&tcp_mutex);
 #endif
 
+#if ENABLE_HLS_OUTPUT
   pthread_mutex_lock(&mutex_writing);
   int split;
   if (video_frame_count == 1) {
@@ -1075,6 +1077,7 @@ static int send_keyframe(uint8_t *data, size_t data_len, int consume_time) {
     fprintf(stderr, "keyframe write error (hls): %d\n", ret);
     fprintf(stderr, "Check if the filesystem is not full\n");
   }
+#endif // ENABLE_HLS_OUTPUT
 
   free(buf);
   av_free_packet(&pkt);
@@ -1142,6 +1145,7 @@ static int send_pframe(uint8_t *data, size_t data_len, int consume_time) {
   pthread_mutex_unlock(&tcp_mutex);
 #endif
 
+#if ENABLE_HLS_OUTPUT
   pthread_mutex_lock(&mutex_writing);
   ret = hls_write_packet(hls, &pkt, 0);
   pthread_mutex_unlock(&mutex_writing);
@@ -1149,6 +1153,7 @@ static int send_pframe(uint8_t *data, size_t data_len, int consume_time) {
     fprintf(stderr, "P frame write error (hls): %d\n", ret);
     fprintf(stderr, "Check if the filesystem is not full\n");
   }
+#endif // ENABLE_HLS_OUTPUT
 
   free(buf);
   av_free_packet(&pkt);
@@ -2322,6 +2327,7 @@ static void encode_and_send_audio() {
     av_free_packet(&tcp_pkt);
 #endif
 
+#if ENABLE_HLS_OUTPUT
     pthread_mutex_lock(&mutex_writing);
     ret = hls_write_packet(hls, &pkt, 0);
     pthread_mutex_unlock(&mutex_writing);
@@ -2329,6 +2335,8 @@ static void encode_and_send_audio() {
       fprintf(stderr, "audio frame write error (hls): %d\n", ret);
       fprintf(stderr, "Check if the filesystem is not full\n");
     }
+#endif // ENABLE_HLS_OUTPUT
+
     av_free_packet(&pkt);
 
     current_audio_frames++;
@@ -2618,6 +2626,7 @@ static void teardown_tcp_output() {
 }
 #endif
 
+#if ENABLE_HLS_OUTPUT
 // Check if HLS_OUTPUT_DIR is accessible.
 // Also create HLS output directory if it doesn't exist.
 static void ensure_hls_dir_exists() {
@@ -2653,6 +2662,7 @@ static void ensure_hls_dir_exists() {
     exit(1);
   }
 }
+#endif // ENABLE_HLS_OUTPUT
 
 int main(int argc, char **argv) {
   codec_settings.audio_sample_rate = AUDIO_SAMPLE_RATE;
@@ -2661,7 +2671,11 @@ int main(int argc, char **argv) {
   codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
 
   check_record_directory();
+
+#if ENABLE_HLS_OUTPUT
   ensure_hls_dir_exists();
+#endif // ENABLE_HLS_OUTPUT
+
   state_set(STATE_DIR, "record", "false");
 
   if (clear_hooks(HOOKS_DIR) != 0) {
@@ -2730,6 +2744,8 @@ int main(int argc, char **argv) {
 #else
   hls = hls_create(2, &codec_settings); // 2 == num_recent_files
 #endif
+
+#if ENABLE_HLS_OUTPUT
   hls->dir = HLS_OUTPUT_DIR;
   hls->target_duration = 1;
   hls->num_retained_old_files = 10;
@@ -2767,7 +2783,8 @@ int main(int argc, char **argv) {
     0x09, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16
   };
   memcpy(hls->encryption_iv, tmp_iv, 16);
-#endif
+#endif // ENABLE_HLS_ENCRYPTION
+#endif // ENABLE_HLS_OUTPUT
 
   setup_av_frame(hls->format_ctx);
 
