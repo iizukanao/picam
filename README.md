@@ -109,7 +109,9 @@ Start nginx server, then run stream.bin. You can access the RTMP stream at `rtmp
 
 ### HTTP Live Streaming
 
-HTTP Live Streaming files are generated in `/run/shm/video`. You can change the output directory by changing HLS_OUTPUT_DIR in `config.h`.
+HTTP Live Streaming files are generated in `/run/shm/video`. You can change the output directory by changing `HLS_OUTPUT_DIR` in config.h.
+
+If you want to turn off HTTP Live Streaming, set `ENABLE_HLS_OUTPUT` to 0 in config.h.
 
 ### Recommended hardware
 
