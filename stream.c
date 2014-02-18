@@ -16,24 +16,24 @@ extern "C" {
 #include <string.h>
 #include <assert.h>
 #include <signal.h>
-#include <fcntl.h>              /* low-level i/o */
+#include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+#include <math.h>
+#include <pthread.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/time.h>
 #include <sys/mman.h>
 #include <sys/ioctl.h>
 #include <sys/statvfs.h>
-#include <math.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <linux/videodev2.h>
 #include <alsa/asoundlib.h>
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
 #include <libavutil/mathematics.h>
-#include <sys/socket.h>
-#include <sys/un.h>
-#include <pthread.h>
 
 #include "bcm_host.h"
 #include "ilclient.h"
@@ -84,15 +84,23 @@ extern "C" {
 // Number of packets to chase recording for each cycle
 #define REC_CHASE_PACKETS 10
 
-static int64_t video_current_pts = 0;
-static int64_t audio_current_pts = 0;
-
 // Pace of PTS
 typedef enum {
   PTS_SPEED_NORMAL,
   PTS_SPEED_UP,
   PTS_SPEED_DOWN,
 } pts_mode_t;
+
+typedef struct EncodedPacket {
+  int64_t pts;
+  uint8_t *data;
+  int size;
+  int stream_index;
+  int flags;
+} EncodedPacket;
+
+static int64_t video_current_pts = 0;
+static int64_t audio_current_pts = 0;
 
 pts_mode_t pts_mode = PTS_SPEED_NORMAL;
 
@@ -216,14 +224,6 @@ static int rec_thread_needs_write = 0;
 static int rec_thread_needs_exit = 0;
 static int rec_thread_frame = 0;
 static int rec_thread_needs_flush = 0;
-
-typedef struct EncodedPacket {
-  int64_t pts;
-  uint8_t *data;
-  int size;
-  int stream_index;
-  int flags;
-} EncodedPacket;
 
 EncodedPacket **encoded_packets; // circular buffer
 static int current_encoded_packet = -1;
@@ -2576,6 +2576,8 @@ static void ensure_hls_dir_exists() {
 #endif // ENABLE_HLS_OUTPUT
 
 int main(int argc, char **argv) {
+  int ret;
+
   codec_settings.audio_sample_rate = AUDIO_SAMPLE_RATE;
   codec_settings.audio_bit_rate = AAC_BIT_RATE;
   codec_settings.audio_channels = 1;
@@ -2604,7 +2606,6 @@ int main(int argc, char **argv) {
   memset(tunnel, 0, sizeof(tunnel));
 #endif
 
-  int ret;
   bcm_host_init();
 
   ret = OMX_Init();
