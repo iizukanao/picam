@@ -7,38 +7,6 @@
  *  MPEG-TS muxer: libavformat
  */
 
-// Some part of this code is derived from:
-// https://github.com/raspberrypi/firmware/blob/master/hardfp/opt/vc/src/hello_pi/hello_encode/encode.c
-// Copyright notice of encode.c is as follows
-/*
-Copyright (c) 2012, Broadcom Europe Ltd
-Copyright (c) 2012, Kalle Vahlman <zuh@iki>
-                    Tuomas Kulve <tuomas@kulve.fi>
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-    * Redistributions of source code must retain the above copyright
-      notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright
-      notice, this list of conditions and the following disclaimer in the
-      documentation and/or other materials provided with the distribution.
-    * Neither the name of the copyright holder nor the
-      names of its contributors may be used to endorse or promote products
-      derived from this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY
-DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-
 #if defined(__cplusplus)
 extern "C" {
 #endif
@@ -372,7 +340,7 @@ static void add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_
   } else {
     packet = malloc(sizeof(EncodedPacket));
     if (packet == NULL) {
-      perror("Can't allocate memory for EncodedPacket");
+      perror("malloc for EncodedPacket");
       return;
     }
     encoded_packets[current_encoded_packet] = packet;
@@ -460,7 +428,7 @@ void check_record_directory() {
     if (errno == ENOENT) {
       fprintf(stderr, "rec directory does not exist\n");
     } else {
-      perror("stat error");
+      perror("stat rec directory");
     }
     exit(1);
   } else {
@@ -471,7 +439,7 @@ void check_record_directory() {
   }
 
   if (access(dir, R_OK) != 0) {
-    perror("Can't access rec directory");
+    fprintf(stderr, "Can't access rec directory: %s\n", strerror(errno));
     exit(1);
   }
 }
@@ -483,7 +451,7 @@ void *rec_thread_stop() {
 
   copy_buf = malloc(BUFSIZ);
   if (copy_buf == NULL) {
-    perror("malloc for copy_buf failed");
+    perror("malloc for copy_buf");
     pthread_exit(0);
   }
 
@@ -497,11 +465,11 @@ void *rec_thread_stop() {
   fprintf(stderr, "copy ");
   fsrc = fopen(recording_tmp_filepath, "r");
   if (fsrc == NULL) {
-    perror("fopen recording_tmp_filepath failed");
+    perror("fopen recording_tmp_filepath");
   }
   fdest = fopen(recording_archive_filepath, "a");
   if (fdest == NULL) {
-    perror("fopen recording_archive_filepath failed");
+    perror("fopen recording_archive_filepath");
   }
   while (1) {
     read_len = fread(copy_buf, 1, BUFSIZ, fsrc);
@@ -516,13 +484,13 @@ void *rec_thread_stop() {
     fclose(fsrc);
     fclose(fdest);
   } else {
-    perror("not an EOF?");
+    fprintf(stderr, "rec_thread_stop: not an EOF?: %s\n", strerror(errno));
   }
 
   // link
   fprintf(stderr, "symlink");
   if (symlink(recording_archive_filepath + 4, recording_filepath) != 0) { // +4 is for trimming "rec/"
-    perror("symlink failed");
+    perror("symlink recording_archive_filepath");
   }
 
   // unlink tmp file
@@ -574,7 +542,7 @@ void *rec_thread_start() {
 
   copy_buf = malloc(BUFSIZ);
   if (copy_buf == NULL) {
-    perror("malloc for copy_buf failed");
+    perror("malloc for copy_buf");
     pthread_exit(0);
   }
 
@@ -648,11 +616,11 @@ void *rec_thread_start() {
 
       fsrc = fopen(recording_tmp_filepath, "r");
       if (fsrc == NULL) {
-        perror("fopen recording_tmp_filepath failed");
+        perror("fopen recording_tmp_filepath");
       }
       fdest = fopen(recording_archive_filepath, "a");
       if (fdest == NULL) {
-        perror("fopen recording_archive_filepath failed");
+        perror("fopen recording_archive_filepath");
       }
       while (1) {
         read_len = fread(copy_buf, 1, BUFSIZ, fsrc);
@@ -667,7 +635,7 @@ void *rec_thread_start() {
         fclose(fsrc);
         fclose(fdest);
       } else {
-        perror("not an EOF?");
+        fprintf(stderr, "rec_thread_start: not an EOF?: %s\n", strerror(errno));
       }
 
       mpegts_open_stream_without_header(rec_format_ctx, recording_tmp_filepath, 0);
@@ -1183,7 +1151,7 @@ static int xrun_recovery(snd_pcm_t *handle, int error) {
 
       if (error < 0) {
         if ( (error = snd_pcm_prepare(handle)) < 0) {
-          fprintf(stderr, "microphone: Suspend cannot be recovered, "
+          fprintf(stderr, "microphone: suspend cannot be recovered, "
               "snd_pcm_prepare failed: %s\n", snd_strerror(error));
         }
       }
@@ -1324,19 +1292,19 @@ static int configure_audio_capture_device() {
         snd_strerror (err));
     exit(1);
   }
-  fprintf (stderr, "microphone: Buffer size = %d [frames]\n", (int)real_buffer_size);
+  fprintf (stderr, "microphone: buffer size: %d frames\n", (int)real_buffer_size);
 
   dir = 0;
   // set the period size
   if ( (err = snd_pcm_hw_params_set_period_size_near(capture_handle, hw_params, (snd_pcm_uframes_t *)&period_size, &dir)) < 0) {
-    fprintf (stderr, "microphone: Period size cannot be configured (%s)\n",
+    fprintf (stderr, "microphone: period size cannot be configured (%s)\n",
         snd_strerror (err));
     exit(1);
   }
 
   snd_pcm_uframes_t actual_period_size;
   if ( (err = snd_pcm_hw_params_get_period_size(hw_params, &actual_period_size, &dir)) < 0) {
-    fprintf (stderr, "microphone: Period size cannot be configured (%s)\n",
+    fprintf (stderr, "microphone: period size cannot be configured (%s)\n",
         snd_strerror (err));
     exit(1);
   }
@@ -1360,7 +1328,7 @@ static int configure_audio_capture_device() {
 
   audio_fd_count = snd_pcm_poll_descriptors_count (capture_handle);
   if (audio_fd_count <= 0) {
-    fprintf(stderr,"microphone: Invalid poll descriptors count\n");
+    fprintf(stderr, "microphone: invalid poll descriptors count\n");
     return audio_fd_count;
   }
   ufds = malloc(sizeof(struct pollfd) * audio_fd_count); // +1 for video capture
@@ -1370,7 +1338,7 @@ static int configure_audio_capture_device() {
   }
   // get poll descriptors
   if ((err = snd_pcm_poll_descriptors(capture_handle, ufds, audio_fd_count)) < 0) { // +1 for video
-    fprintf(stderr,"microphone: Unable to obtain poll descriptors for capture: %s\n", snd_strerror(err));
+    fprintf(stderr, "microphone: unable to obtain poll descriptors for capture: %s\n", snd_strerror(err));
     return err;
   }
   is_first_audio = 1; 
@@ -1442,35 +1410,24 @@ static void shutdown_openmax() {
   ilclient_flush_tunnels(tunnel, 0);
 #endif
 
-  fprintf(stderr, "disabling port buffers for 71...\n");
+  // Disable port buffers
   ilclient_disable_port_buffers(camera_component, 71, NULL, NULL, NULL);
-  fprintf(stderr, "disabling port buffers for 200...\n");
   ilclient_disable_port_buffers(video_encode, 200, NULL, NULL, NULL);
-  fprintf(stderr, "disabling port buffers for 201...\n");
   ilclient_disable_port_buffers(video_encode, 201, NULL, NULL, NULL);
 
 #if ENABLE_PREVIEW || ENABLE_CLOCK
-  fprintf(stderr, "disable_tunnel\n");
   ilclient_disable_tunnel(tunnel);
-  fprintf(stderr, "teardown_tunnels\n");
   ilclient_teardown_tunnels(tunnel);
 #endif
 
-  fprintf(stderr, "ilclient_state_transition to idle\n");
   ilclient_state_transition(component_list, OMX_StateIdle);
-  fprintf(stderr, "ilclient_state_transition to loaded\n");
   ilclient_state_transition(component_list, OMX_StateLoaded);
 
-  fprintf(stderr, "ilclient_cleanup_components\n");
   ilclient_cleanup_components(component_list);
 
-  fprintf(stderr, "OMX_Deinit\n");
   OMX_Deinit();
 
-  fprintf(stderr, "destroy cam_client\n");
   ilclient_destroy(cam_client);
-
-  fprintf(stderr, "ilclient_destroy\n");
   ilclient_destroy(ilclient);
 }
 
@@ -1488,9 +1445,7 @@ static void set_exposure_to_auto() {
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexConfigCommonExposure, &exposure_type);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "%s:%d: OMX_SetParameter() for camera_component port 71 "
-        "exposure type failed with %x!\n",
-        __FUNCTION__, __LINE__, error);
+    fprintf(stderr, "failed to set camera exposure to auto: 0x%x\n", error);
   }
   current_exposure_mode = EXPOSURE_AUTO;
 }
@@ -1510,9 +1465,7 @@ static void set_exposure_to_night() {
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexConfigCommonExposure, &exposure_type);
   if (error != OMX_ErrorNone) {
-    fprintf
-      (stderr, "%s:%d: OMX_SetParameter() for camera_component port 71 exposure type failed with %x!\n",
-       __FUNCTION__, __LINE__, error);
+    fprintf(stderr, "failed to set camera exposure to night: 0x%x\n", error);
   }
   current_exposure_mode = EXPOSURE_NIGHT;
 }
@@ -1617,7 +1570,7 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
   if (keepRunning) {
     error = OMX_FillThisBuffer(ILC_GET_HANDLE(camera_component), out);
     if (error != OMX_ErrorNone) {
-      fprintf(stderr, "error filling buffer (camera-2): %x\n", error);
+      fprintf(stderr, "error filling camera buffer (2): 0x%x\n", error);
     }
   } else {
     shutdown_openmax();
@@ -1636,9 +1589,10 @@ static int openmax_cam_open() {
 #endif
   OMX_PARAM_TIMESTAMPMODETYPE timestamp_mode;
 
-  if ((cam_client = ilclient_init()) == NULL) {
-    fprintf(stderr, "ilclient_init returned NULL\n");
-    return -3;
+  cam_client = ilclient_init();
+  if (cam_client == NULL) {
+    fprintf(stderr, "openmax_cam_open: ilclient_init failed\n");
+    return -1;
   }
 
   ilclient_set_fill_buffer_done_callback(cam_client, cam_fill_buffer_done, 0);
@@ -1649,9 +1603,7 @@ static int openmax_cam_open() {
       ILCLIENT_ENABLE_INPUT_BUFFERS |
       ILCLIENT_ENABLE_OUTPUT_BUFFERS);
   if (error != 0) {
-    fprintf
-      (stderr, "ilclient_create_component() for camera_component failed with %x!\n",
-       error);
+    fprintf(stderr, "failed to create camera component: 0x%x\n", error);
     exit(1);
   }
   component_list[n_component_list++] = camera_component;
@@ -1661,10 +1613,9 @@ static int openmax_cam_open() {
   cam_def.nVersion.nVersion = OMX_VERSION;
   cam_def.nPortIndex = 71;
 
-  if (OMX_GetParameter
-      (ILC_GET_HANDLE(camera_component), OMX_IndexParamPortDefinition, &cam_def) != OMX_ErrorNone) {
-    fprintf(stderr, "%s:%d: OMX_GetParameter() for camera_component port 71 port definition failed!\n",
-        __FUNCTION__, __LINE__);
+  error = OMX_GetParameter(ILC_GET_HANDLE(camera_component), OMX_IndexParamPortDefinition, &cam_def);
+  if (error != OMX_ErrorNone) {
+    fprintf(stderr, "failed to get camera 71 port definition: 0x%x\n", error);
     exit(1);
   }
 
@@ -1689,9 +1640,7 @@ static int openmax_cam_open() {
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexParamPortDefinition, &cam_def);
   if (error != OMX_ErrorNone) {
-    fprintf
-      (stderr, "%s:%d: OMX_SetParameter() for camera_component port 71 port definition failed with %x!\n",
-       __FUNCTION__, __LINE__, error);
+    fprintf(stderr, "failed to set camera 71 port definition: 0x%x\n", error);
     exit(1);
   }
 
@@ -1704,9 +1653,7 @@ static int openmax_cam_open() {
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexConfigVideoFramerate, &framerate);
   if (error != OMX_ErrorNone) {
-    fprintf
-      (stderr, "%s:%d: OMX_SetParameter() for camera_component port 71 video framrate failed with %x!\n",
-       __FUNCTION__, __LINE__, error);
+    fprintf(stderr, "failed to set camera 71 framerate: 0x%x\n", error);
     exit(1);
   }
 
@@ -1718,9 +1665,7 @@ static int openmax_cam_open() {
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexParamCommonUseStcTimestamps, &timestamp_mode);
   if (error != OMX_ErrorNone) {
-    fprintf
-      (stderr, "%s:%d: OMX_SetParameter() for camera_component port 71 timestamp mode failed with %x!\n",
-       __FUNCTION__, __LINE__, error);
+    fprintf(stderr, "failed to set camera timestamp mode: 0x%x\n", error);
     exit(1);
   }
 
@@ -1728,9 +1673,8 @@ static int openmax_cam_open() {
 
   // Set camera component to idle state
   if (ilclient_change_component_state(camera_component, OMX_StateIdle) == -1) {
-    fprintf
-      (stderr, "%s:%d: ilclient_change_component_state(camera_component, OMX_StateIdle) failed\n",
-       __FUNCTION__, __LINE__);
+    fprintf(stderr, "failed to set camera to idle state\n");
+    exit(1);
   }
 
 #if ENABLE_CLOCK
@@ -1738,9 +1682,7 @@ static int openmax_cam_open() {
   error = ilclient_create_component(cam_client, &clock_component, "clock",
       ILCLIENT_DISABLE_ALL_PORTS);
   if (error != 0) {
-    fprintf
-      (stderr, "ilclient_create_component() for clock failed with %x!\n",
-       error);
+    fprintf(stderr, "failed to create clock component: 0x%x\n", error);
     exit(1);
   }
   component_list[n_component_list++] = clock_component;
@@ -1752,30 +1694,29 @@ static int openmax_cam_open() {
   clock_state.nVersion.nVersion = OMX_VERSION;
   clock_state.eState = OMX_TIME_ClockStateWaitingForStartTime;
   clock_state.nWaitMask = 1;
-  if(OMX_SetParameter(ILC_GET_HANDLE(clock_component), OMX_IndexConfigTimeClockState, &clock_state) != OMX_ErrorNone) {
-    fprintf(stderr, "set parameter for clock (clock state) failed\n");
+  error = OMX_SetParameter(ILC_GET_HANDLE(clock_component), OMX_IndexConfigTimeClockState, &clock_state);
+  if (error != OMX_ErrorNone) {
+    fprintf(stderr, "failed to set clock state: 0x%x\n", error);
   }
 
   set_tunnel(tunnel+n_tunnel, clock_component, 80, camera_component, 73);
 
   if (ilclient_setup_tunnel(tunnel+(n_tunnel++), 0, 0) != 0) {
-    fprintf(stderr, "ilclient_setup_tunnel error\n");
+    fprintf(stderr, "failed to setup tunnel from clock to camera\n");
     exit(1);
   }
 #endif
 
 #if ENABLE_PREVIEW
   // Preview port
-  fprintf(stderr, "portdefinition 70\n");
   memset(&portdef, 0, sizeof(OMX_PARAM_PORTDEFINITIONTYPE));
   portdef.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
   portdef.nVersion.nVersion = OMX_VERSION;
   portdef.nPortIndex = 70;
 
-  if (OMX_GetParameter
-      (ILC_GET_HANDLE(camera_component), OMX_IndexParamPortDefinition, &portdef) != OMX_ErrorNone) {
-    fprintf(stderr, "%s:%d: OMX_GetParameter() for camera_component port 70 failed!\n",
-        __FUNCTION__, __LINE__);
+  error = OMX_GetParameter(ILC_GET_HANDLE(camera_component), OMX_IndexParamPortDefinition, &portdef);
+  if (error != OMX_ErrorNone) {
+    fprintf(stderr, "failed to get camera preview 70 port definition: 0x%x\n", error);
     exit(1);
   }
 
@@ -1789,13 +1730,10 @@ static int openmax_cam_open() {
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexParamPortDefinition, &portdef);
   if (error != OMX_ErrorNone) {
-    fprintf
-      (stderr, "%s:%d: OMX_SetParameter() for camera_component port 70 failed with %x!\n",
-       __FUNCTION__, __LINE__, error);
+    fprintf(stderr, "failed to set camera preview 70 port definition: 0x%x\n", error);
     exit(1);
   }
 
-  fprintf(stderr, "framerate\n");
   memset(&framerate, 0, sizeof(OMX_CONFIG_FRAMERATETYPE));
   framerate.nSize = sizeof(OMX_CONFIG_FRAMERATETYPE);
   framerate.nVersion.nVersion = OMX_VERSION;
@@ -1804,9 +1742,7 @@ static int openmax_cam_open() {
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexConfigVideoFramerate, &framerate);
   if (error != OMX_ErrorNone) {
-    fprintf
-      (stderr, "%s:%d: OMX_SetParameter() for camera_component port 70 failed with %x!\n",
-       __FUNCTION__, __LINE__, error);
+    fprintf(stderr, "failed to set camera preview 70 framerate: 0x%x\n", error);
     exit(1);
   }
 
@@ -1814,9 +1750,7 @@ static int openmax_cam_open() {
   r = ilclient_create_component(cam_client, &render_component, "video_render",
       ILCLIENT_DISABLE_ALL_PORTS);
   if (r != 0) {
-    fprintf
-      (stderr, "ilclient_create_component() for render_component failed with %x!\n",
-       r);
+    fprintf(stderr, "failed to create render component: 0x%x\n", r);
     exit(1);
   }
   component_list[n_component_list++] = render_component;
@@ -1824,7 +1758,7 @@ static int openmax_cam_open() {
   set_tunnel(tunnel+n_tunnel, camera_component, 70, render_component, 90);
 
   if (ilclient_setup_tunnel(tunnel+(n_tunnel++), 0, 0) != 0) {
-    fprintf(stderr, "ilclient_setup_tunnel error\n");
+    fprintf(stderr, "failed to setup tunnel from camera to render\n");
     exit(1);
   }
 
@@ -2002,20 +1936,19 @@ static int video_encode_startup() {
   OMX_ERRORTYPE error;
   int r;
 
-  if ((ilclient = ilclient_init()) == NULL) {
-    fprintf(stderr, "ilclient_init returned NULL\n");
-    return -3;
+  ilclient = ilclient_init();
+  if (ilclient == NULL) {
+    fprintf(stderr, "video_encode_startup: ilclient_init failed\n");
+    return -1;
   }
 
-  // create video_encode
+  // create video_encode component
   r = ilclient_create_component(ilclient, &video_encode, "video_encode",
       ILCLIENT_DISABLE_ALL_PORTS |
       ILCLIENT_ENABLE_INPUT_BUFFERS |
       ILCLIENT_ENABLE_OUTPUT_BUFFERS);
   if (r != 0) {
-    fprintf
-      (stderr, "ilclient_create_component() for video_encode failed with %x!\n",
-       r);
+    fprintf(stderr, "failed to create video_encode component: 0x%x\n", r);
     exit(1);
   }
   component_list[n_component_list++] = video_encode;
@@ -2025,11 +1958,9 @@ static int video_encode_startup() {
   portdef.nVersion.nVersion = OMX_VERSION;
   portdef.nPortIndex = 200;
 
-  if (OMX_GetParameter
-      (ILC_GET_HANDLE(video_encode), OMX_IndexParamPortDefinition,
-       &portdef) != OMX_ErrorNone) {
-    fprintf(stderr, "%s:%d: OMX_GetParameter() for video_encode port 200 failed!\n",
-        __FUNCTION__, __LINE__);
+  error = OMX_GetParameter(ILC_GET_HANDLE(video_encode), OMX_IndexParamPortDefinition, &portdef);
+  if (error != OMX_ErrorNone) {
+    fprintf(stderr, "failed to get video_encode 200 port definition: 0x%x\n", error);
     exit(1);
   }
 
@@ -2049,9 +1980,7 @@ static int video_encode_startup() {
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamPortDefinition, &portdef);
   if (error != OMX_ErrorNone) {
-    fprintf
-      (stderr, "%s:%d: OMX_SetParameter() for video_encode port 200 failed with %x!\n",
-       __FUNCTION__, __LINE__, error);
+    fprintf(stderr, "failed to set video_encode 200 port definition: 0x%x\n", error);
     exit(1);
   }
 
@@ -2060,11 +1989,9 @@ static int video_encode_startup() {
   portdef_201.nVersion.nVersion = OMX_VERSION;
   portdef_201.nPortIndex = 201;
 
-  if (OMX_GetParameter
-      (ILC_GET_HANDLE(video_encode), OMX_IndexParamPortDefinition,
-       &portdef_201) != OMX_ErrorNone) {
-    fprintf(stderr, "%s:%d: OMX_GetParameter() for video_encode port 200 failed!\n",
-        __FUNCTION__, __LINE__);
+  error = OMX_GetParameter(ILC_GET_HANDLE(video_encode), OMX_IndexParamPortDefinition, &portdef_201);
+  if (error != OMX_ErrorNone) {
+    fprintf(stderr, "failed to get video_encode 201 port definition: 0x%x\n", error);
     exit(1);
   }
 
@@ -2074,9 +2001,7 @@ static int video_encode_startup() {
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamPortDefinition, &portdef_201);
   if (error != OMX_ErrorNone) {
-    fprintf
-      (stderr, "%s:%d: OMX_SetParameter() for video_encode port 200 failed with %x!\n",
-       __FUNCTION__, __LINE__, error);
+    fprintf(stderr, "failed to set video_encode 201 port definition: 0x%x\n", error);
     exit(1);
   }
 
@@ -2089,9 +2014,7 @@ static int video_encode_startup() {
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamVideoPortFormat, &format);
   if (error != OMX_ErrorNone) {
-    fprintf
-      (stderr, "%s:%d: OMX_SetParameter() for video_encode port 201 port format failed with %x!\n",
-       __FUNCTION__, __LINE__, error);
+    fprintf(stderr, "failed to set video_encode 201 port format: 0x%x\n", error);
     exit(1);
   }
 
@@ -2101,10 +2024,9 @@ static int video_encode_startup() {
   avctype.nVersion.nVersion = OMX_VERSION;
   avctype.nPortIndex = 201;
 
-  if (OMX_GetParameter
-      (ILC_GET_HANDLE(video_encode), OMX_IndexParamVideoAvc, &avctype) != OMX_ErrorNone) {
-    fprintf(stderr, "%s:%d: OMX_GetParameter() for video_encode port 201 avctype failed!\n",
-        __FUNCTION__, __LINE__);
+  error = OMX_GetParameter (ILC_GET_HANDLE(video_encode), OMX_IndexParamVideoAvc, &avctype);
+  if (error != OMX_ErrorNone) {
+    fprintf(stderr, "failed to get video_encode 201 AVC: 0x%x\n", error);
     exit(1);
   }
 
@@ -2136,9 +2058,7 @@ static int video_encode_startup() {
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamVideoAvc, &avctype);
   if (error != OMX_ErrorNone) {
-    fprintf
-      (stderr, "%s:%d: OMX_SetParameter() for video_encode port 201 video avc failed with %x!\n",
-       __FUNCTION__, __LINE__, error);
+    fprintf(stderr, "failed to set video_encode 201 AVC: 0x%x\n", error);
     exit(1);
   }
 
@@ -2154,9 +2074,7 @@ static int video_encode_startup() {
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamVideoBitrate, &bitrate_type);
   if (error != OMX_ErrorNone) {
-    fprintf
-      (stderr, "%s:%d: OMX_SetParameter() for video_encode port 201 bitrate failed with %x!\n",
-       __FUNCTION__, __LINE__, error);
+    fprintf(stderr, "failed to set video_encode 201 bitrate: 0x%x\n", error);
     exit(1);
   }
 
@@ -2169,34 +2087,31 @@ static int video_encode_startup() {
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamBrcmNALSSeparate, &boolean_type);
   if (error != OMX_ErrorNone) {
-    fprintf
-      (stderr, "%s:%d: OMX_SetParameter() for video_encode port 201 nal separate failed with %x!\n",
-       __FUNCTION__, __LINE__, error);
+    fprintf(stderr, "failed to set video_encode NAL separate: 0x%x\n", error);
     exit(1);
   }
 
   // Set video_encode component to idle state
   if (ilclient_change_component_state(video_encode, OMX_StateIdle) == -1) {
-    fprintf
-      (stderr, "%s:%d: ilclient_change_component_state(video_encode, OMX_StateIdle) failed\n",
-       __FUNCTION__, __LINE__);
+    fprintf(stderr, "failed to set video_encode to idle state\n");
+    exit(1);
   }
 
   // Enable port buffers for port 71
   if (ilclient_enable_port_buffers(camera_component, 71, NULL, NULL, NULL) != 0) {
-    fprintf(stderr, "enabling port buffers for 71 failed!\n");
+    fprintf(stderr, "failed to enable port buffers for camera 71\n");
     exit(1);
   }
 
   // Enable port buffers for port 200
   if (ilclient_enable_port_buffers(video_encode, 200, NULL, NULL, NULL) != 0) {
-    fprintf(stderr, "enabling port buffers for 200 failed!\n");
+    fprintf(stderr, "failed to enable port buffers for video_encode 200\n");
     exit(1);
   }
 
   // Enable port buffers for port 201
   if (ilclient_enable_port_buffers(video_encode, 201, NULL, NULL, NULL) != 0) {
-    fprintf(stderr, "enabling port buffers for 201 failed!\n");
+    fprintf(stderr, "failed to enable port buffers for video_encode 201\n");
     exit(1);
   }
 
@@ -2226,7 +2141,7 @@ static void encode_and_send_image() {
   // OMX_EmptyThisBuffer takes 22000-27000 usec at 1920x1080
   error = OMX_EmptyThisBuffer(ILC_GET_HANDLE(video_encode), buf);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "error emptying buffer: %x\n", error);
+    fprintf(stderr, "error emptying buffer: 0x%x\n", error);
   }
 
   out = ilclient_get_output_buffer(video_encode, 201, 1);
@@ -2234,7 +2149,7 @@ static void encode_and_send_image() {
   while (1) {
     error = OMX_FillThisBuffer(ILC_GET_HANDLE(video_encode), out);
     if (error != OMX_ErrorNone) {
-      fprintf(stderr, "error filling buffer (video_encode-4): %x\n", error);
+      fprintf(stderr, "error filling video_encode buffer: 0x%x\n", error);
     }
 
     if (out->nFilledLen > 0) {
@@ -2362,7 +2277,7 @@ static int read_audio_poll_mmap() {
   avail = snd_pcm_avail_update(capture_handle);
   if (avail < 0) {
     if ( (error = xrun_recovery(capture_handle, avail)) < 0) {
-      fprintf(stderr,"microphone: SUSPEND recovery failed: %s\n", snd_strerror(error));
+      fprintf(stderr, "microphone: SUSPEND recovery failed: %s\n", snd_strerror(error));
       exit(1);
     }
     is_first_audio = 1;
@@ -2377,7 +2292,7 @@ static int read_audio_poll_mmap() {
         is_first_audio = 0;
         fprintf(stderr, "S");
         if ( (error = snd_pcm_start(capture_handle)) < 0) {
-          fprintf(stderr,"microphone: Start error: %s\n", snd_strerror(error));
+          fprintf(stderr, "microphone: start error: %s\n", snd_strerror(error));
           exit(EXIT_FAILURE);
         }
         break;
@@ -2387,7 +2302,7 @@ static int read_audio_poll_mmap() {
         // wait for pcm to become ready
         if ( (error = snd_pcm_wait(capture_handle, -1)) < 0) {
           if ((error = xrun_recovery(capture_handle, error)) < 0) {
-            fprintf(stderr,"microphone: snd_pcm_wait error: %s\n", snd_strerror(error));
+            fprintf(stderr, "microphone: snd_pcm_wait error: %s\n", snd_strerror(error));
             exit(EXIT_FAILURE);
           }
           is_first_audio = 1;
@@ -2403,7 +2318,7 @@ static int read_audio_poll_mmap() {
     // to this variable by the function.
     if ((error = snd_pcm_mmap_begin (capture_handle, &my_areas, &offset, &frames)) < 0) {
       if ((error = xrun_recovery(capture_handle, error)) < 0) {
-        fprintf(stderr,"microphone: MMAP begin avail error: %s\n", snd_strerror(error));
+        fprintf(stderr, "microphone: mmap begin avail error: %s\n", snd_strerror(error));
         exit(EXIT_FAILURE);
       }
       is_first_audio = 1;
@@ -2414,7 +2329,7 @@ static int read_audio_poll_mmap() {
     commitres = snd_pcm_mmap_commit(capture_handle, offset, frames);
     if (commitres < 0 || (snd_pcm_uframes_t)commitres != frames) {
       if ((error = xrun_recovery(capture_handle, commitres >= 0 ? commitres : -EPIPE)) < 0) {
-        fprintf(stderr,"microphone: MMAP commit error: %s\n", snd_strerror(error));
+        fprintf(stderr, "microphone: mmap commit error: %s\n", snd_strerror(error));
         exit(EXIT_FAILURE);
       }
       is_first_audio = 1;
@@ -2466,9 +2381,7 @@ static void start_openmax_clock() {
   error = OMX_SetParameter(ILC_GET_HANDLE(clock_component),
       OMX_IndexConfigTimeClockState, &clock_state);
   if (error != OMX_ErrorNone) {
-    fprintf
-      (stderr, "%s:%d: OMX_SetParameter() for clock state failed with %x!\n",
-       __FUNCTION__, __LINE__, error);
+    fprintf(stderr, "failed to start clock: 0x%x\n", error);
     exit(1);
   }
 }
@@ -2484,13 +2397,11 @@ static void start_openmax_capturing() {
   boolean.nPortIndex = 71;
   boolean.bEnabled = 1;
 
-  fprintf(stderr, "start capturing\n");
+  fprintf(stderr, "start capturing video\n");
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexConfigPortCapturing, &boolean);
   if (error != OMX_ErrorNone) {
-    fprintf
-      (stderr, "%s:%d: OMX_SetParameter() for camera_component port 71 port capturing failed with %x!\n",
-       __FUNCTION__, __LINE__, error);
+    fprintf(stderr, "failed to start capturing video: 0x%x\n", error);
     exit(1);
   }
 
@@ -2510,7 +2421,7 @@ static void openmax_cam_loop() {
 
   error = OMX_FillThisBuffer(ILC_GET_HANDLE(camera_component), out);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "error filling buffer (camera-1): %x\n", error);
+    fprintf(stderr, "error filling camera buffer (1): 0x%x\n", error);
   }
 }
 
@@ -2568,12 +2479,12 @@ static void audio_loop_poll_mmap() {
           snd_pcm_state(capture_handle) == SND_PCM_STATE_SUSPENDED) {
         avail_flags = snd_pcm_state(capture_handle) == SND_PCM_STATE_XRUN ? -EPIPE : -ESTRPIPE;
         if (xrun_recovery(capture_handle, avail_flags) < 0) {
-          fprintf(stderr,"microphone: Write error: %s\n", snd_strerror(avail_flags));
+          fprintf(stderr, "microphone: write error: %s\n", snd_strerror(avail_flags));
           exit(EXIT_FAILURE);
         }
         is_first_audio = 1;
       } else {
-        fprintf(stderr,"microphone: Wait for poll failed\n");
+        fprintf(stderr, "microphone: wait for poll failed\n");
         continue;
       }
     }
@@ -2645,7 +2556,7 @@ static void ensure_hls_dir_exists() {
         exit(1);
       }
     } else {
-      perror("stat error");
+      perror("stat HLS_OUTPUT_DIR");
       exit(1);
     }
   } else {
@@ -2698,9 +2609,9 @@ int main(int argc, char **argv) {
 
   ret = OMX_Init();
   if (ret != OMX_ErrorNone) {
-    fprintf(stderr, "OMX_Init failed with error code: 0x%x\n", ret);
+    fprintf(stderr, "OMX_Init failed: 0x%x\n", ret);
     ilclient_destroy(ilclient);
-    return -4;
+    return 1;
   }
   memset(component_list, 0, sizeof(component_list));
 
@@ -2723,7 +2634,7 @@ int main(int argc, char **argv) {
       fprintf(stderr, "### WARNING: audio device is not available ###\n");
       disable_audio_capturing = 1;
     } else if (ret < 0) {
-      fprintf(stderr, "init_audio failed with %d\n", ret);
+      fprintf(stderr, "init_audio failed: %d\n", ret);
       exit(1);
     }
   }
@@ -2755,7 +2666,7 @@ int main(int argc, char **argv) {
   fprintf(stderr, "set hls->encryption_key_uri\n");
   hls->encryption_key_uri = malloc(11);
   if (hls->encryption_key_uri == NULL) {
-    perror("Can't malloc for encryption key uri");
+    perror("malloc for hls->encryption_key_uri");
     return 1;
   }
   memcpy(hls->encryption_key_uri, "stream.key", 11);
@@ -2763,7 +2674,7 @@ int main(int argc, char **argv) {
   fprintf(stderr, "set hls->encryption_key\n");
   hls->encryption_key = malloc(16);
   if (hls->encryption_key == NULL) {
-    perror("Can't malloc for encryption key");
+    perror("malloc for hls->encryption_key");
     return 1;
   }
   uint8_t tmp_key[] = {
@@ -2775,7 +2686,7 @@ int main(int argc, char **argv) {
   fprintf(stderr, "set hls->encryption_iv\n");
   hls->encryption_iv = malloc(16);
   if (hls->encryption_iv == NULL) {
-    perror("Can't malloc for encryption iv");
+    perror("malloc for hls->encryption_iv");
     return 1;
   }
   uint8_t tmp_iv[] = {
