@@ -197,7 +197,7 @@ static snd_pcm_t *capture_handle;
 static uint16_t *samples;
 static AVFrame *av_frame;
 static int audio_fd_count;
-static struct pollfd *ufds;//file descriptor array used by pool
+static struct pollfd *poll_fds; // file descriptors for polling audio
 static int is_first_audio;
 static int period_size;
 static int channels = 1;
@@ -285,7 +285,7 @@ static void prepare_encoded_packets() {
   int malloc_size = sizeof(EncodedPacket *) * encoded_packets_size;
   encoded_packets = malloc(malloc_size);
   if (encoded_packets == NULL) {
-    fprintf(stderr, "Can't allocate memory for encodedPackets\n");
+    fprintf(stderr, "can't allocate memory for encoded_packets\n");
     exit(1);
   }
   memset(encoded_packets, 0, malloc_size);
@@ -965,7 +965,7 @@ static int send_keyframe(uint8_t *data, size_t data_len, int consume_time) {
   total_size = access_unit_delimiter_length + codec_config_total_size + data_len;
   ptr = buf = av_malloc(total_size);
   if (buf == NULL) {
-    fprintf(stderr, "Can't allocate buf in send_keyframe; size=%d\n", total_size);
+    fprintf(stderr, "send_keyframe: can't allocate buf (%d bytes)\n", total_size);
     exit(1);
   }
 
@@ -1128,30 +1128,28 @@ static int send_pframe(uint8_t *data, size_t data_len, int consume_time) {
   return ret;
 }
 
-/* methods for audio capturing */
-
 // Callback function that is called when an error has occurred
 static int xrun_recovery(snd_pcm_t *handle, int error) {
   switch(error) {
     case -EPIPE: // Buffer overrun
-      fprintf(stderr, "microphone error: Buffer overrun\n");
-      if ( (error = snd_pcm_prepare(handle)) < 0) {
-        fprintf(stderr, "microphone error: Buffer overrrun cannot be recovered, "
+      fprintf(stderr, "microphone error: buffer overrun\n");
+      if ((error = snd_pcm_prepare(handle)) < 0) {
+        fprintf(stderr, "microphone error: buffer overrrun cannot be recovered, "
             "snd_pcm_prepare failed: %s\n", snd_strerror(error));
       }
       return 0;
       break;
 
     case -ESTRPIPE: // Microphone is suspended
-      fprintf(stderr, "microphone error: ESTRPIPE\n");
+      fprintf(stderr, "microphone error: suspended\n");
       // Wait until the suspend flag is cleared
       while ((error = snd_pcm_resume(handle)) == -EAGAIN) {
         sleep(1);
       }
 
       if (error < 0) {
-        if ( (error = snd_pcm_prepare(handle)) < 0) {
-          fprintf(stderr, "microphone: suspend cannot be recovered, "
+        if ((error = snd_pcm_prepare(handle)) < 0) {
+          fprintf(stderr, "microphone: suspend can't be recovered, "
               "snd_pcm_prepare failed: %s\n", snd_strerror(error));
         }
       }
@@ -1170,18 +1168,18 @@ static int xrun_recovery(snd_pcm_t *handle, int error) {
 }
 
 // Wait for data using poll
-static int wait_for_poll(snd_pcm_t *device, struct pollfd *ufds, unsigned int audio_fd_count) {
+static int wait_for_poll(snd_pcm_t *device, struct pollfd *target_fds, unsigned int audio_fd_count) {
   unsigned short revents;
   int avail_flags = 0;
   int ret;
 
   while (1) {
-    ret = poll(ufds, audio_fd_count, -1); // -1 means block, +1 for video
+    ret = poll(target_fds, audio_fd_count, -1); // -1 means block
     if (ret < 0) {
       fprintf(stderr, "poll error: %d\n", ret);
       return ret;
     } else {
-      snd_pcm_poll_descriptors_revents(device, ufds, audio_fd_count, &revents);
+      snd_pcm_poll_descriptors_revents(device, target_fds, audio_fd_count, &revents);
       if (revents & POLLERR) {
         return -EIO;
       }
@@ -1200,10 +1198,10 @@ static int open_audio_capture_device() {
 
   char *input_device = "hw:0,0";
   fprintf(stderr, "opening ALSA device: %s\n", input_device);
-  if ((err = snd_pcm_open (&capture_handle, input_device, SND_PCM_STREAM_CAPTURE, 0)) < 0) {
+  err = snd_pcm_open(&capture_handle, input_device, SND_PCM_STREAM_CAPTURE, 0);
+  if (err < 0) {
     fprintf (stderr, "cannot open audio device %s (%s)\n",
-        input_device,
-        snd_strerror (err));
+        input_device, snd_strerror(err));
     return -1;
   }
 
@@ -1223,121 +1221,128 @@ static int configure_audio_capture_device() {
 #endif
   int buffer_size;
 
-  // alsa poll mmap
+  // ALSA poll mmap
   snd_pcm_uframes_t real_buffer_size; // real buffer size in frames
   int dir;
 
   buffer_size = av_samples_get_buffer_size(NULL, ctx->channels,
       ctx->frame_size, ctx->sample_fmt, 0);
 
-  if ((err = snd_pcm_hw_params_malloc (&hw_params)) < 0) {
-    fprintf (stderr, "cannot allocate hardware parameter structure (%s)\n",
-        snd_strerror (err));
-    exit (1);
+  err = snd_pcm_hw_params_malloc(&hw_params);
+  if (err < 0) {
+    fprintf(stderr, "cannot allocate hardware parameter structure (%s)\n",
+        snd_strerror(err));
+    exit(1);
   }
 
-  if ((err = snd_pcm_hw_params_any (capture_handle, hw_params)) < 0) {
-    fprintf (stderr, "cannot initialize hardware parameter structure (%s)\n",
-        snd_strerror (err));
-    exit (1);
+  err = snd_pcm_hw_params_any(capture_handle, hw_params);
+  if (err < 0) {
+    fprintf(stderr, "cannot initialize hardware parameter structure (%s)\n",
+        snd_strerror(err));
+    exit(1);
   }
 
   // use mmap
-  if ((err = snd_pcm_hw_params_set_access (capture_handle, hw_params, SND_PCM_ACCESS_MMAP_INTERLEAVED)) < 0) {
-    fprintf (stderr, "cannot set access type (%s)\n",
-        snd_strerror (err));
-    exit (1);
+  err = snd_pcm_hw_params_set_access(capture_handle, hw_params,
+      SND_PCM_ACCESS_MMAP_INTERLEAVED);
+  if (err < 0) {
+    fprintf(stderr, "cannot set access type (%s)\n", snd_strerror(err));
+    exit(1);
   }
 
   // SND_PCM_FORMAT_S16_LE => PCM 16 bit signed little endian
-  if ((err = snd_pcm_hw_params_set_format (capture_handle, hw_params, SND_PCM_FORMAT_S16_LE)) < 0) {
-    fprintf (stderr, "cannot set sample format (%s)\n",
-        snd_strerror (err));
-    exit (1);
+  err = snd_pcm_hw_params_set_format(capture_handle, hw_params, SND_PCM_FORMAT_S16_LE);
+  if (err < 0) {
+    fprintf(stderr, "cannot set sample format (%s)\n", snd_strerror(err));
+    exit(1);
   }
 
   // set the sample rate
   unsigned int rate = AUDIO_SAMPLE_RATE;
-  if ((err = snd_pcm_hw_params_set_rate_near (capture_handle, hw_params, &rate, 0)) < 0) {
-    fprintf (stderr, "cannot set sample rate (%s)\n",
-        snd_strerror (err));
-    exit (1);
+  err = snd_pcm_hw_params_set_rate_near(capture_handle, hw_params, &rate, 0);
+  if (err < 0) {
+    fprintf(stderr, "cannot set sample rate (%s)\n", snd_strerror(err));
+    exit(1);
   }
 
   unsigned int actual_rate;
   int actual_dir;
-  if ((err = snd_pcm_hw_params_get_rate(hw_params, &actual_rate, &actual_dir)) < 0) {
+  err = snd_pcm_hw_params_get_rate(hw_params, &actual_rate, &actual_dir);
+  if (err < 0) {
     fprintf(stderr, "microphone: failed to get rate (%s)\n", snd_strerror(err));
     exit(1);
   }
   fprintf(stderr, "actual sample rate=%u dir=%d\n", actual_rate, actual_dir);
 
   // set the number of channels
-  if ((err = snd_pcm_hw_params_set_channels (capture_handle, hw_params, channels)) < 0) {
-    fprintf (stderr, "cannot set channel count (%s)\n",
-        snd_strerror (err));
+  err = snd_pcm_hw_params_set_channels(capture_handle, hw_params, channels);
+  if (err < 0) {
+    fprintf(stderr, "cannot set channel count (%s)\n", snd_strerror(err));
     exit(1);
   }
 
   // set the buffer size
-  if ( (err = snd_pcm_hw_params_set_buffer_size(capture_handle, hw_params, buffer_size * ALSA_BUFFER_MULTIPLY)) < 0) {
-    fprintf (stderr, "microphone: failed to set buffer size (%s)\n",
-        snd_strerror (err));
+  err = snd_pcm_hw_params_set_buffer_size(capture_handle, hw_params,
+      buffer_size * ALSA_BUFFER_MULTIPLY);
+  if (err < 0) {
+    fprintf(stderr, "microphone: failed to set buffer size (%s)\n", snd_strerror(err));
     exit(1);
   }
 
   // check the value of the buffer size
-  if ( (err = snd_pcm_hw_params_get_buffer_size(hw_params, &real_buffer_size)) < 0) {
-    fprintf (stderr, "microphone: failed to get buffer size (%s)\n",
-        snd_strerror (err));
+  err = snd_pcm_hw_params_get_buffer_size(hw_params, &real_buffer_size);
+  if (err < 0) {
+    fprintf(stderr, "microphone: failed to get buffer size (%s)\n", snd_strerror(err));
     exit(1);
   }
-  fprintf (stderr, "microphone: buffer size: %d frames\n", (int)real_buffer_size);
+  fprintf(stderr, "microphone: buffer size: %d frames\n", (int)real_buffer_size);
 
   dir = 0;
   // set the period size
-  if ( (err = snd_pcm_hw_params_set_period_size_near(capture_handle, hw_params, (snd_pcm_uframes_t *)&period_size, &dir)) < 0) {
-    fprintf (stderr, "microphone: period size cannot be configured (%s)\n",
-        snd_strerror (err));
+  err = snd_pcm_hw_params_set_period_size_near(capture_handle, hw_params,
+      (snd_pcm_uframes_t *)&period_size, &dir);
+  if (err < 0) {
+    fprintf(stderr, "microphone: period size cannot be configured (%s)\n", snd_strerror(err));
     exit(1);
   }
 
   snd_pcm_uframes_t actual_period_size;
-  if ( (err = snd_pcm_hw_params_get_period_size(hw_params, &actual_period_size, &dir)) < 0) {
-    fprintf (stderr, "microphone: period size cannot be configured (%s)\n",
-        snd_strerror (err));
+  err = snd_pcm_hw_params_get_period_size(hw_params, &actual_period_size, &dir);
+  if (err < 0) {
+    fprintf(stderr, "microphone: period size cannot be configured (%s)\n", snd_strerror(err));
     exit(1);
   }
   fprintf(stderr, "actual_period_size=%lu dir=%d\n", actual_period_size, dir);
 
   // apply the hardware configuration
-  if ((err = snd_pcm_hw_params (capture_handle, hw_params)) < 0) {
-    fprintf (stderr, "cannot set parameters (%s)\n",
-        snd_strerror (err));
+  err = snd_pcm_hw_params (capture_handle, hw_params);
+  if (err < 0) {
+    fprintf(stderr, "cannot set parameters (%s)\n", snd_strerror(err));
     exit(1);
   }
 
   // end of configuration
   snd_pcm_hw_params_free (hw_params);
 
-  if ((err = snd_pcm_prepare (capture_handle)) < 0) {
-    fprintf (stderr, "cannot prepare audio interface for use (%s)\n",
-        snd_strerror (err));
-    exit (1);
+  err = snd_pcm_prepare(capture_handle);
+  if (err < 0) {
+    fprintf(stderr, "cannot prepare audio interface for use (%s)\n", snd_strerror(err));
+    exit(1);
   }
 
-  audio_fd_count = snd_pcm_poll_descriptors_count (capture_handle);
+  audio_fd_count = snd_pcm_poll_descriptors_count(capture_handle);
   if (audio_fd_count <= 0) {
     fprintf(stderr, "microphone: invalid poll descriptors count\n");
     return audio_fd_count;
   }
-  ufds = malloc(sizeof(struct pollfd) * audio_fd_count); // +1 for video capture
-  if (ufds == NULL) {
-    fprintf(stderr, "Can't allocate ufds\n");
+  poll_fds = malloc(sizeof(struct pollfd) * audio_fd_count);
+  if (poll_fds == NULL) {
+    fprintf(stderr, "can't allocate poll_fds\n");
     exit(1);
   }
   // get poll descriptors
-  if ((err = snd_pcm_poll_descriptors(capture_handle, ufds, audio_fd_count)) < 0) { // +1 for video
+  err = snd_pcm_poll_descriptors(capture_handle, poll_fds, audio_fd_count);
+  if (err < 0) {
     fprintf(stderr, "microphone: unable to obtain poll descriptors for capture: %s\n", snd_strerror(err));
     return err;
   }
@@ -1381,7 +1386,7 @@ static void teardown_audio_encode() {
 static void teardown_audio_capture_device() {
   snd_pcm_close (capture_handle);
 
-  free(ufds);
+  free(poll_fds);
 }
 
 /* Return 1 if the difference is negative, otherwise 0.  */
@@ -1796,7 +1801,7 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
     // merge the previous buffer
     concat_buf = realloc(encbuf, encbuf_size + out->nFilledLen);
     if (concat_buf == NULL) {
-      fprintf(stderr, "Can't allocate concat_buf; size=%d\n", encbuf_size + out->nFilledLen);
+      fprintf(stderr, "can't allocate concat_buf (%d bytes)\n", encbuf_size + out->nFilledLen);
       free(encbuf);
       exit(1);
     }
@@ -1818,7 +1823,7 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
     } else {
       encbuf = malloc(buf_len);
       if (encbuf == NULL) {
-        fprintf(stderr, "Can't allocate encbuf; size=%d\n", buf_len);
+        fprintf(stderr, "can't allocate encbuf (%d bytes)\n", buf_len);
         exit(1);
       }
       memcpy(encbuf, buf, buf_len);
@@ -1854,7 +1859,7 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
       // Insert timing info to nal_unit_type 7
       codec_configs[n_codec_configs] = malloc(buf_len);
       if (codec_configs[n_codec_configs] == NULL) {
-        fprintf(stderr, "Fatal: Can't allocate memory for codec config; size=%d\n", buf_len);
+        fprintf(stderr, "can't allocate memory for codec config (%d bytes)\n", buf_len);
         exit(1);
       }
       codec_config_sizes[n_codec_configs] = buf_len;
@@ -2472,7 +2477,7 @@ static void audio_loop_poll_mmap() {
       // the first and the second frame.
     }
 
-    avail_flags = wait_for_poll(capture_handle, ufds, audio_fd_count);
+    avail_flags = wait_for_poll(capture_handle, poll_fds, audio_fd_count);
     if (avail_flags < 0) { // try to recover from error
       fprintf(stderr, "trying to recover from error\n");
       if (snd_pcm_state(capture_handle) == SND_PCM_STATE_XRUN ||
