@@ -67,6 +67,9 @@ extern "C" {
 // the camera will go into day (auto) mode
 #define EXPOSURE_AUTO_Y_THRESHOLD 50
 
+// Enable verbose output or not
+#define ENABLE_VERBOSE_LOG 1
+
 
 ////////////////////////////
 // Advanced configurations

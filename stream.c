@@ -886,6 +886,7 @@ static int64_t get_next_audio_write_time() {
   return audio_start_time + audio_frame_count * 1000000000.0 / ((float)AUDIO_SAMPLE_RATE / (float)period_size);
 }
 
+#if ENABLE_VERBOSE_LOG
 static void print_audio_timing() {
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -901,6 +902,7 @@ static void print_audio_timing() {
   fprintf(stderr, " a-v=%lld c-a=%lld u=%d d=%d\n",
       avdiff, clock_pts - audio_pts, speed_up_count, speed_down_count);
 }
+#endif
 
 static void send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts) {
 #if ENABLE_UNIX_SOCKETS_OUTPUT
@@ -1891,6 +1893,7 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
 
         // calculate FPS and display it
         if (tsBegin.tv_sec != 0 && tsBegin.tv_nsec != 0) {
+          keyframes_count++;
           clock_gettime(CLOCK_MONOTONIC, &tsEnd);
           timespec_subtract(&tsDiff, &tsEnd, &tsBegin);
           unsigned long long wait_nsec = tsDiff.tv_sec * INT64_C(1000000000) + tsDiff.tv_nsec;
@@ -1901,9 +1904,12 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
           } else {
             fps = 1 / divisor;
           }
-          keyframes_count++;
           fprintf(stderr, " %5.2f fps k=%d", fps, keyframes_count);
+#if ENABLE_VERBOSE_LOG
           print_audio_timing();
+#else
+          fprintf(stderr, "\n");
+#endif
           current_audio_frames = 0;
           frame_count = 0;
         }
