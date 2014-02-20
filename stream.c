@@ -753,8 +753,8 @@ static void setup_socks() {
   strcpy(remote_video.sun_path, SOCK_PATH_VIDEO);
   len = strlen(remote_video.sun_path) + sizeof(remote_video.sun_family);
   if (connect(sockfd_video, (struct sockaddr *)&remote_video, len) == -1) {
-    fprintf(stderr, "failed to connect to video socket (%s): %s\n"
-        "perhaps RTSP server is not running?\n",
+    fprintf(stderr, "failed to connect to video socket (%s): %s\nperhaps RTSP server"
+        " (https://github.com/iizukanao/node-rtsp-rtmp-server) is not running?\n",
         SOCK_PATH_VIDEO, strerror(errno));
     exit(1);
   }
@@ -768,8 +768,8 @@ static void setup_socks() {
   strcpy(remote_video_control.sun_path, SOCK_PATH_VIDEO_CONTROL);
   len = strlen(remote_video_control.sun_path) + sizeof(remote_video_control.sun_family);
   if (connect(sockfd_video_control, (struct sockaddr *)&remote_video_control, len) == -1) {
-    fprintf(stderr, "failed to connect to video_control socket (%s): %s\n"
-        "perhaps RTSP server is not running?\n",
+    fprintf(stderr, "failed to connect to video_control socket (%s): %s\nperhaps RTSP server"
+        " (https://github.com/iizukanao/node-rtsp-rtmp-server) is not running?\n",
         SOCK_PATH_VIDEO_CONTROL, strerror(errno));
     exit(1);
   }
@@ -783,8 +783,8 @@ static void setup_socks() {
   strcpy(remote_audio.sun_path, SOCK_PATH_AUDIO);
   len = strlen(remote_audio.sun_path) + sizeof(remote_audio.sun_family);
   if (connect(sockfd_audio, (struct sockaddr *)&remote_audio, len) == -1) {
-    fprintf(stderr, "failed to connect to audio socket (%s): %s\n"
-        "perhaps RTSP server is not running?\n",
+    fprintf(stderr, "failed to connect to audio socket (%s): %s\nperhaps RTSP server"
+        " (https://github.com/iizukanao/node-rtsp-rtmp-server) is not running?\n",
         SOCK_PATH_AUDIO, strerror(errno));
     exit(1);
   }
@@ -798,8 +798,8 @@ static void setup_socks() {
   strcpy(remote_audio_control.sun_path, SOCK_PATH_AUDIO_CONTROL);
   len = strlen(remote_audio_control.sun_path) + sizeof(remote_audio_control.sun_family);
   if (connect(sockfd_audio_control, (struct sockaddr *)&remote_audio_control, len) == -1) {
-    fprintf(stderr, "failed to connect to audio_control socket (%s): %s\n"
-        "perhaps RTSP server is not running?\n",
+    fprintf(stderr, "failed to connect to audio_control socket (%s): %s\nperhaps RTSP server"
+        " (https://github.com/iizukanao/node-rtsp-rtmp-server) is not running?\n",
         SOCK_PATH_AUDIO_CONTROL, strerror(errno));
     exit(1);
   }
