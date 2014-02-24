@@ -129,8 +129,8 @@ Then run `make`.
 
 I have tested this program with the combination of:
 
-- [PLANEX PL-US35AP](http://www.planex.co.jp/product/usb/pl-us35ap/)
-- [ELECOM MS-STM95](http://www2.elecom.co.jp/multimedia/microphone/ms-stm95/)
+- USB to 3.5mm audio adapter: [PLANEX PL-US35AP](http://www.planex.co.jp/product/usb/pl-us35ap/)
+- Microphone: [ELECOM MS-STM95](http://www2.elecom.co.jp/multimedia/microphone/ms-stm95/)
 
 ### License
 
