@@ -127,7 +127,8 @@ Then run `make`.
 
 #### USB microphone
 
-In combination with:
+I have tested this program with the combination of:
+
 - [PLANEX PL-US35AP](http://www.planex.co.jp/product/usb/pl-us35ap/)
 - [ELECOM MS-STM95](http://www2.elecom.co.jp/multimedia/microphone/ms-stm95/)
 
