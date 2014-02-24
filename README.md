@@ -30,7 +30,7 @@
 
 #### Install libraries
 
-Build and install these libraries for a Raspberry Pi:
+Build and install these libraries on a Raspberry Pi:
 
 - [FFmpeg](http://www.ffmpeg.org/)
 - [alsa-lib](http://www.alsa-project.org/main/index.php/Main_Page)
@@ -54,7 +54,7 @@ On a Raspberry Pi, issue the following command:
     $ cd picam
     $ ./stream.bin
 
-Make sure that [node-rtsp-rtmp-server](https://github.com/iizukanao/node-rtsp-rtmp-server) is running before starting stream.bin.
+Make sure that [node-rtsp-rtmp-server](https://github.com/iizukanao/node-rtsp-rtmp-server) is running before starting stream.bin. Alternatively you can [use nginx-rtmp-module](#using-picam-in-combination-with-nginx-rtmp-module), or [use HTTP Live Streaming only](#using-http-live-streaming-only).
 
 ### Recording
 
@@ -111,7 +111,17 @@ Start nginx server, then run stream.bin. You can access the RTMP stream at `rtmp
 
 HTTP Live Streaming files are generated in `/run/shm/video`. You can change the output directory by changing `HLS_OUTPUT_DIR` in config.h.
 
-If you want to turn off HTTP Live Streaming, set `ENABLE_HLS_OUTPUT` to 0 in config.h.
+If you want to turn off HTTP Live Streaming, set `ENABLE_HLS_OUTPUT` to 0 in config.h, then run `make`.
+
+### Using HTTP Live Streaming only
+
+To enable HTTP Live Streaming only and disable other output, change the constants in config.h as follows:
+
+    #define ENABLE_HLS_OUTPUT  1
+    #define ENABLE_UNIX_SOCKETS_OUTPUT  0
+    #define ENABLE_TCP_OUTPUT  0
+
+Then run `make`.
 
 ### Recommended hardware
 
