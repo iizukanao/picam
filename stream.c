@@ -64,8 +64,8 @@ extern "C" {
 #define AVAIL_AUDIO 2
 
 // Each video frame's PTS is incremented by this in normal condition
-// 90000 / 3014 = 29.860650299 FPS
-#define VIDEO_PTS_STEP 3014
+// 90000 / 2955 = 30.46 FPS
+#define VIDEO_PTS_STEP 2955
 
 // If this value is increased, audio gets faster than video
 #define N_BUFFER_COUNT_ACTUAL 1
@@ -1656,7 +1656,7 @@ static int openmax_cam_open() {
   framerate.nSize = sizeof(OMX_CONFIG_FRAMERATETYPE);
   framerate.nVersion.nVersion = OMX_VERSION;
   framerate.nPortIndex = 71; // capture port
-  framerate.xEncodeFramerate = (90000.0 / VIDEO_PTS_STEP) * 65536;
+  framerate.xEncodeFramerate = fr_q16;
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexConfigVideoFramerate, &framerate);
   if (error != OMX_ErrorNone) {
