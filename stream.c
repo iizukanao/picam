@@ -906,7 +906,7 @@ static void print_audio_timing() {
 
 static void send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts) {
 #if ENABLE_UNIX_SOCKETS_OUTPUT
-  int payload_size = databuflen - 1;  // -7(ADTS header) +6(pts)
+  int payload_size = databuflen + 6;  // +6(pts)
   int total_size = payload_size + 3;  // more 3 bytes for payload length
   uint8_t *sendbuf = malloc(total_size);
   if (sendbuf == NULL) {
@@ -922,7 +922,7 @@ static void send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts) {
   sendbuf[6] = (pts >> 16) & 0xff;
   sendbuf[7] = (pts >> 8) & 0xff;
   sendbuf[8] = pts & 0xff;
-  memcpy(sendbuf + 9, databuf + 7, databuflen - 7); // omit ADTS header (7 bytes)
+  memcpy(sendbuf + 9, databuf, databuflen);
   if (send(sockfd_audio, sendbuf, total_size, 0) == -1) {
     perror("send audio");
     exit(1);
