@@ -906,23 +906,26 @@ static void print_audio_timing() {
 
 static void send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts) {
 #if ENABLE_UNIX_SOCKETS_OUTPUT
-  int payload_size = databuflen + 6;  // +6(pts)
+  int payload_size = databuflen + 7;  // +1(packet type) +6(pts)
   int total_size = payload_size + 3;  // more 3 bytes for payload length
   uint8_t *sendbuf = malloc(total_size);
   if (sendbuf == NULL) {
     fprintf(stderr, "Can't alloc for audio sendbuf: size=%d", total_size);
     return;
   }
+  // payload header
   sendbuf[0] = (payload_size >> 16) & 0xff;
   sendbuf[1] = (payload_size >> 8) & 0xff;
   sendbuf[2] = payload_size & 0xff;
-  sendbuf[3] = (pts >> 40) & 0xff;
-  sendbuf[4] = (pts >> 32) & 0xff;
-  sendbuf[5] = (pts >> 24) & 0xff;
-  sendbuf[6] = (pts >> 16) & 0xff;
-  sendbuf[7] = (pts >> 8) & 0xff;
-  sendbuf[8] = pts & 0xff;
-  memcpy(sendbuf + 9, databuf, databuflen);
+  // payload
+  sendbuf[3] = 0x01;  // packet type (PTS == DTS)
+  sendbuf[4] = (pts >> 40) & 0xff;
+  sendbuf[5] = (pts >> 32) & 0xff;
+  sendbuf[6] = (pts >> 24) & 0xff;
+  sendbuf[7] = (pts >> 16) & 0xff;
+  sendbuf[8] = (pts >> 8) & 0xff;
+  sendbuf[9] = pts & 0xff;
+  memcpy(sendbuf + 10, databuf, databuflen);
   if (send(sockfd_audio, sendbuf, total_size, 0) == -1) {
     perror("send audio");
     exit(1);
@@ -933,23 +936,26 @@ static void send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts) {
 
 static void send_video_frame(uint8_t *databuf, int databuflen, int64_t pts) {
 #if ENABLE_UNIX_SOCKETS_OUTPUT
-  int payload_size = databuflen + 2;  // -4(start code) +6(pts)
+  int payload_size = databuflen + 7;  // +1(packet type) +6(pts)
   int total_size = payload_size + 3;  // more 3 bytes for payload length
   uint8_t *sendbuf = malloc(total_size);
   if (sendbuf == NULL) {
     fprintf(stderr, "Can't alloc for video sendbuf: size=%d", total_size);
     return;
   }
+  // payload header
   sendbuf[0] = (payload_size >> 16) & 0xff;
   sendbuf[1] = (payload_size >> 8) & 0xff;
   sendbuf[2] = payload_size & 0xff;
-  sendbuf[3] = (pts >> 40) & 0xff;
-  sendbuf[4] = (pts >> 32) & 0xff;
-  sendbuf[5] = (pts >> 24) & 0xff;
-  sendbuf[6] = (pts >> 16) & 0xff;
-  sendbuf[7] = (pts >> 8) & 0xff;
-  sendbuf[8] = pts & 0xff;
-  memcpy(sendbuf + 9, databuf + 4, databuflen - 4); // omit start code (4 bytes)
+  // payload
+  sendbuf[3] = 0x01;  // packet type (PTS == DTS)
+  sendbuf[4] = (pts >> 40) & 0xff;
+  sendbuf[5] = (pts >> 32) & 0xff;
+  sendbuf[6] = (pts >> 24) & 0xff;
+  sendbuf[7] = (pts >> 16) & 0xff;
+  sendbuf[8] = (pts >> 8) & 0xff;
+  sendbuf[9] = pts & 0xff;
+  memcpy(sendbuf + 10, databuf, databuflen);
   if (send(sockfd_video, sendbuf, total_size, 0) == -1) {
     perror("send video error");
   }
