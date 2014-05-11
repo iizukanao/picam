@@ -938,7 +938,6 @@ static void send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts) {
   memcpy(sendbuf + 10, databuf, databuflen);
   if (send(sockfd_audio, sendbuf, total_size, 0) == -1) {
     perror("send audio data");
-    exit(1);
   }
   free(sendbuf);
 #endif // ENABLE_UNIX_SOCKETS_OUTPUT
