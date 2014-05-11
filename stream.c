@@ -686,12 +686,17 @@ void on_file_create(char *filename, char *content) {
 }
 
 // Send audio packet to node-rtsp-rtmp-server
-static void send_audio_control_info() {
+static void send_audio_start_time() {
 #if ENABLE_UNIX_SOCKETS_OUTPUT
+  int payload_size = 9;
   int64_t logical_start_time = audio_start_time;
-  uint8_t sendbuf[9] = {
-    // header
-    0x1,
+  uint8_t sendbuf[12] = {
+    // payload size
+    (payload_size >> 16) & 0xff,
+    (payload_size >> 8) & 0xff,
+    payload_size & 0xff,
+    // packet type (0x01 == audio start time)
+    0x01,
     // payload
     logical_start_time >> 56,
     (logical_start_time >> 48) & 0xff,
@@ -702,20 +707,25 @@ static void send_audio_control_info() {
     (logical_start_time >> 8) & 0xff,
     logical_start_time & 0xff,
   };
-  if (send(sockfd_audio_control, sendbuf, 9, 0) == -1) {
-    perror("send audio_control");
+  if (send(sockfd_audio_control, sendbuf, 12, 0) == -1) {
+    perror("send audio start time");
     exit(1);
   }
 #endif // ENABLE_UNIX_SOCKETS_OUTPUT
 }
 
 // Send video packet to node-rtsp-rtmp-server
-static void send_video_control_info() {
+static void send_video_start_time() {
 #if ENABLE_UNIX_SOCKETS_OUTPUT
+  int payload_size = 9;
   int64_t logical_start_time = video_start_time;
-  uint8_t sendbuf[9] = {
-    // header
-    0x1,
+  uint8_t sendbuf[12] = {
+    // payload size
+    (payload_size >> 16) & 0xff,
+    (payload_size >> 8) & 0xff,
+    payload_size & 0xff,
+    // packet type (0x00 == video start time)
+    0x00,
     // payload
     logical_start_time >> 56,
     (logical_start_time >> 48) & 0xff,
@@ -726,8 +736,8 @@ static void send_video_control_info() {
     (logical_start_time >> 8) & 0xff,
     logical_start_time & 0xff,
   };
-  if (send(sockfd_video_control, sendbuf, 9, 0) == -1) {
-    perror("send video_control");
+  if (send(sockfd_video_control, sendbuf, 12, 0) == -1) {
+    perror("send video start time");
     exit(1);
   }
 #endif // ENABLE_UNIX_SOCKETS_OUTPUT
@@ -918,7 +928,7 @@ static void send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts) {
   sendbuf[1] = (payload_size >> 8) & 0xff;
   sendbuf[2] = payload_size & 0xff;
   // payload
-  sendbuf[3] = 0x01;  // packet type (PTS == DTS)
+  sendbuf[3] = 0x03;  // packet type (0x03 == audio data)
   sendbuf[4] = (pts >> 40) & 0xff;
   sendbuf[5] = (pts >> 32) & 0xff;
   sendbuf[6] = (pts >> 24) & 0xff;
@@ -927,7 +937,7 @@ static void send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts) {
   sendbuf[9] = pts & 0xff;
   memcpy(sendbuf + 10, databuf, databuflen);
   if (send(sockfd_audio, sendbuf, total_size, 0) == -1) {
-    perror("send audio");
+    perror("send audio data");
     exit(1);
   }
   free(sendbuf);
@@ -948,7 +958,7 @@ static void send_video_frame(uint8_t *databuf, int databuflen, int64_t pts) {
   sendbuf[1] = (payload_size >> 8) & 0xff;
   sendbuf[2] = payload_size & 0xff;
   // payload
-  sendbuf[3] = 0x01;  // packet type (PTS == DTS)
+  sendbuf[3] = 0x02;  // packet type (0x02 == video data)
   sendbuf[4] = (pts >> 40) & 0xff;
   sendbuf[5] = (pts >> 32) & 0xff;
   sendbuf[6] = (pts >> 24) & 0xff;
@@ -957,7 +967,7 @@ static void send_video_frame(uint8_t *databuf, int databuflen, int64_t pts) {
   sendbuf[9] = pts & 0xff;
   memcpy(sendbuf + 10, databuf, databuflen);
   if (send(sockfd_video, sendbuf, total_size, 0) == -1) {
-    perror("send video error");
+    perror("send video data");
   }
   free(sendbuf);
 #endif // ENABLE_UNIX_SOCKETS_OUTPUT
@@ -1552,8 +1562,8 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
             struct timespec ts;
             clock_gettime(CLOCK_MONOTONIC, &ts);
             video_start_time = audio_start_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
-            send_audio_control_info();
-            send_video_control_info();
+            send_audio_start_time();
+            send_video_start_time();
           }
         }
 
@@ -2520,8 +2530,8 @@ static void audio_loop_poll_mmap() {
             struct timespec ts;
             clock_gettime(CLOCK_MONOTONIC, &ts);
             video_start_time = audio_start_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
-            send_audio_control_info();
-            send_video_control_info();
+            send_audio_start_time();
+            send_video_start_time();
           }
         }
         if (is_video_recording_started == 1) {
