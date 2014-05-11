@@ -39,10 +39,10 @@ extern "C" {
 // Meant to be used with https://github.com/iizukanao/node-rtsp-rtmp-server
 #define ENABLE_UNIX_SOCKETS_OUTPUT 1  // default: 1
 // UNIX domain sockets provided by node-rtsp-rtmp-server
-#define SOCK_PATH_VIDEO         "/tmp/node_rtsp_rtmp_videoReceiver"
 #define SOCK_PATH_VIDEO_CONTROL "/tmp/node_rtsp_rtmp_videoControl"
-#define SOCK_PATH_AUDIO         "/tmp/node_rtsp_rtmp_audioReceiver"
 #define SOCK_PATH_AUDIO_CONTROL "/tmp/node_rtsp_rtmp_audioControl"
+#define SOCK_PATH_VIDEO_DATA    "/tmp/node_rtsp_rtmp_videoData"
+#define SOCK_PATH_AUDIO_DATA    "/tmp/node_rtsp_rtmp_audioData"
 
 // Enable MPEG-TS output via TCP socket or not
 #define ENABLE_TCP_OUTPUT 0  // default: 0

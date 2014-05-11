@@ -760,12 +760,12 @@ static void setup_socks() {
     exit(1);
   }
   remote_video.sun_family = AF_UNIX;
-  strcpy(remote_video.sun_path, SOCK_PATH_VIDEO);
+  strcpy(remote_video.sun_path, SOCK_PATH_VIDEO_DATA);
   len = strlen(remote_video.sun_path) + sizeof(remote_video.sun_family);
   if (connect(sockfd_video, (struct sockaddr *)&remote_video, len) == -1) {
     fprintf(stderr, "failed to connect to video socket (%s): %s\nperhaps RTSP server"
         " (https://github.com/iizukanao/node-rtsp-rtmp-server) is not running?\n",
-        SOCK_PATH_VIDEO, strerror(errno));
+        SOCK_PATH_VIDEO_DATA, strerror(errno));
     exit(1);
   }
 
@@ -790,12 +790,12 @@ static void setup_socks() {
     exit(1);
   }
   remote_audio.sun_family = AF_UNIX;
-  strcpy(remote_audio.sun_path, SOCK_PATH_AUDIO);
+  strcpy(remote_audio.sun_path, SOCK_PATH_AUDIO_DATA);
   len = strlen(remote_audio.sun_path) + sizeof(remote_audio.sun_family);
   if (connect(sockfd_audio, (struct sockaddr *)&remote_audio, len) == -1) {
     fprintf(stderr, "failed to connect to audio socket (%s): %s\nperhaps RTSP server"
         " (https://github.com/iizukanao/node-rtsp-rtmp-server) is not running?\n",
-        SOCK_PATH_AUDIO, strerror(errno));
+        SOCK_PATH_AUDIO_DATA, strerror(errno));
     exit(1);
   }
 
