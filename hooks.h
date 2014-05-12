@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+int hooks_create_dir(char *dir);
 int clear_hooks(char *dirname);
 void start_watching_hooks(pthread_t *thread, char *dir, void (*callback)(char *, char *), int read_content);
 void stop_watching_hooks();

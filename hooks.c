@@ -30,6 +30,43 @@ static pthread_t *watcher_thread;
 void sig_handler(int signum) {
 }
 
+// Create hooks dir if it does not exist
+int hooks_create_dir(char *dir) {
+  struct stat st;
+  int err;
+
+  err = stat(dir, &st);
+  if (err == -1) {
+    if (errno == ENOENT) {
+      // create directory
+      if (mkdir(dir, 0755) == 0) { // success
+        fprintf(stderr, "created hooks dir: ./%s\n", dir);
+      } else { // error
+        fprintf(stderr, "error creating hooks dir (./%s): %s\n",
+            dir, strerror(errno));
+        return -1;
+      }
+    } else {
+      perror("stat hooks dir");
+      return -1;
+    }
+  } else {
+    if (!S_ISDIR(st.st_mode)) {
+      fprintf(stderr, "hooks dir (./%s) is not a directory\n",
+          dir);
+      return -1;
+    }
+  }
+
+  if (access(dir, R_OK) != 0) {
+    fprintf(stderr, "Can't access hooks dir (./%s): %s\n",
+        dir, strerror(errno));
+    return -1;
+  }
+
+  return 0;
+}
+
 int clear_hooks(char *dirname) {
   DIR *dir;
   struct dirent *ent;
