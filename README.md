@@ -26,8 +26,6 @@
 
 ### Installation
 
-(Documentation is in progress)
-
 #### Install libraries
 
 Build and install these libraries on a Raspberry Pi:
@@ -49,12 +47,61 @@ On a Raspberry Pi, issue the following command:
     $ cd picam
     $ make
 
-### Starting the process
+### Usage
 
-    $ cd picam
-    $ ./stream.bin
+    $ ./picam --help
+    picam version 1.0.0
+    Usage: picam [options]
 
-Make sure that [node-rtsp-rtmp-server](https://github.com/iizukanao/node-rtsp-rtmp-server) is running before starting stream.bin. Alternatively you can [use nginx-rtmp-module](#using-picam-in-combination-with-nginx-rtmp-module), or [use HTTP Live Streaming only](#using-http-live-streaming-only).
+    Options:
+     [video]
+      -w, --width         Width in pixels (default: 1280)
+      -h, --height        Height in pixels (default: 720)
+      -v, --videobitrate  Video bit rate (default: 2000000)
+      -g, --gopsize       GOP size (default: 30)
+     [audio]
+      -r, --samplerate    Audio sample rate (default: 48000)
+      -a, --audiobitrate  Audio bit rate (default: 40000)
+      --alsadev <dev>     ALSA microphone device (default: hw:0,0)
+      --volume <num>      Amplify audio by multiplying the volume by <num>
+                          (default: 1.0)
+     [HTTP Live Streaming (HLS)]
+      -o, --hlsdir <dir>  Generate HTTP Live Streaming files in <dir>
+      --hlsenc            Enable HLS encryption
+      --hlsenckeyuri <uri>  Set HLS encryption key URI (default: stream.key)
+      --hlsenckey <hex>   Set HLS encryption key in hex string
+                          (default: 75b0a81de17487c88a47507a7e1fdf73)
+      --hlsenciv <hex>    Set HLS encryption IV in hex string
+                          (default: 01020304050607080910111213141516)
+     [output for node-rtsp-rtmp-server]
+      --rtspout           Enable output for node-rtsp-rtmp-server
+      --rtspvideocontrol <path>  Set video control socket path
+                          (default: /tmp/node_rtsp_rtmp_videoControl)
+      --rtspaudiocontrol <path>  Set audio control socket path
+                          (default: /tmp/node_rtsp_rtmp_audioControl)
+      --rtspvideodata <path>  Set video data socket path
+                          (default: /tmp/node_rtsp_rtmp_videoData)
+      --rtspaudiodata <path>  Set audio data socket path
+                          (default: /tmp/node_rtsp_rtmp_audioData)
+     [MPEG-TS output via TCP]
+      --tcpout <url>      Enable TCP output to <url>
+                          (e.g. --tcpout tcp://127.0.0.1:8181)
+     [camera]
+      --autoexposure      Enable automatic changing of exposure
+      --expnight <num>    Change the exposure to night mode if the average
+                          value of Y (brightness) is <= <num> while in
+                          daylight mode (default: 40)
+      --expday <num>      Change the exposure to daylight mode if the average
+                          value of Y (brightness) is >= <num> while in
+                          night mode (default: 50)
+      -p, --preview       Display a preview window for video
+     [misc]
+      --recordbuf <num>   Start recording from <num> keyframes ago
+                          (default: 5)
+      --statedir <dir>    Set state dir (default: state)
+      --hooksdir <dir>    Set hooks dir (default: hooks)
+      -q, --quiet         Turn off most of the log messages
+      --help              Print this help
 
 ### Recording
 
@@ -68,26 +115,21 @@ Make sure that [node-rtsp-rtmp-server](https://github.com/iizukanao/node-rtsp-rt
     $ cd picam
     $ touch hooks/stop_record
 
+Recorded files are generated in rec/ directory.
+
 ### Mute/Unmute
 
-To mute:
+To mute microphone temporarily:
 
     $ touch hooks/mute
 
-To unmute:
+To unmute microphone:
 
     $ touch hooks/unmute
 
-Recorded MPEG-TS file will go in `archive` directory.
-
 ### Using picam in combination with nginx-rtmp-module
 
-To use picam with [nginx-rtmp-module](https://github.com/arut/nginx-rtmp-module), make changes to the two constants in config.h like this:
-
-    #define ENABLE_UNIX_SOCKETS_OUTPUT 0
-    #define ENABLE_TCP_OUTPUT 1
-
-Run `make` to build stream.bin. Add the following lines to nginx.conf:
+To use picam with [nginx-rtmp-module](https://github.com/arut/nginx-rtmp-module), add the following lines to nginx.conf:
 
     rtmp {
         server {
@@ -105,23 +147,17 @@ Run `make` to build stream.bin. Add the following lines to nginx.conf:
 
 Note that `/path/to/ffmpeg` should be replaced with the actual absolute path to ffmpeg command.
 
-Start nginx server, then run stream.bin. You can access the RTMP stream at `rtmp://YOUR_RASPBERRYPI_IP/webcam/mystream`.
+Start nginx server, then run:
+
+    $ ./picam --tcpout tcp://127.0.0.1:8181
+
+You can access your live stream at `rtmp://YOUR_RASPBERRYPI_IP/webcam/mystream`.
 
 ### HTTP Live Streaming
 
-HTTP Live Streaming files are generated in `/run/shm/video`. You can change the output directory by changing `HLS_OUTPUT_DIR` in config.h.
+HTTP Live Streaming is disabled by default. To enable HTTP Live Streaming and generate files in /run/shm/hls, run:
 
-If you want to turn off HTTP Live Streaming, set `ENABLE_HLS_OUTPUT` to 0 in config.h, then run `make`.
-
-### Using HTTP Live Streaming only
-
-To enable HTTP Live Streaming only and disable other output, change the constants in config.h as follows:
-
-    #define ENABLE_HLS_OUTPUT  1
-    #define ENABLE_UNIX_SOCKETS_OUTPUT  0
-    #define ENABLE_TCP_OUTPUT  0
-
-Then run `make`.
+    $ ./picam -o /run/shm/hls
 
 ### Recommended hardware
 
