@@ -75,7 +75,7 @@ On a Raspberry Pi, issue the following command:
       --hlsenckey <hex>   Set HLS encryption key in hex string
                           (default: 75b0a81de17487c88a47507a7e1fdf73)
       --hlsenciv <hex>    Set HLS encryption IV in hex string
-                          (default: 01020304050607080910111213141516)
+                          (default: 000102030405060708090a0b0c0d0e0f)
      [output for node-rtsp-rtmp-server]
       --rtspout           Enable output for node-rtsp-rtmp-server
       --rtspvideocontrol <path>  Set video control socket path
