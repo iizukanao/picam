@@ -88,6 +88,11 @@ extern "C" {
 #define FILL_COLOR_U 128
 #define FILL_COLOR_V 128
 
+// Directory to put recorded MPEG-TS files
+static const char *rec_dir = "rec";
+static const char *rec_tmp_dir = "rec/tmp";
+static const char *rec_archive_dir = "rec/archive";
+
 // Whether or not to enable clock OMX component
 static const int is_clock_enabled = 1;
 
@@ -486,31 +491,41 @@ void setup_av_frame(AVFormatContext *format_ctx) {
   }
 }
 
-void check_record_directory() {
+// Create dir if it does not exist
+int create_dir(const char *dir) {
   struct stat st;
   int err;
-  char *dir;
 
-  dir = "rec";
   err = stat(dir, &st);
   if (err == -1) {
     if (errno == ENOENT) {
-      fprintf(stderr, "rec directory does not exist\n");
+      // create directory
+      if (mkdir(dir, 0755) == 0) { // success
+        fprintf(stderr, "created directory: ./%s\n", dir);
+      } else { // error
+        fprintf(stderr, "error creating directory ./%s: %s\n",
+            dir, strerror(errno));
+        return -1;
+      }
     } else {
-      perror("stat rec directory");
+      perror("stat directory");
+      return -1;
     }
-    exit(1);
   } else {
     if (!S_ISDIR(st.st_mode)) {
-      fprintf(stderr, "rec is not a directory\n");
-      exit(1);
+      fprintf(stderr, "./%s is not a directory\n",
+          dir);
+      return -1;
     }
   }
 
   if (access(dir, R_OK) != 0) {
-    fprintf(stderr, "Can't access rec directory: %s\n", strerror(errno));
-    exit(1);
+    fprintf(stderr, "Can't access directory ./%s: %s\n",
+        dir, strerror(errno));
+    return -1;
   }
+
+  return 0;
 }
 
 void *rec_thread_stop() {
@@ -3144,7 +3159,9 @@ int main(int argc, char **argv) {
   codec_settings.audio_channels = 1;
   codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
 
-  check_record_directory();
+  create_dir(rec_dir);
+  create_dir(rec_tmp_dir);
+  create_dir(rec_archive_dir);
 
   if (is_hlsout_enabled) {
     ensure_hls_dir_exists();
