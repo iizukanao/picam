@@ -1,7 +1,16 @@
 #include <libavutil/avutil.h>
 
 #include "mpegts.h"
-#include "config.h"
+
+static long video_bitrate;
+static int video_width;
+static int video_height;
+
+void mpegts_set_config(long bitrate, int width, int height) {
+  video_bitrate = bitrate;
+  video_width = width;
+  video_height = height;
+}
 
 void setup_video_stream(AVFormatContext *format_ctx) {
   AVStream *video_stream;
@@ -18,7 +27,7 @@ void setup_video_stream(AVFormatContext *format_ctx) {
   video_codec_ctx->codec_id      = CODEC_ID_H264;
   video_codec_ctx->codec_type    = AVMEDIA_TYPE_VIDEO;
   video_codec_ctx->codec_tag     = 0;
-  video_codec_ctx->bit_rate      = H264_BIT_RATE;
+  video_codec_ctx->bit_rate      = video_bitrate;
 
   // Main profile is not playable on Android
   video_codec_ctx->profile       = FF_PROFILE_H264_CONSTRAINED_BASELINE;
@@ -28,8 +37,8 @@ void setup_video_stream(AVFormatContext *format_ctx) {
   video_codec_ctx->time_base.den = 180000;
   video_codec_ctx->ticks_per_frame = 2;
   video_codec_ctx->pix_fmt       = 0;
-  video_codec_ctx->width         = WIDTH;
-  video_codec_ctx->height        = HEIGHT;
+  video_codec_ctx->width         = video_width;
+  video_codec_ctx->height        = video_height;
   video_codec_ctx->has_b_frames  = 0;
   video_codec_ctx->flags         |= CODEC_FLAG_GLOBAL_HEADER;
 }

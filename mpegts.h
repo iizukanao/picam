@@ -17,6 +17,7 @@ typedef struct MpegTSCodecSettings {
 AVFormatContext *mpegts_create_context(MpegTSCodecSettings *settings);
 AVFormatContext *mpegts_create_context_video_only(MpegTSCodecSettings *settings);
 AVFormatContext *mpegts_create_context_audio_only(MpegTSCodecSettings *settings);
+void mpegts_set_config(long bitrate, int width, int height);
 void mpegts_open_stream(AVFormatContext *format_ctx, char *filename, int dump_format);
 void mpegts_open_stream_without_header(AVFormatContext *format_ctx, char *filename, int dump_format);
 void mpegts_close_stream(AVFormatContext *format_ctx);
