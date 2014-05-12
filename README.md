@@ -170,9 +170,9 @@ HTTP Live Streaming is disabled by default. To enable HTTP Live Streaming and ge
 
 Optionally you can enable encryption for HTTP Live Streaming. We will use the following settings as an example.
 
-    HTTP Live Streaming directory: /run/shm/hls/
-    Encryption key: 0xf0f1f2f3f4f5f6f7f8f9fafbfcfdfeff
-    Encryption IV:  0x000102030405060708090a0b0c0d0e0f
+- **HTTP Live Streaming directory**: /run/shm/hls/
+- **Encryption key**: 0xf0f1f2f3f4f5f6f7f8f9fafbfcfdfeff
+- **Encryption IV**:  0x000102030405060708090a0b0c0d0e0f
 
 First you have to create a file named "enc.key" which contains 16-byte encryption key. To create such file, do:
 
