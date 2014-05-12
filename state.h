@@ -5,6 +5,7 @@
 extern "C" {
 #endif
 
+int state_create_dir(char *dir);
 void state_set(char *dir, char *name, char *value);
 void state_get(char *dir, char *name, char **buf);
 
