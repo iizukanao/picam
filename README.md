@@ -159,6 +159,29 @@ HTTP Live Streaming is disabled by default. To enable HTTP Live Streaming and ge
 
     $ ./picam -o /run/shm/hls
 
+#### Encryption
+
+You can enable encryption for HTTP Live Streaming. We will use the following settings as an example.
+
+    HTTP Live Streaming directory: /run/shm/hls/
+    Encryption key: 0xf0f1f2f3f4f5f6f7f8f9fafbfcfdfeff
+    Encryption IV:  0x000102030405060708090a0b0c0d0e0f
+
+First you have to create a file named "enc.key" which contains 16 byte encryption key. To generate such file:
+
+    $ echo -n $'\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff' > enc.key
+
+Put enc.key in /run/shm/hls/ directory. Run picam with following options:
+
+    $ ./picam -o /run/shm/hls --hlsenc --hlsenckeyuri enc.key \
+      --hlsenckey f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff \
+      --hlsenciv 000102030405060708090a0b0c0d0e0f
+
+You can watch the HTTP Live Streaming by accessing index.m3u8 with QuickTime Player.
+
+#### Example program to create encryption key file
+
+
 ### Recommended hardware
 
 #### USB microphone
