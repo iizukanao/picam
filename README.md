@@ -18,11 +18,13 @@
 - Auto exposure adjustment
 - Send H.264/AAC data with timestamps via UNIX domain socket to another process
 
+
 ### Required hardware
 
 - Raspberry Pi
 - Raspberry Pi Camera Board
 - USB microphone (see [Recommended hardware](#recommended-hardware))
+
 
 ### Installation
 
@@ -46,6 +48,7 @@ On a Raspberry Pi, issue the following command:
     $ git clone https://github.com/iizukanao/picam.git
     $ cd picam
     $ make
+
 
 ### Usage
 
@@ -103,6 +106,7 @@ On a Raspberry Pi, issue the following command:
       -q, --quiet         Turn off most of the log messages
       --help              Print this help
 
+
 ### Recording
 
 #### Start recording
@@ -117,6 +121,7 @@ On a Raspberry Pi, issue the following command:
 
 Recorded files are generated in rec/ directory.
 
+
 ### Mute/Unmute
 
 To mute microphone temporarily:
@@ -126,6 +131,7 @@ To mute microphone temporarily:
 To unmute microphone:
 
     $ touch hooks/unmute
+
 
 ### Using picam in combination with nginx-rtmp-module
 
@@ -153,6 +159,7 @@ Start nginx server, then run:
 
 You can access your live stream at `rtmp://YOUR_RASPBERRYPI_IP/webcam/mystream`.
 
+
 ### HTTP Live Streaming
 
 HTTP Live Streaming is disabled by default. To enable HTTP Live Streaming and generate files in /run/shm/hls, run:
@@ -167,7 +174,7 @@ Optionally you can enable encryption for HTTP Live Streaming. We will use the fo
     Encryption key: 0xf0f1f2f3f4f5f6f7f8f9fafbfcfdfeff
     Encryption IV:  0x000102030405060708090a0b0c0d0e0f
 
-First you have to create a file named "enc.key" which contains 16 byte encryption key. To create such file, do:
+First you have to create a file named "enc.key" which contains 16-byte encryption key. To create such file, do:
 
     $ echo -n $'\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff' > enc.key
 
@@ -179,14 +186,12 @@ Put enc.key in /run/shm/hls/ directory. Then, run picam with following options:
 
 You can watch the HTTP Live Streaming by accessing /run/shm/hls/index.m3u8 via HTTP or HTTPS with QuickTime Player.
 
-#### Example program to create encryption key file
-
 
 ### Recommended hardware
 
 #### USB microphone
 
-I have tested this program with the combination of:
+Any cheap USB microphone should work as long as it is supported by ALSA. I have tested this program with the combination of:
 
 - USB to 3.5mm audio adapter: [PLANEX PL-US35AP](http://www.planex.co.jp/product/usb/pl-us35ap/)
 - Microphone: [ELECOM MS-STM95](http://www2.elecom.co.jp/multimedia/microphone/ms-stm95/)
