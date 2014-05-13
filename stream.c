@@ -1666,11 +1666,10 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
     } else {
       log_warn("got zero bytes\n");
     }
+    out->nFilledLen = 0;
   } else {
     log_warn("out is NULL\n");
   }
-
-  out->nFilledLen = 0;
 
   if (keepRunning) {
     error = OMX_FillThisBuffer(ILC_GET_HANDLE(camera_component), out);
