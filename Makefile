@@ -8,9 +8,6 @@ EXECUTABLE=picam
 
 all: $(SOURCES) $(EXECUTABLE)
 
-still: still.c
-	$(CC) still.c -o still $(CFLAGS) $(LDFLAGS)
-
 $(EXECUTABLE): $(OBJECTS)
 	$(CC) $(OBJECTS) -o $@ $(LDFLAGS)
 
