@@ -42,6 +42,7 @@ extern "C" {
 #include "mpegts.h"
 #include "httplivestreaming.h"
 #include "state.h"
+#include "log.h"
 
 #define PROGRAM_NAME     "picam"
 #define PROGRAM_VERSION  "1.0.0"
@@ -111,11 +112,6 @@ typedef struct EncodedPacket {
   int flags;
 } EncodedPacket;
 
-#define LOG_LEVEL_DEBUG  0
-#define LOG_LEVEL_INFO   1
-#define LOG_LEVEL_ERROR  2
-
-static int log_level;
 static const int log_level_default = LOG_LEVEL_INFO;
 static int video_width;
 static const int video_width_default = 1280;
@@ -316,12 +312,12 @@ static MpegTSCodecSettings codec_settings;
 static int is_audio_muted = 0;
 
 static void unmute_audio() {
-  fprintf(stderr, "unmute");
+  log_info("unmute");
   is_audio_muted = 0;
 }
 
 static void mute_audio() {
-  fprintf(stderr, "mute");
+  log_info("mute");
   is_audio_muted = 1;
 }
 
@@ -330,7 +326,7 @@ static int is_disk_almost_full() {
   struct statvfs stat;
   statvfs("/", &stat);
   int used_percent = ceil( (stat.f_blocks - stat.f_bfree) * 100.0 / stat.f_blocks);
-  fprintf(stderr, "disk usage=%d%% ", used_percent);
+  log_info("disk_usage=%d%% ", used_percent);
   if (used_percent >= 95) {
     return 1;
   } else {
@@ -357,7 +353,7 @@ static void prepare_encoded_packets() {
   int malloc_size = sizeof(EncodedPacket *) * encoded_packets_size;
   encoded_packets = malloc(malloc_size);
   if (encoded_packets == NULL) {
-    fprintf(stderr, "can't allocate memory for encoded_packets\n");
+    log_error("cannot allocate memory for encoded_packets\n");
     exit(1);
   }
   memset(encoded_packets, 0, malloc_size);
@@ -382,7 +378,7 @@ static int write_encoded_packets(int max_packets, int origin_pts) {
     avpkt.flags = enc_pkt->flags;
     ret = av_write_frame(rec_format_ctx, &avpkt);
     if (ret < 0) {
-      fprintf(stderr, "write_encoded_packets: av_write_frame error: ret=%d\n", ret);
+      log_error("write_encoded_packets: av_write_frame error: ret=%d\n", ret);
     }
     if (++rec_thread_frame == encoded_packets_size) {
       rec_thread_frame = 0;
@@ -450,7 +446,7 @@ void setup_av_frame(AVFormatContext *format_ctx) {
 
   av_frame = avcodec_alloc_frame();
   if (!av_frame) {
-    fprintf(stderr, "avcodec_alloc_frame failed\n");
+    log_error("avcodec_alloc_frame failed\n");
     exit(1);
   }
 
@@ -463,7 +459,7 @@ void setup_av_frame(AVFormatContext *format_ctx) {
       audio_codec_ctx->frame_size, audio_codec_ctx->sample_fmt, 0);
   samples = av_malloc(buffer_size);
   if (!samples) {
-    fprintf(stderr, "av_malloc for samples failed\n");
+    log_error("av_malloc for samples failed\n");
     exit(1);
   }
 #if AUDIO_BUFFER_CHUNKS > 0
@@ -471,7 +467,7 @@ void setup_av_frame(AVFormatContext *format_ctx) {
   for (i = 0; i < AUDIO_BUFFER_CHUNKS; i++) {
     audio_buffer[i] = av_malloc(buffer_size);
     if (!audio_buffer[i]) {
-      fprintf(stderr, "av_malloc for audio_buffer[%d] failed\n", i);
+      log_error("av_malloc for audio_buffer[%d] failed\n", i);
       exit(1);
     }
   }
@@ -479,14 +475,12 @@ void setup_av_frame(AVFormatContext *format_ctx) {
 
   period_size = buffer_size / channels / sizeof(short);
   audio_pts_step_base = 90000.0 * period_size / audio_sample_rate;
-  if (log_level <= LOG_LEVEL_DEBUG) {
-    fprintf(stderr, "audio_pts_step_base: %d\n", audio_pts_step_base);
-  }
+  log_debug("audio_pts_step_base: %d\n", audio_pts_step_base);
 
   ret = avcodec_fill_audio_frame(av_frame, audio_codec_ctx->channels, audio_codec_ctx->sample_fmt,
       (const uint8_t*)samples, buffer_size, 0);
   if (ret < 0) {
-    fprintf(stderr, "avcodec_fill_audio_frame failed: ret=%d\n", ret);
+    log_error("avcodec_fill_audio_frame failed: ret=%d\n", ret);
     exit(1);
   }
 }
@@ -501,9 +495,9 @@ int create_dir(const char *dir) {
     if (errno == ENOENT) {
       // create directory
       if (mkdir(dir, 0755) == 0) { // success
-        fprintf(stderr, "created directory: ./%s\n", dir);
+        log_info("created directory: ./%s\n", dir);
       } else { // error
-        fprintf(stderr, "error creating directory ./%s: %s\n",
+        log_error("error creating directory ./%s: %s\n",
             dir, strerror(errno));
         return -1;
       }
@@ -513,14 +507,13 @@ int create_dir(const char *dir) {
     }
   } else {
     if (!S_ISDIR(st.st_mode)) {
-      fprintf(stderr, "./%s is not a directory\n",
-          dir);
+      log_error("./%s is not a directory\n", dir);
       return -1;
     }
   }
 
   if (access(dir, R_OK) != 0) {
-    fprintf(stderr, "Can't access directory ./%s: %s\n",
+    log_error("cannot access directory ./%s: %s\n",
         dir, strerror(errno));
     return -1;
   }
@@ -542,11 +535,11 @@ void *rec_thread_stop() {
   pthread_mutex_lock(&rec_write_mutex);
   mpegts_close_stream(rec_format_ctx);
   mpegts_destroy_context(rec_format_ctx);
-  fprintf(stderr, "stop rec");
+  log_info("stop rec");
   state_set(state_dir, "record", "false");
   pthread_mutex_unlock(&rec_write_mutex);
 
-  fprintf(stderr, "copy ");
+  log_debug("copy ");
   fsrc = fopen(recording_tmp_filepath, "r");
   if (fsrc == NULL) {
     perror("fopen recording_tmp_filepath");
@@ -568,17 +561,17 @@ void *rec_thread_stop() {
     fclose(fsrc);
     fclose(fdest);
   } else {
-    fprintf(stderr, "rec_thread_stop: not an EOF?: %s\n", strerror(errno));
+    log_error("rec_thread_stop: not an EOF?: %s\n", strerror(errno));
   }
 
   // link
-  fprintf(stderr, "symlink");
+  log_debug("symlink");
   if (symlink(recording_archive_filepath + 4, recording_filepath) != 0) { // +4 is for trimming "rec/"
     perror("symlink recording_archive_filepath");
   }
 
   // unlink tmp file
-  fprintf(stderr, "unlink");
+  log_debug("unlink");
   unlink(recording_tmp_filepath);
 
   state_set(state_dir, "last_rec", recording_filepath);
@@ -657,7 +650,7 @@ void *rec_thread_start() {
   rec_format_ctx = mpegts_create_context(&codec_settings);
   mpegts_open_stream(rec_format_ctx, recording_tmp_filepath, 0);
   is_recording = 1;
-  fprintf(stderr, "start rec to %s", recording_tmp_filepath);
+  log_info("start rec to %s", recording_tmp_filepath);
   state_set(state_dir, "record", "true");
   pthread_mutex_unlock(&rec_write_mutex);
 
@@ -688,14 +681,14 @@ void *rec_thread_start() {
       wrote_packets = write_encoded_packets(REC_CHASE_PACKETS, rec_start_pts);
       if (wrote_packets <= 2) {
         if (!is_caught_up) {
-          fprintf(stderr, "caught up");
+          log_info("caught up");
           is_caught_up = 1;
         }
       }
     }
     check_record_duration();
     if (rec_thread_needs_flush) {
-      fprintf(stderr, "F");
+      log_debug("F");
       mpegts_close_stream_without_trailer(rec_format_ctx);
 
       fsrc = fopen(recording_tmp_filepath, "r");
@@ -719,7 +712,7 @@ void *rec_thread_start() {
         fclose(fsrc);
         fclose(fdest);
       } else {
-        fprintf(stderr, "rec_thread_start: not an EOF?: %s\n", strerror(errno));
+        log_error("rec_thread_start: not an EOF?: %s\n", strerror(errno));
       }
 
       mpegts_open_stream_without_header(rec_format_ctx, recording_tmp_filepath, 0);
@@ -744,12 +737,12 @@ void *rec_thread_start() {
 
 void start_record() {
   if (is_recording) {
-    fprintf(stderr, "Recording is already started\n");
+    log_warn("recording is already started\n");
     return;
   }
 
   if (is_disk_almost_full()) {
-    fprintf(stderr, "disk is almost full, recording not started\n");
+    log_error("disk is almost full, recording not started\n");
     return;
   }
 
@@ -836,9 +829,7 @@ static void setup_socks() {
     struct sockaddr_un remote_video_control;
     struct sockaddr_un remote_audio_control;
 
-    if (log_level <= LOG_LEVEL_DEBUG) {
-      fprintf(stderr, "connecting to UNIX domain sockets\n");
-    }
+    log_debug("connecting to UNIX domain sockets\n");
 
     // Setup sockfd_video
     if ((sockfd_video = socket(AF_UNIX, SOCK_STREAM, 0)) == -1) {
@@ -849,7 +840,7 @@ static void setup_socks() {
     strcpy(remote_video.sun_path, rtsp_video_data_path);
     len = strlen(remote_video.sun_path) + sizeof(remote_video.sun_family);
     if (connect(sockfd_video, (struct sockaddr *)&remote_video, len) == -1) {
-      fprintf(stderr, "error: failed to connect to video data socket (%s): %s\n"
+      log_error("error: failed to connect to video data socket (%s): %s\n"
           "perhaps RTSP server (https://github.com/iizukanao/node-rtsp-rtmp-server) is not running?\n",
           rtsp_video_data_path, strerror(errno));
       exit(1);
@@ -864,7 +855,7 @@ static void setup_socks() {
     strcpy(remote_video_control.sun_path, rtsp_video_control_path);
     len = strlen(remote_video_control.sun_path) + sizeof(remote_video_control.sun_family);
     if (connect(sockfd_video_control, (struct sockaddr *)&remote_video_control, len) == -1) {
-      fprintf(stderr, "error: failed to connect to video control socket (%s): %s\n"
+      log_error("error: failed to connect to video control socket (%s): %s\n"
           "perhaps RTSP server (https://github.com/iizukanao/node-rtsp-rtmp-server) is not running?\n",
           rtsp_video_control_path, strerror(errno));
       exit(1);
@@ -879,7 +870,7 @@ static void setup_socks() {
     strcpy(remote_audio.sun_path, rtsp_audio_data_path);
     len = strlen(remote_audio.sun_path) + sizeof(remote_audio.sun_family);
     if (connect(sockfd_audio, (struct sockaddr *)&remote_audio, len) == -1) {
-      fprintf(stderr, "error: failed to connect to audio data socket (%s): %s\n"
+      log_error("error: failed to connect to audio data socket (%s): %s\n"
           "perhaps RTSP server (https://github.com/iizukanao/node-rtsp-rtmp-server) is not running?\n",
           rtsp_audio_data_path, strerror(errno));
       exit(1);
@@ -894,7 +885,7 @@ static void setup_socks() {
     strcpy(remote_audio_control.sun_path, rtsp_audio_control_path);
     len = strlen(remote_audio_control.sun_path) + sizeof(remote_audio_control.sun_family);
     if (connect(sockfd_audio_control, (struct sockaddr *)&remote_audio_control, len) == -1) {
-      fprintf(stderr, "error: failed to connect to audio control socket (%s): %s\n"
+      log_error("error: failed to connect to audio control socket (%s): %s\n"
           "perhaps RTSP server (https://github.com/iizukanao/node-rtsp-rtmp-server) is not running?\n",
           rtsp_audio_control_path, strerror(errno));
       exit(1);
@@ -937,36 +928,32 @@ static int64_t get_next_video_pts() {
   int pts_diff = audio_current_pts - video_current_pts - VIDEO_PTS_STEP;
   int tolerance = (VIDEO_PTS_STEP + audio_pts_step_base) * 2;
   if (pts_diff >= PTS_DIFF_TOO_LARGE) {
-    if (log_level <= LOG_LEVEL_DEBUG) {
-      fprintf(stderr, "vR%d", pts_diff);
-    }
+    // video PTS is too slow
+    log_debug("vR%d", pts_diff);
     pts = audio_current_pts;
   } else if (pts_diff >= tolerance) {
     if (pts_mode != PTS_SPEED_UP) {
+      // speed up video PTS
       speed_up_count++;
       pts_mode = PTS_SPEED_UP;
-      if (log_level <= LOG_LEVEL_DEBUG) {
-        fprintf(stderr, "vSPEED_UP(%d)", pts_diff);
-      }
+      log_debug("vSPEED_UP(%d)", pts_diff);
     }
     // Catch up with audio PTS if the delay is too large.
     pts = video_current_pts + VIDEO_PTS_STEP + 150;
   } else if (pts_diff <= -tolerance) {
     if (pts_mode != PTS_SPEED_DOWN) {
+      // speed down video PTS
       pts_mode = PTS_SPEED_DOWN;
       speed_down_count++;
-      if (log_level <= LOG_LEVEL_DEBUG) {
-        fprintf(stderr, "vSPEED_DOWN(%d)", pts_diff);
-      }
+      log_debug("vSPEED_DOWN(%d)", pts_diff);
     }
     pts = video_current_pts + VIDEO_PTS_STEP - 150;
   } else {
     pts = video_current_pts + VIDEO_PTS_STEP;
     if (pts_diff < 2000 && pts_diff > -2000) {
       if (pts_mode != PTS_SPEED_NORMAL) {
-        if (log_level <= LOG_LEVEL_DEBUG) {
-          fprintf(stderr, "vNORMAL");
-        }
+        // video PTS has caught up with audio PTS
+        log_debug("vNORMAL");
         pts_mode = PTS_SPEED_NORMAL;
       }
     } else {
@@ -1002,7 +989,7 @@ static void print_audio_timing() {
   // (cur_time - audio_start_time) * INT64_C(90000) / INT64_C(1000000000);
   int64_t clock_pts = (cur_time - audio_start_time) * 90000.0 / 1000000000.0;
 
-  fprintf(stderr, " a-v=%lld c-a=%lld u=%d d=%d\n",
+  log_debug(" a-v=%lld c-a=%lld u=%d d=%d\n",
       avdiff, clock_pts - audio_pts, speed_up_count, speed_down_count);
 }
 
@@ -1012,7 +999,7 @@ static void send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts) {
     int total_size = payload_size + 3;  // more 3 bytes for payload length
     uint8_t *sendbuf = malloc(total_size);
     if (sendbuf == NULL) {
-      fprintf(stderr, "Can't alloc for audio sendbuf: size=%d", total_size);
+      log_error("cannot allocate memory for audio sendbuf: size=%d", total_size);
       return;
     }
     // payload header
@@ -1041,7 +1028,7 @@ static void send_video_frame(uint8_t *databuf, int databuflen, int64_t pts) {
     int total_size = payload_size + 3;  // more 3 bytes for payload length
     uint8_t *sendbuf = malloc(total_size);
     if (sendbuf == NULL) {
-      fprintf(stderr, "Can't alloc for video sendbuf: size=%d", total_size);
+      log_error("cannot allocate memory for video sendbuf: size=%d", total_size);
       return;
     }
     // payload header
@@ -1074,7 +1061,7 @@ static int send_keyframe(uint8_t *data, size_t data_len, int consume_time) {
   total_size = access_unit_delimiter_length + codec_config_total_size + data_len;
   ptr = buf = av_malloc(total_size);
   if (buf == NULL) {
-    fprintf(stderr, "send_keyframe: can't allocate buf (%d bytes)\n", total_size);
+    log_error("send_keyframe: cannot allocate memory for buf (%d bytes)\n", total_size);
     exit(1);
   }
 
@@ -1151,8 +1138,8 @@ static int send_keyframe(uint8_t *data, size_t data_len, int consume_time) {
     ret = hls_write_packet(hls, &pkt, split);
     pthread_mutex_unlock(&mutex_writing);
     if (ret < 0) {
-      fprintf(stderr, "keyframe write error (hls): %d\n", ret);
-      fprintf(stderr, "Check if the filesystem is not full\n");
+      log_error("keyframe write error (hls): %d\n", ret);
+      log_error("check if the filesystem is not full\n");
     }
   }
 
@@ -1169,15 +1156,15 @@ static int send_pframe(uint8_t *data, size_t data_len, int consume_time) {
   int64_t pts;
 
   if (data_len == 0) {
-    fprintf(stderr, "Z");
+    log_debug("Z");
     return 0;
   }
 
   total_size = access_unit_delimiter_length + data_len;
   buf = av_malloc(total_size);
   if (buf == NULL) {
-    fprintf(stderr, "send_pframe malloc failed: size=%d\n", total_size);
-    exit(1);
+    log_fatal("send_pframe malloc failed: size=%d\n", total_size);
+    return 0;
   }
 
   // access unit delimiter (nal_unit_type 9)
@@ -1227,8 +1214,8 @@ static int send_pframe(uint8_t *data, size_t data_len, int consume_time) {
     ret = hls_write_packet(hls, &pkt, 0);
     pthread_mutex_unlock(&mutex_writing);
     if (ret < 0) {
-      fprintf(stderr, "P frame write error (hls): %d\n", ret);
-      fprintf(stderr, "Check if the filesystem is not full\n");
+      log_error("P frame write error (hls): %d\n", ret);
+      log_error("check if the filesystem is not full\n");
     }
   }
 
@@ -1241,16 +1228,16 @@ static int send_pframe(uint8_t *data, size_t data_len, int consume_time) {
 static int xrun_recovery(snd_pcm_t *handle, int error) {
   switch(error) {
     case -EPIPE: // Buffer overrun
-      fprintf(stderr, "microphone error: buffer overrun\n");
+      log_error("microphone error: buffer overrun\n");
       if ((error = snd_pcm_prepare(handle)) < 0) {
-        fprintf(stderr, "microphone error: buffer overrrun cannot be recovered, "
+        log_error("microphone error: buffer overrrun cannot be recovered, "
             "snd_pcm_prepare failed: %s\n", snd_strerror(error));
       }
       return 0;
       break;
 
     case -ESTRPIPE: // Microphone is suspended
-      fprintf(stderr, "microphone error: suspended\n");
+      log_error("microphone error: suspended\n");
       // Wait until the suspend flag is cleared
       while ((error = snd_pcm_resume(handle)) == -EAGAIN) {
         sleep(1);
@@ -1258,7 +1245,7 @@ static int xrun_recovery(snd_pcm_t *handle, int error) {
 
       if (error < 0) {
         if ((error = snd_pcm_prepare(handle)) < 0) {
-          fprintf(stderr, "microphone: suspend can't be recovered, "
+          log_error("microphone: suspend cannot be recovered, "
               "snd_pcm_prepare failed: %s\n", snd_strerror(error));
         }
       }
@@ -1266,11 +1253,11 @@ static int xrun_recovery(snd_pcm_t *handle, int error) {
       break;
 
     case -EBADFD: // PCM descriptor is wrong
-      fprintf(stderr, "microphone error: EBADFD\n");
+      log_error("microphone error: EBADFD\n");
       break;
 
     default:
-      fprintf(stderr, "microphone error: unknown, error = %d\n",error);
+      log_error("microphone error: unknown, error = %d\n",error);
       break;
   }
   return error;
@@ -1286,7 +1273,7 @@ static int wait_for_poll(snd_pcm_t *device, struct pollfd *target_fds, unsigned 
     ret = poll(target_fds, audio_fd_count, -1); // -1 means block
     if (ret < 0) {
       if (keepRunning) {
-        fprintf(stderr, "audio poll error: %d\n", ret);
+        log_error("audio poll error: %d\n", ret);
       }
       return ret;
     } else {
@@ -1307,12 +1294,10 @@ static int wait_for_poll(snd_pcm_t *device, struct pollfd *target_fds, unsigned 
 static int open_audio_capture_device() {
   int err;
 
-  if (log_level <= LOG_LEVEL_DEBUG) {
-    fprintf(stderr, "opening ALSA device: %s\n", alsa_dev);
-  }
+  log_debug("opening ALSA device: %s\n", alsa_dev);
   err = snd_pcm_open(&capture_handle, alsa_dev, SND_PCM_STREAM_CAPTURE, 0);
   if (err < 0) {
-    fprintf (stderr, "cannot open audio device '%s' (%s)\n",
+    log_error("cannot open audio device '%s' (%s)\n",
         alsa_dev, snd_strerror(err));
     return -1;
   }
@@ -1342,14 +1327,14 @@ static int configure_audio_capture_device() {
 
   err = snd_pcm_hw_params_malloc(&hw_params);
   if (err < 0) {
-    fprintf(stderr, "cannot allocate hardware parameter structure (%s)\n",
+    log_fatal("cannot allocate hardware parameter structure (%s)\n",
         snd_strerror(err));
     exit(1);
   }
 
   err = snd_pcm_hw_params_any(capture_handle, hw_params);
   if (err < 0) {
-    fprintf(stderr, "cannot initialize hardware parameter structure (%s)\n",
+    log_fatal("cannot initialize hardware parameter structure (%s)\n",
         snd_strerror(err));
     exit(1);
   }
@@ -1358,14 +1343,14 @@ static int configure_audio_capture_device() {
   err = snd_pcm_hw_params_set_access(capture_handle, hw_params,
       SND_PCM_ACCESS_MMAP_INTERLEAVED);
   if (err < 0) {
-    fprintf(stderr, "cannot set access type (%s)\n", snd_strerror(err));
+    log_fatal("cannot set access type (%s)\n", snd_strerror(err));
     exit(1);
   }
 
   // SND_PCM_FORMAT_S16_LE => PCM 16 bit signed little endian
   err = snd_pcm_hw_params_set_format(capture_handle, hw_params, SND_PCM_FORMAT_S16_LE);
   if (err < 0) {
-    fprintf(stderr, "cannot set sample format (%s)\n", snd_strerror(err));
+    log_fatal("cannot set sample format (%s)\n", snd_strerror(err));
     exit(1);
   }
 
@@ -1373,7 +1358,7 @@ static int configure_audio_capture_device() {
   unsigned int rate = audio_sample_rate;
   err = snd_pcm_hw_params_set_rate_near(capture_handle, hw_params, &rate, 0);
   if (err < 0) {
-    fprintf(stderr, "cannot set sample rate (%s)\n", snd_strerror(err));
+    log_fatal("cannot set sample rate (%s)\n", snd_strerror(err));
     exit(1);
   }
 
@@ -1381,14 +1366,12 @@ static int configure_audio_capture_device() {
   int actual_dir;
   err = snd_pcm_hw_params_get_rate(hw_params, &actual_rate, &actual_dir);
   if (err < 0) {
-    fprintf(stderr, "microphone: failed to get rate (%s)\n", snd_strerror(err));
+    log_fatal("microphone: failed to get rate (%s)\n", snd_strerror(err));
     exit(1);
   }
-  if (log_level <= LOG_LEVEL_DEBUG) {
-    fprintf(stderr, "actual sample rate=%u dir=%d\n", actual_rate, actual_dir);
-  }
+  log_debug("actual sample rate=%u dir=%d\n", actual_rate, actual_dir);
   if (actual_rate != audio_sample_rate) {
-    fprintf(stderr, "error: failed to set the sample rate of microphone to %d (got %d)\n",
+    log_fatal("error: failed to set the sample rate of microphone to %d (got %d)\n",
         audio_sample_rate, actual_rate);
     exit(EXIT_FAILURE);
   }
@@ -1396,7 +1379,7 @@ static int configure_audio_capture_device() {
   // set the number of channels
   err = snd_pcm_hw_params_set_channels(capture_handle, hw_params, channels);
   if (err < 0) {
-    fprintf(stderr, "cannot set channel count (%s)\n", snd_strerror(err));
+    log_fatal("cannot set channel count (%s)\n", snd_strerror(err));
     exit(1);
   }
 
@@ -1404,43 +1387,39 @@ static int configure_audio_capture_device() {
   err = snd_pcm_hw_params_set_buffer_size(capture_handle, hw_params,
       buffer_size * ALSA_BUFFER_MULTIPLY);
   if (err < 0) {
-    fprintf(stderr, "microphone: failed to set buffer size (%s)\n", snd_strerror(err));
+    log_fatal("microphone: failed to set buffer size (%s)\n", snd_strerror(err));
     exit(1);
   }
 
   // check the value of the buffer size
   err = snd_pcm_hw_params_get_buffer_size(hw_params, &real_buffer_size);
   if (err < 0) {
-    fprintf(stderr, "microphone: failed to get buffer size (%s)\n", snd_strerror(err));
+    log_fatal("microphone: failed to get buffer size (%s)\n", snd_strerror(err));
     exit(1);
   }
-  if (log_level <= LOG_LEVEL_DEBUG) {
-    fprintf(stderr, "microphone: buffer size: %d frames\n", (int)real_buffer_size);
-  }
+  log_debug("microphone: buffer size: %d frames\n", (int)real_buffer_size);
 
   dir = 0;
   // set the period size
   err = snd_pcm_hw_params_set_period_size_near(capture_handle, hw_params,
       (snd_pcm_uframes_t *)&period_size, &dir);
   if (err < 0) {
-    fprintf(stderr, "microphone: period size cannot be configured (%s)\n", snd_strerror(err));
+    log_fatal("microphone: period size cannot be configured (%s)\n", snd_strerror(err));
     exit(1);
   }
 
   snd_pcm_uframes_t actual_period_size;
   err = snd_pcm_hw_params_get_period_size(hw_params, &actual_period_size, &dir);
   if (err < 0) {
-    fprintf(stderr, "microphone: period size cannot be configured (%s)\n", snd_strerror(err));
+    log_fatal("microphone: period size cannot be configured (%s)\n", snd_strerror(err));
     exit(1);
   }
-  if (log_level <= LOG_LEVEL_DEBUG) {
-    fprintf(stderr, "actual_period_size=%lu dir=%d\n", actual_period_size, dir);
-  }
+  log_debug("actual_period_size=%lu dir=%d\n", actual_period_size, dir);
 
   // apply the hardware configuration
   err = snd_pcm_hw_params (capture_handle, hw_params);
   if (err < 0) {
-    fprintf(stderr, "cannot set parameters (%s)\n", snd_strerror(err));
+    log_fatal("cannot set PCM hardware parameters (%s)\n", snd_strerror(err));
     exit(1);
   }
 
@@ -1449,24 +1428,24 @@ static int configure_audio_capture_device() {
 
   err = snd_pcm_prepare(capture_handle);
   if (err < 0) {
-    fprintf(stderr, "cannot prepare audio interface for use (%s)\n", snd_strerror(err));
+    log_fatal("cannot prepare audio interface for use (%s)\n", snd_strerror(err));
     exit(1);
   }
 
   audio_fd_count = snd_pcm_poll_descriptors_count(capture_handle);
   if (audio_fd_count <= 0) {
-    fprintf(stderr, "microphone: invalid poll descriptors count\n");
+    log_error("microphone: invalid poll descriptors count\n");
     return audio_fd_count;
   }
   poll_fds = malloc(sizeof(struct pollfd) * audio_fd_count);
   if (poll_fds == NULL) {
-    fprintf(stderr, "can't allocate poll_fds\n");
+    log_fatal("cannot allocate memory for poll_fds\n");
     exit(1);
   }
   // get poll descriptors
   err = snd_pcm_poll_descriptors(capture_handle, poll_fds, audio_fd_count);
   if (err < 0) {
-    fprintf(stderr, "microphone: unable to obtain poll descriptors for capture: %s\n", snd_strerror(err));
+    log_error("microphone: unable to obtain poll descriptors for capture: %s\n", snd_strerror(err));
     return err;
   }
   is_first_audio = 1; 
@@ -1490,11 +1469,11 @@ static void teardown_audio_encode() {
     pkt.size = 0;
 
     ret = avcodec_encode_audio2(ctx, &pkt, NULL, &got_output);
-    if (ret < 0) {
-      fprintf(stderr, "error encoding frame\n");
-      exit(1);
-    }
     av_free_packet(&pkt);
+    if (ret < 0) {
+      log_error("error encoding frame\n");
+      break;
+    }
   }
 
   av_freep(&samples);
@@ -1523,9 +1502,7 @@ static int timespec_subtract(struct timespec *result, struct timespec *t2, struc
 
 void stopSignalHandler(int signo) {
   keepRunning = 0;
-  if (log_level <= LOG_LEVEL_DEBUG) {
-    fprintf(stderr, "stop requested (signal=%d)\n", signo);
-  }
+  log_debug("stop requested (signal=%d)\n", signo);
 }
 
 static void shutdown_video() {
@@ -1571,13 +1548,11 @@ static void set_exposure_to_auto() {
   exposure_type.nPortIndex = OMX_ALL;
   exposure_type.eExposureControl = OMX_ExposureControlAuto;
 
-  if (log_level <= LOG_LEVEL_INFO) {
-    fprintf(stderr, "exposure mode: auto\n");
-  }
+  log_info("exposure mode: auto\n");
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexConfigCommonExposure, &exposure_type);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "failed to set camera exposure to auto: 0x%x\n", error);
+    log_error("failed to set camera exposure to auto: 0x%x\n", error);
   }
   current_exposure_mode = EXPOSURE_AUTO;
 }
@@ -1592,13 +1567,11 @@ static void set_exposure_to_night() {
   exposure_type.nPortIndex = OMX_ALL;
   exposure_type.eExposureControl = OMX_ExposureControlNight;
 
-  if (log_level <= LOG_LEVEL_INFO) {
-    fprintf(stderr, "exposure mode: night\n");
-  }
+  log_info("exposure mode: night\n");
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexConfigCommonExposure, &exposure_type);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "failed to set camera exposure to night: 0x%x\n", error);
+    log_error("failed to set camera exposure to night: 0x%x\n", error);
   }
   current_exposure_mode = EXPOSURE_NIGHT;
 }
@@ -1643,9 +1616,7 @@ static void auto_select_exposure(int width, int height, uint8_t *data) {
   if (current_exposure_mode == EXPOSURE_NIGHT) {
     average_y /= diff_frames;
   }
-  if (log_level <= LOG_LEVEL_DEBUG) {
-    fprintf(stderr, "y=%d(%d) ", average_y, diff_frames);
-  }
+  log_debug("y=%d(%d) ", average_y, diff_frames);
   if (average_y <= exposure_night_y_threshold) { // dark
     if (current_exposure_mode == EXPOSURE_AUTO) {
       set_exposure_to_night();
@@ -1680,25 +1651,23 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
 
         if (is_audio_recording_started == 1) {
           if (video_pending_drop_frames > 0) {
-            fprintf(stderr, "dV");
+            log_debug("dV");
             video_pending_drop_frames--;
           } else {
-            if (log_level <= LOG_LEVEL_INFO) {
-              fprintf(stderr, ".");
-            }
+            log_info(".");
             encode_and_send_image();
             previous_previous_capture_frame = previous_capture_frame;
             previous_capture_frame = video_frame_count;
           }
         }
       } else {
-        fprintf(stderr, "\nNot an end of a frame\n");
+        log_warn("\nnot an end of a frame\n");
       }
     } else {
-      fprintf(stderr, "Got zero bytes\n");
+      log_warn("got zero bytes\n");
     }
   } else {
-    fprintf(stderr, "out is NULL\n");
+    log_warn("out is NULL\n");
   }
 
   out->nFilledLen = 0;
@@ -1706,7 +1675,7 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
   if (keepRunning) {
     error = OMX_FillThisBuffer(ILC_GET_HANDLE(camera_component), out);
     if (error != OMX_ErrorNone) {
-      fprintf(stderr, "error filling camera buffer (2): 0x%x\n", error);
+      log_error("error filling camera buffer (2): 0x%x\n", error);
     }
   } else {
     shutdown_openmax();
@@ -1725,7 +1694,7 @@ static int openmax_cam_open() {
 
   cam_client = ilclient_init();
   if (cam_client == NULL) {
-    fprintf(stderr, "openmax_cam_open: ilclient_init failed\n");
+    log_error("openmax_cam_open: ilclient_init failed\n");
     return -1;
   }
 
@@ -1737,7 +1706,7 @@ static int openmax_cam_open() {
       ILCLIENT_ENABLE_INPUT_BUFFERS |
       ILCLIENT_ENABLE_OUTPUT_BUFFERS);
   if (error != 0) {
-    fprintf(stderr, "failed to create camera component: 0x%x\n", error);
+    log_fatal("failed to create camera component: 0x%x\n", error);
     exit(1);
   }
   component_list[n_component_list++] = camera_component;
@@ -1749,7 +1718,7 @@ static int openmax_cam_open() {
 
   error = OMX_GetParameter(ILC_GET_HANDLE(camera_component), OMX_IndexParamPortDefinition, &cam_def);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "failed to get camera 71 port definition: 0x%x\n", error);
+    log_fatal("failed to get camera 71 port definition: 0x%x\n", error);
     exit(1);
   }
 
@@ -1774,7 +1743,7 @@ static int openmax_cam_open() {
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexParamPortDefinition, &cam_def);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "failed to set camera 71 port definition: 0x%x\n", error);
+    log_fatal("failed to set camera 71 port definition: 0x%x\n", error);
     exit(1);
   }
 
@@ -1787,7 +1756,7 @@ static int openmax_cam_open() {
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexConfigVideoFramerate, &framerate);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "failed to set camera 71 framerate: 0x%x\n", error);
+    log_fatal("failed to set camera 71 framerate: 0x%x\n", error);
     exit(1);
   }
 
@@ -1799,7 +1768,7 @@ static int openmax_cam_open() {
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexParamCommonUseStcTimestamps, &timestamp_mode);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "failed to set camera timestamp mode: 0x%x\n", error);
+    log_fatal("failed to set camera timestamp mode: 0x%x\n", error);
     exit(1);
   }
 
@@ -1807,7 +1776,7 @@ static int openmax_cam_open() {
 
   // Set camera component to idle state
   if (ilclient_change_component_state(camera_component, OMX_StateIdle) == -1) {
-    fprintf(stderr, "failed to set camera to idle state (perhaps you need to reboot the machine)\n");
+    log_fatal("failed to set camera to idle state (perhaps you need to reboot the machine)\n");
     exit(1);
   }
 
@@ -1816,7 +1785,7 @@ static int openmax_cam_open() {
     error = ilclient_create_component(cam_client, &clock_component, "clock",
         ILCLIENT_DISABLE_ALL_PORTS);
     if (error != 0) {
-      fprintf(stderr, "failed to create clock component: 0x%x\n", error);
+      log_fatal("failed to create clock component: 0x%x\n", error);
       exit(1);
     }
     component_list[n_component_list++] = clock_component;
@@ -1830,13 +1799,13 @@ static int openmax_cam_open() {
     clock_state.nWaitMask = 1;
     error = OMX_SetParameter(ILC_GET_HANDLE(clock_component), OMX_IndexConfigTimeClockState, &clock_state);
     if (error != OMX_ErrorNone) {
-      fprintf(stderr, "failed to set clock state: 0x%x\n", error);
+      log_error("failed to set clock state: 0x%x\n", error);
     }
 
     set_tunnel(tunnel+n_tunnel, clock_component, 80, camera_component, 73);
 
     if (ilclient_setup_tunnel(tunnel+(n_tunnel++), 0, 0) != 0) {
-      fprintf(stderr, "failed to setup tunnel from clock to camera\n");
+      log_fatal("failed to setup tunnel from clock to camera\n");
       exit(1);
     }
   } // if (is_clock_enabled)
@@ -1850,7 +1819,7 @@ static int openmax_cam_open() {
 
     error = OMX_GetParameter(ILC_GET_HANDLE(camera_component), OMX_IndexParamPortDefinition, &portdef);
     if (error != OMX_ErrorNone) {
-      fprintf(stderr, "failed to get camera preview 70 port definition: 0x%x\n", error);
+      log_fatal("failed to get camera preview 70 port definition: 0x%x\n", error);
       exit(1);
     }
 
@@ -1864,7 +1833,7 @@ static int openmax_cam_open() {
     error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
         OMX_IndexParamPortDefinition, &portdef);
     if (error != OMX_ErrorNone) {
-      fprintf(stderr, "failed to set camera preview 70 port definition: 0x%x\n", error);
+      log_fatal("failed to set camera preview 70 port definition: 0x%x\n", error);
       exit(1);
     }
 
@@ -1876,7 +1845,7 @@ static int openmax_cam_open() {
     error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
         OMX_IndexConfigVideoFramerate, &framerate);
     if (error != OMX_ErrorNone) {
-      fprintf(stderr, "failed to set camera preview 70 framerate: 0x%x\n", error);
+      log_fatal("failed to set camera preview 70 framerate: 0x%x\n", error);
       exit(1);
     }
 
@@ -1884,7 +1853,7 @@ static int openmax_cam_open() {
     r = ilclient_create_component(cam_client, &render_component, "video_render",
         ILCLIENT_DISABLE_ALL_PORTS);
     if (r != 0) {
-      fprintf(stderr, "failed to create render component: 0x%x\n", r);
+      log_fatal("failed to create render component: 0x%x\n", r);
       exit(1);
     }
     component_list[n_component_list++] = render_component;
@@ -1892,7 +1861,7 @@ static int openmax_cam_open() {
     set_tunnel(tunnel+n_tunnel, camera_component, 70, render_component, 90);
 
     if (ilclient_setup_tunnel(tunnel+(n_tunnel++), 0, 0) != 0) {
-      fprintf(stderr, "failed to setup tunnel from camera to render\n");
+      log_fatal("failed to setup tunnel from camera to render\n");
       exit(1);
     }
 
@@ -1920,14 +1889,14 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
   // out->nTimeStamp is useless as the value is always zero
 
   if (out == NULL) {
-    fprintf(stderr, "FATAL: Not getting it :(\n");
+    log_error("cannot get video encode buffer\n");
     return 0;
   }
   if (encbuf != NULL) {
     // merge the previous buffer
     concat_buf = realloc(encbuf, encbuf_size + out->nFilledLen);
     if (concat_buf == NULL) {
-      fprintf(stderr, "can't allocate concat_buf (%d bytes)\n", encbuf_size + out->nFilledLen);
+      log_fatal("cannot allocate memory for concat_buf (%d bytes)\n", encbuf_size + out->nFilledLen);
       free(encbuf);
       exit(1);
     }
@@ -1949,7 +1918,7 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
     } else {
       encbuf = malloc(buf_len);
       if (encbuf == NULL) {
-        fprintf(stderr, "can't allocate encbuf (%d bytes)\n", buf_len);
+        log_fatal("cannot allocate memory for encbuf (%d bytes)\n", buf_len);
         exit(1);
       }
       memcpy(encbuf, buf, buf_len);
@@ -1960,34 +1929,32 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
     encbuf_size = -1;
 
     nal_unit_type = buf[4] & 0x1f;
-    if (log_level <= LOG_LEVEL_DEBUG) {
-      if (nal_unit_type != 1 && nal_unit_type != 5) {
-        fprintf(stderr, "%d", nal_unit_type);
-      }
+    if (nal_unit_type != 1 && nal_unit_type != 5) {
+      log_debug("%d", nal_unit_type);
     }
     if (out->nFlags != 0x480 && out->nFlags != 0x490 &&
         out->nFlags != 0x430 && out->nFlags != 0x410 &&
         out->nFlags != 0x400 && out->nFlags != 0x510 &&
         out->nFlags != 0x530) {
-      fprintf(stderr, "\nNew flag (%d,nal=%d)\n", out->nFlags, nal_unit_type);
+      log_warn("\nnew flag (%d,nal=%d)\n", out->nFlags, nal_unit_type);
     }
     if (out->nFlags & OMX_BUFFERFLAG_DATACORRUPT) {
-      fprintf(stderr, "\n=== OMX_BUFFERFLAG_DATACORRUPT ===\n");
+      log_warn("\n=== OMX_BUFFERFLAG_DATACORRUPT ===\n");
     }
     if (out->nFlags & OMX_BUFFERFLAG_EXTRADATA) {
-      fprintf(stderr, "\n=== OMX_BUFFERFLAG_EXTRADATA ===\n");
+      log_warn("\n=== OMX_BUFFERFLAG_EXTRADATA ===\n");
     }
     if (out->nFlags & OMX_BUFFERFLAG_FRAGMENTLIST) {
-      fprintf(stderr, "\n=== OMX_BUFFERFLAG_FRAGMENTLIST ===\n");
+      log_warn("\n=== OMX_BUFFERFLAG_FRAGMENTLIST ===\n");
     }
     if (out->nFlags & OMX_BUFFERFLAG_DISCONTINUITY) {
-      fprintf(stderr, "\n=== OMX_BUFFERFLAG_DISCONTINUITY ===\n");
+      log_warn("\n=== OMX_BUFFERFLAG_DISCONTINUITY ===\n");
     }
     if (out->nFlags & OMX_BUFFERFLAG_CODECCONFIG) {
       // Insert timing info to nal_unit_type 7
       codec_configs[n_codec_configs] = malloc(buf_len);
       if (codec_configs[n_codec_configs] == NULL) {
-        fprintf(stderr, "can't allocate memory for codec config (%d bytes)\n", buf_len);
+        log_fatal("cannot allocate memory for codec config (%d bytes)\n", buf_len);
         exit(1);
       }
       codec_config_sizes[n_codec_configs] = buf_len;
@@ -2003,7 +1970,7 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
       if (out->nFlags & OMX_BUFFERFLAG_SYNCFRAME) { // keyframe
         // TODO: Send out nal_unit_type 6 (SEI) before the first I frame
         if (nal_unit_type != 5) {
-          fprintf(stderr, "SYNCFRAME nal_unit_type=%d len=%d\n", nal_unit_type, buf_len);
+          log_debug("SYNCFRAME nal_unit_type=%d len=%d\n", nal_unit_type, buf_len);
         }
         int consume_time = 0;
         if (nal_unit_type == 1 || nal_unit_type == 2 ||
@@ -2011,7 +1978,7 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
             nal_unit_type == 5) {
           consume_time = 1;
         } else {
-          fprintf(stderr, "(nosl)");
+          log_debug("(nosl)");
         }
 #if !(AUDIO_ONLY)
         send_keyframe(buf, buf_len, consume_time);
@@ -2030,13 +1997,11 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
           } else {
             fps = 1 / divisor;
           }
-          if (log_level <= LOG_LEVEL_INFO) {
-            fprintf(stderr, " %5.2f fps k=%d", fps, keyframes_count);
-            if (log_level <= LOG_LEVEL_DEBUG) {
-              print_audio_timing();
-            } else {
-              fprintf(stderr, "\n");
-            }
+          log_info(" %5.2f fps k=%d", fps, keyframes_count);
+          if (log_get_level() <= LOG_LEVEL_DEBUG) {
+            print_audio_timing();
+          } else {
+            log_info("\n");
           }
           current_audio_frames = 0;
           frame_count = 0;
@@ -2050,7 +2015,7 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
               nal_unit_type == 5) {
             consume_time = 1;
           } else {
-            fprintf(stderr, "(nosl)");
+            log_debug("(nosl)");
           }
 #if !(AUDIO_ONLY)
           send_pframe(buf, buf_len, consume_time);
@@ -2077,7 +2042,7 @@ static int video_encode_startup() {
 
   ilclient = ilclient_init();
   if (ilclient == NULL) {
-    fprintf(stderr, "video_encode_startup: ilclient_init failed\n");
+    log_fatal("video_encode_startup: ilclient_init failed\n");
     return -1;
   }
 
@@ -2087,7 +2052,7 @@ static int video_encode_startup() {
       ILCLIENT_ENABLE_INPUT_BUFFERS |
       ILCLIENT_ENABLE_OUTPUT_BUFFERS);
   if (r != 0) {
-    fprintf(stderr, "failed to create video_encode component: 0x%x\n", r);
+    log_fatal("failed to create video_encode component: 0x%x\n", r);
     exit(1);
   }
   component_list[n_component_list++] = video_encode;
@@ -2099,7 +2064,7 @@ static int video_encode_startup() {
 
   error = OMX_GetParameter(ILC_GET_HANDLE(video_encode), OMX_IndexParamPortDefinition, &portdef);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "failed to get video_encode 200 port definition: 0x%x\n", error);
+    log_fatal("failed to get video_encode 200 port definition: 0x%x\n", error);
     exit(1);
   }
 
@@ -2119,7 +2084,7 @@ static int video_encode_startup() {
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamPortDefinition, &portdef);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "failed to set video_encode 200 port definition: 0x%x\n", error);
+    log_fatal("failed to set video_encode 200 port definition: 0x%x\n", error);
     exit(1);
   }
 
@@ -2130,7 +2095,7 @@ static int video_encode_startup() {
 
   error = OMX_GetParameter(ILC_GET_HANDLE(video_encode), OMX_IndexParamPortDefinition, &portdef_201);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "failed to get video_encode 201 port definition: 0x%x\n", error);
+    log_fatal("failed to get video_encode 201 port definition: 0x%x\n", error);
     exit(1);
   }
 
@@ -2140,7 +2105,7 @@ static int video_encode_startup() {
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamPortDefinition, &portdef_201);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "failed to set video_encode 201 port definition: 0x%x\n", error);
+    log_fatal("failed to set video_encode 201 port definition: 0x%x\n", error);
     exit(1);
   }
 
@@ -2153,7 +2118,7 @@ static int video_encode_startup() {
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamVideoPortFormat, &format);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "failed to set video_encode 201 port format: 0x%x\n", error);
+    log_fatal("failed to set video_encode 201 port format: 0x%x\n", error);
     exit(1);
   }
 
@@ -2165,7 +2130,7 @@ static int video_encode_startup() {
 
   error = OMX_GetParameter (ILC_GET_HANDLE(video_encode), OMX_IndexParamVideoAvc, &avctype);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "failed to get video_encode 201 AVC: 0x%x\n", error);
+    log_fatal("failed to get video_encode 201 AVC: 0x%x\n", error);
     exit(1);
   }
 
@@ -2197,7 +2162,7 @@ static int video_encode_startup() {
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamVideoAvc, &avctype);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "failed to set video_encode 201 AVC: 0x%x\n", error);
+    log_fatal("failed to set video_encode 201 AVC: 0x%x\n", error);
     exit(1);
   }
 
@@ -2213,7 +2178,7 @@ static int video_encode_startup() {
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamVideoBitrate, &bitrate_type);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "failed to set video_encode 201 bitrate: 0x%x\n", error);
+    log_fatal("failed to set video_encode 201 bitrate: 0x%x\n", error);
     exit(1);
   }
 
@@ -2226,31 +2191,31 @@ static int video_encode_startup() {
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamBrcmNALSSeparate, &boolean_type);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "failed to set video_encode NAL separate: 0x%x\n", error);
+    log_fatal("failed to set video_encode NAL separate: 0x%x\n", error);
     exit(1);
   }
 
   // Set video_encode component to idle state
   if (ilclient_change_component_state(video_encode, OMX_StateIdle) == -1) {
-    fprintf(stderr, "failed to set video_encode to idle state\n");
+    log_fatal("failed to set video_encode to idle state\n");
     exit(1);
   }
 
   // Enable port buffers for port 71
   if (ilclient_enable_port_buffers(camera_component, 71, NULL, NULL, NULL) != 0) {
-    fprintf(stderr, "failed to enable port buffers for camera 71\n");
+    log_fatal("failed to enable port buffers for camera 71\n");
     exit(1);
   }
 
   // Enable port buffers for port 200
   if (ilclient_enable_port_buffers(video_encode, 200, NULL, NULL, NULL) != 0) {
-    fprintf(stderr, "failed to enable port buffers for video_encode 200\n");
+    log_fatal("failed to enable port buffers for video_encode 200\n");
     exit(1);
   }
 
   // Enable port buffers for port 201
   if (ilclient_enable_port_buffers(video_encode, 201, NULL, NULL, NULL) != 0) {
-    fprintf(stderr, "failed to enable port buffers for video_encode 201\n");
+    log_fatal("failed to enable port buffers for video_encode 201\n");
     exit(1);
   }
 
@@ -2270,7 +2235,7 @@ static void encode_and_send_image() {
 
   buf = ilclient_get_input_buffer(video_encode, 200, 1);
   if (buf == NULL) {
-    fprintf(stderr, "Doh, no buffers for me!\n");
+    log_error("cannot get the encoded video buffer\n");
     exit(1);
   }
 
@@ -2280,7 +2245,7 @@ static void encode_and_send_image() {
   // OMX_EmptyThisBuffer takes 22000-27000 usec at 1920x1080
   error = OMX_EmptyThisBuffer(ILC_GET_HANDLE(video_encode), buf);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "error emptying buffer: 0x%x\n", error);
+    log_error("error emptying buffer: 0x%x\n", error);
   }
 
   out = ilclient_get_output_buffer(video_encode, 201, 1);
@@ -2288,13 +2253,13 @@ static void encode_and_send_image() {
   while (1) {
     error = OMX_FillThisBuffer(ILC_GET_HANDLE(video_encode), out);
     if (error != OMX_ErrorNone) {
-      fprintf(stderr, "error filling video_encode buffer: 0x%x\n", error);
+      log_error("error filling video_encode buffer: 0x%x\n", error);
     }
 
     if (out->nFilledLen > 0) {
       video_encode_fill_buffer_done(out);
     } else {
-      fprintf(stderr, "E(%d)", out->nFlags);
+      log_debug("E(%d)", out->nFlags);
       break;
     }
 
@@ -2329,7 +2294,7 @@ static void encode_and_send_audio() {
   // encode the samples
   ret = avcodec_encode_audio2(ctx, &pkt, av_frame, &got_output);
   if (ret < 0) {
-    fprintf(stderr, "error encoding audio frame\n");
+    log_error("error encoding audio frame\n");
     exit(1);
   }
   if (got_output) {
@@ -2386,8 +2351,8 @@ static void encode_and_send_audio() {
       ret = hls_write_packet(hls, &pkt, 0);
       pthread_mutex_unlock(&mutex_writing);
       if (ret < 0) {
-        fprintf(stderr, "audio frame write error (hls): %d\n", ret);
-        fprintf(stderr, "Check if the filesystem is not full\n");
+        log_error("audio frame write error (hls): %d\n", ret);
+        log_error("check if the filesystem is not full\n");
       }
     }
 
@@ -2395,7 +2360,7 @@ static void encode_and_send_audio() {
 
     current_audio_frames++;
   } else {
-    fprintf(stderr, "Not getting audio output");
+    log_error("not getting audio output");
   }
 }
 
@@ -2416,7 +2381,7 @@ static int read_audio_poll_mmap() {
   avail = snd_pcm_avail_update(capture_handle);
   if (avail < 0) {
     if ( (error = xrun_recovery(capture_handle, avail)) < 0) {
-      fprintf(stderr, "microphone: SUSPEND recovery failed: %s\n", snd_strerror(error));
+      log_fatal("microphone: SUSPEND recovery failed: %s\n", snd_strerror(error));
       exit(1);
     }
     is_first_audio = 1;
@@ -2429,21 +2394,19 @@ static int read_audio_poll_mmap() {
         // if the capture from PCM is started (is_first_audio=1) and one period is ready to process,
         // the stream must start 
         is_first_audio = 0;
-        if (log_level <= LOG_LEVEL_DEBUG) {
-          fprintf(stderr, "S");
-        }
+        log_debug("S");
         if ( (error = snd_pcm_start(capture_handle)) < 0) {
-          fprintf(stderr, "microphone: start error: %s\n", snd_strerror(error));
+          log_fatal("microphone: start error: %s\n", snd_strerror(error));
           exit(EXIT_FAILURE);
         }
         break;
 
       case 0:
-        fprintf(stderr, "0");
+        log_debug("not first audio");
         // wait for pcm to become ready
         if ( (error = snd_pcm_wait(capture_handle, -1)) < 0) {
           if ((error = xrun_recovery(capture_handle, error)) < 0) {
-            fprintf(stderr, "microphone: snd_pcm_wait error: %s\n", snd_strerror(error));
+            log_fatal("microphone: snd_pcm_wait error: %s\n", snd_strerror(error));
             exit(EXIT_FAILURE);
           }
           is_first_audio = 1;
@@ -2459,7 +2422,7 @@ static int read_audio_poll_mmap() {
     // to this variable by the function.
     if ((error = snd_pcm_mmap_begin (capture_handle, &my_areas, &offset, &frames)) < 0) {
       if ((error = xrun_recovery(capture_handle, error)) < 0) {
-        fprintf(stderr, "microphone: mmap begin avail error: %s\n", snd_strerror(error));
+        log_fatal("microphone: mmap begin avail error: %s\n", snd_strerror(error));
         exit(EXIT_FAILURE);
       }
       is_first_audio = 1;
@@ -2470,7 +2433,7 @@ static int read_audio_poll_mmap() {
     commitres = snd_pcm_mmap_commit(capture_handle, offset, frames);
     if (commitres < 0 || (snd_pcm_uframes_t)commitres != frames) {
       if ((error = xrun_recovery(capture_handle, commitres >= 0 ? commitres : -EPIPE)) < 0) {
-        fprintf(stderr, "microphone: mmap commit error: %s\n", snd_strerror(error));
+        log_fatal("microphone: mmap commit error: %s\n", snd_strerror(error));
         exit(EXIT_FAILURE);
       }
       is_first_audio = 1;
@@ -2484,10 +2447,10 @@ static int read_audio_poll_mmap() {
     for (i = 0; i < total_samples; i++) {
       int16_t value = (int16_t)this_samples[i];
       if (value < audio_min_value) { // negative overflow of audio volume
-        fprintf(stderr, "o-");
+        log_info("o-");
         value = -32768;
       } else if (value > audio_max_value) { // positive overflow audio volume
-        fprintf(stderr, "o+");
+        log_info("o+");
         value = 32767;
       } else {
         value = (int16_t)(value * audio_volume_multiply);
@@ -2500,7 +2463,7 @@ static int read_audio_poll_mmap() {
   if (++audio_buffer_index == AUDIO_BUFFER_CHUNKS) {
     audio_buffer_index = 0;
     if (!is_audio_buffer_filled) {
-      fprintf(stderr, "audio buffer filled\n");
+      log_debug("audio buffer filled\n");
       is_audio_buffer_filled = 1;
     }
   }
@@ -2521,7 +2484,7 @@ static void start_openmax_clock() {
   error = OMX_SetParameter(ILC_GET_HANDLE(clock_component),
       OMX_IndexConfigTimeClockState, &clock_state);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "failed to start clock: 0x%x\n", error);
+    log_fatal("failed to start clock: 0x%x\n", error);
     exit(1);
   }
 }
@@ -2536,13 +2499,11 @@ static void start_openmax_capturing() {
   boolean.nPortIndex = 71;
   boolean.bEnabled = 1;
 
-  if (log_level <= LOG_LEVEL_DEBUG) {
-    fprintf(stderr, "start capturing video\n");
-  }
+  log_debug("start capturing video\n");
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexConfigPortCapturing, &boolean);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "failed to start capturing video: 0x%x\n", error);
+    log_fatal("failed to start capturing video: 0x%x\n", error);
     exit(1);
   }
 
@@ -2557,14 +2518,12 @@ static void openmax_cam_loop() {
 
   start_openmax_capturing();
 
-  if (log_level <= LOG_LEVEL_DEBUG) {
-    fprintf(stderr, "waiting for the first video buffer\n");
-  }
+  log_debug("waiting for the first video buffer\n");
   out = ilclient_get_output_buffer(camera_component, 71, 1);
 
   error = OMX_FillThisBuffer(ILC_GET_HANDLE(camera_component), out);
   if (error != OMX_ErrorNone) {
-    fprintf(stderr, "error filling camera buffer (1): 0x%x\n", error);
+    log_error("error filling camera buffer (1): 0x%x\n", error);
   }
 }
 
@@ -2588,7 +2547,7 @@ static void *audio_nop_loop() {
         ts.tv_nsec = diff_time;
         ret = clock_nanosleep(CLOCK_MONOTONIC, 0, &ts, NULL);
         if (ret != 0) {
-          fprintf(stderr, "nanosleep error:%d\n", ret);
+          log_error("nanosleep error:%d\n", ret);
         }
       }
     } else {
@@ -2597,7 +2556,7 @@ static void *audio_nop_loop() {
       ts.tv_nsec = 100000000;
       ret = clock_nanosleep(CLOCK_MONOTONIC, 0, &ts, NULL);
       if (ret != 0) {
-        fprintf(stderr, "nanosleep error:%d\n", ret);
+        log_error("nanosleep error:%d\n", ret);
       }
     }
   }
@@ -2618,19 +2577,19 @@ static void audio_loop_poll_mmap() {
     avail_flags = wait_for_poll(capture_handle, poll_fds, audio_fd_count);
     if (avail_flags < 0) { // try to recover from error
       if (keepRunning) {
-        fprintf(stderr, "trying to recover from error\n");
+        log_error("trying to recover from error\n");
       }
       if (snd_pcm_state(capture_handle) == SND_PCM_STATE_XRUN ||
           snd_pcm_state(capture_handle) == SND_PCM_STATE_SUSPENDED) {
         avail_flags = snd_pcm_state(capture_handle) == SND_PCM_STATE_XRUN ? -EPIPE : -ESTRPIPE;
         if (xrun_recovery(capture_handle, avail_flags) < 0) {
-          fprintf(stderr, "microphone: write error: %s\n", snd_strerror(avail_flags));
+          log_fatal("microphone: write error: %s\n", snd_strerror(avail_flags));
           exit(EXIT_FAILURE);
         }
         is_first_audio = 1;
       } else {
         if (keepRunning) {
-          fprintf(stderr, "microphone: wait for poll failed\n");
+          log_error("microphone: wait for poll failed\n");
         }
         continue;
       }
@@ -2656,7 +2615,7 @@ static void audio_loop_poll_mmap() {
         }
         if (is_video_recording_started == 1) {
           if (audio_pending_drop_frames > 0) {
-            fprintf(stderr, "dA");
+            log_debug("dA");
             audio_pending_drop_frames--;
           } else {
             if (is_audio_muted) {
@@ -2693,9 +2652,9 @@ static void ensure_hls_dir_exists() {
     if (errno == ENOENT) {
       // create directory
       if (mkdir(hls_output_dir, 0755) == 0) { // success
-        fprintf(stderr, "created HLS output directory: %s\n", hls_output_dir);
+        log_info("created HLS output directory: %s\n", hls_output_dir);
       } else { // error
-        fprintf(stderr, "error creating hls_output_dir (%s): %s\n",
+        log_error("error creating hls_output_dir (%s): %s\n",
             hls_output_dir, strerror(errno));
         exit(1);
       }
@@ -2705,85 +2664,77 @@ static void ensure_hls_dir_exists() {
     }
   } else {
     if (!S_ISDIR(st.st_mode)) {
-      fprintf(stderr, "hls_output_dir (%s) is not a directory\n",
+      log_error("hls_output_dir (%s) is not a directory\n",
           hls_output_dir);
       exit(1);
     }
   }
 
   if (access(hls_output_dir, R_OK) != 0) {
-    fprintf(stderr, "Can't access hls_output_dir (%s): %s\n",
+    log_error("cannot access hls_output_dir (%s): %s\n",
         hls_output_dir, strerror(errno));
     exit(1);
   }
 }
 
-static void fprint_hex(FILE *fp, uint8_t *data, int len) {
-  int i;
-
-  for (i = 0; i < len; i++) {
-    fprintf(fp, "%02x", data[i]);
-  }
-}
-
 static void print_usage() {
-  printf(PROGRAM_NAME " version " PROGRAM_VERSION "\n");
-  printf("Usage: " PROGRAM_NAME " [options]\n");
-  printf("\n");
-  printf("Options:\n");
-  printf(" [video]\n");
-  printf("  -w, --width         Width in pixels (default: %d)\n", video_width_default);
-  printf("  -h, --height        Height in pixels (default: %d)\n", video_height_default);
-//  printf("  -f, --fps           Frame rate (default: %d)\n", video_fps_default);
-  printf("  -v, --videobitrate  Video bit rate (default: %ld)\n", video_bitrate_default);
-  printf("  -g, --gopsize       GOP size (default: %d)\n", video_gop_size_default);
-  printf(" [audio]\n");
-  printf("  -r, --samplerate    Audio sample rate (default: %d)\n", audio_sample_rate_default);
-  printf("  -a, --audiobitrate  Audio bit rate (default: %ld)\n", audio_bitrate_default);
-  printf("  --alsadev <dev>     ALSA microphone device (default: %s)\n", alsa_dev_default);
-  printf("  --volume <num>      Amplify audio by multiplying the volume by <num>\n");
-  printf("                      (default: %.1f)\n", audio_volume_multiply_default);
-  printf(" [HTTP Live Streaming (HLS)]\n");
-  printf("  -o, --hlsdir <dir>  Generate HTTP Live Streaming files in <dir>\n");
-  printf("  --hlsenc            Enable HLS encryption\n");
-  printf("  --hlsenckeyuri <uri>  Set HLS encryption key URI (default: %s)\n", hls_encryption_key_uri_default);
-  printf("  --hlsenckey <hex>   Set HLS encryption key in hex string\n");
-  printf("                      (default: ");
-  fprint_hex(stdout, hls_encryption_key, sizeof(hls_encryption_key));
-  printf(")\n");
-  printf("  --hlsenciv <hex>    Set HLS encryption IV in hex string\n");
-  printf("                      (default: ");
-  fprint_hex(stdout, hls_encryption_iv, sizeof(hls_encryption_iv));
-  printf(")\n");
-  printf(" [output for node-rtsp-rtmp-server]\n");
-  printf("  --rtspout           Enable output for node-rtsp-rtmp-server\n");
-  printf("  --rtspvideocontrol <path>  Set video control socket path\n");
-  printf("                      (default: %s)\n", rtsp_video_control_path_default);
-  printf("  --rtspaudiocontrol <path>  Set audio control socket path\n");
-  printf("                      (default: %s)\n", rtsp_audio_control_path_default);
-  printf("  --rtspvideodata <path>  Set video data socket path\n");
-  printf("                      (default: %s)\n", rtsp_video_data_path_default);
-  printf("  --rtspaudiodata <path>  Set audio data socket path\n");
-  printf("                      (default: %s)\n", rtsp_audio_data_path_default);
-  printf(" [MPEG-TS output via TCP]\n");
-  printf("  --tcpout <url>      Enable TCP output to <url>\n");
-  printf("                      (e.g. --tcpout tcp://127.0.0.1:8181)\n");
-  printf(" [camera]\n");
-  printf("  --autoexposure      Enable automatic changing of exposure\n");
-  printf("  --expnight <num>    Change the exposure to night mode if the average\n");
-  printf("                      value of Y (brightness) is <= <num> while in\n");
-  printf("                      daylight mode (default: %d)\n", exposure_night_y_threshold_default);
-  printf("  --expday <num>      Change the exposure to daylight mode if the average\n");
-  printf("                      value of Y (brightness) is >= <num> while in\n");
-  printf("                      night mode (default: %d)\n", exposure_auto_y_threshold_default);
-  printf("  -p, --preview       Display a preview window for video\n");
-  printf(" [misc]\n");
-  printf("  --recordbuf <num>   Start recording from <num> keyframes ago\n");
-  printf("                      (default: %d)\n", record_buffer_keyframes_default);
-  printf("  --statedir <dir>    Set state dir (default: %s)\n", state_dir_default);
-  printf("  --hooksdir <dir>    Set hooks dir (default: %s)\n", hooks_dir_default);
-  printf("  -q, --quiet         Turn off most of the log messages\n");
-  printf("  --help              Print this help\n");
+  log_info(PROGRAM_NAME " version " PROGRAM_VERSION "\n");
+  log_info("Usage: " PROGRAM_NAME " [options]\n");
+  log_info("\n");
+  log_info("Options:\n");
+  log_info(" [video]\n");
+  log_info("  -w, --width         Width in pixels (default: %d)\n", video_width_default);
+  log_info("  -h, --height        Height in pixels (default: %d)\n", video_height_default);
+//  log_info("  -f, --fps           Frame rate (default: %d)\n", video_fps_default);
+  log_info("  -v, --videobitrate  Video bit rate (default: %ld)\n", video_bitrate_default);
+  log_info("  -g, --gopsize       GOP size (default: %d)\n", video_gop_size_default);
+  log_info(" [audio]\n");
+  log_info("  -r, --samplerate    Audio sample rate (default: %d)\n", audio_sample_rate_default);
+  log_info("  -a, --audiobitrate  Audio bit rate (default: %ld)\n", audio_bitrate_default);
+  log_info("  --alsadev <dev>     ALSA microphone device (default: %s)\n", alsa_dev_default);
+  log_info("  --volume <num>      Amplify audio by multiplying the volume by <num>\n");
+  log_info("                      (default: %.1f)\n", audio_volume_multiply_default);
+  log_info(" [HTTP Live Streaming (HLS)]\n");
+  log_info("  -o, --hlsdir <dir>  Generate HTTP Live Streaming files in <dir>\n");
+  log_info("  --hlsenc            Enable HLS encryption\n");
+  log_info("  --hlsenckeyuri <uri>  Set HLS encryption key URI (default: %s)\n", hls_encryption_key_uri_default);
+  log_info("  --hlsenckey <hex>   Set HLS encryption key in hex string\n");
+  log_info("                      (default: ");
+  log_hex(LOG_LEVEL_INFO, hls_encryption_key, sizeof(hls_encryption_key));
+  log_info(")\n");
+  log_info("  --hlsenciv <hex>    Set HLS encryption IV in hex string\n");
+  log_info("                      (default: ");
+  log_hex(LOG_LEVEL_INFO, hls_encryption_iv, sizeof(hls_encryption_iv));
+  log_info(")\n");
+  log_info(" [output for node-rtsp-rtmp-server]\n");
+  log_info("  --rtspout           Enable output for node-rtsp-rtmp-server\n");
+  log_info("  --rtspvideocontrol <path>  Set video control socket path\n");
+  log_info("                      (default: %s)\n", rtsp_video_control_path_default);
+  log_info("  --rtspaudiocontrol <path>  Set audio control socket path\n");
+  log_info("                      (default: %s)\n", rtsp_audio_control_path_default);
+  log_info("  --rtspvideodata <path>  Set video data socket path\n");
+  log_info("                      (default: %s)\n", rtsp_video_data_path_default);
+  log_info("  --rtspaudiodata <path>  Set audio data socket path\n");
+  log_info("                      (default: %s)\n", rtsp_audio_data_path_default);
+  log_info(" [MPEG-TS output via TCP]\n");
+  log_info("  --tcpout <url>      Enable TCP output to <url>\n");
+  log_info("                      (e.g. --tcpout tcp://127.0.0.1:8181)\n");
+  log_info(" [camera]\n");
+  log_info("  --autoexposure      Enable automatic changing of exposure\n");
+  log_info("  --expnight <num>    Change the exposure to night mode if the average\n");
+  log_info("                      value of Y (brightness) is <= <num> while in\n");
+  log_info("                      daylight mode (default: %d)\n", exposure_night_y_threshold_default);
+  log_info("  --expday <num>      Change the exposure to daylight mode if the average\n");
+  log_info("                      value of Y (brightness) is >= <num> while in\n");
+  log_info("                      night mode (default: %d)\n", exposure_auto_y_threshold_default);
+  log_info("  -p, --preview       Display a preview window for video\n");
+  log_info(" [misc]\n");
+  log_info("  --recordbuf <num>   Start recording from <num> keyframes ago\n");
+  log_info("                      (default: %d)\n", record_buffer_keyframes_default);
+  log_info("  --statedir <dir>    Set state dir (default: %s)\n", state_dir_default);
+  log_info("  --hooksdir <dir>    Set hooks dir (default: %s)\n", hooks_dir_default);
+  log_info("  -q, --quiet         Turn off most of the log messages\n");
+  log_info("  --help              Print this help\n");
 }
 
 int main(int argc, char **argv) {
@@ -2825,6 +2776,12 @@ int main(int argc, char **argv) {
   int option_index = 0;
   int opt;
 
+  // Turn off buffering for stdout
+  setvbuf(stdout, NULL, _IONBF, 0);
+
+  log_set_level(LOG_LEVEL_INFO);
+  log_set_stream(stdout);
+
   // Set default values of options
   video_width = video_width_default;
   video_height = video_height_default;
@@ -2857,7 +2814,6 @@ int main(int argc, char **argv) {
       sizeof(hls_encryption_key_uri));
   is_preview_enabled = is_preview_enabled_default;
   record_buffer_keyframes = record_buffer_keyframes_default;
-  log_level = log_level_default;
 
   while ((opt = getopt_long(argc, argv, "w:h:g:v:a:r:o:pq", long_options, &option_index)) != -1) {
     switch (opt) {
@@ -2886,12 +2842,12 @@ int main(int argc, char **argv) {
           char *end;
           long value = strtol(optarg, &end, 10);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
-            fprintf(stderr, "Invalid expnight: %s\n", optarg);
+            log_fatal("invalid expnight: %s\n", optarg);
             print_usage();
             return EXIT_FAILURE;
           }
           if (value < 0) {
-            fprintf(stderr, "Invalid expnight: %ld (must be >= 0)\n", value);
+            log_fatal("invalid expnight: %ld (must be >= 0)\n", value);
             return EXIT_FAILURE;
           }
           exposure_night_y_threshold = value;
@@ -2899,12 +2855,12 @@ int main(int argc, char **argv) {
           char *end;
           long value = strtol(optarg, &end, 10);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
-            fprintf(stderr, "Invalid expday: %s\n", optarg);
+            log_fatal("invalid expday: %s\n", optarg);
             print_usage();
             return EXIT_FAILURE;
           }
           if (value < 0) {
-            fprintf(stderr, "Invalid expday: %ld (must be >= 0)\n", value);
+            log_fatal("invalid expday: %ld (must be >= 0)\n", value);
             return EXIT_FAILURE;
           }
           exposure_auto_y_threshold = value;
@@ -2916,12 +2872,12 @@ int main(int argc, char **argv) {
           char *end;
           double value = strtod(optarg, &end);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
-            fprintf(stderr, "Invalid volume: %s\n", optarg);
+            log_fatal("invalid volume: %s\n", optarg);
             print_usage();
             return EXIT_FAILURE;
           }
           if (value < 0.0) {
-            fprintf(stderr, "Invalid volume: %.1f (must be >= 0.0)\n", value);
+            log_fatal("invalid volume: %.1f (must be >= 0.0)\n", value);
             return EXIT_FAILURE;
           }
           audio_volume_multiply = value;
@@ -2936,7 +2892,7 @@ int main(int argc, char **argv) {
             if (sscanf(optarg + i * 2, "%02x", &value) == 1) {
               hls_encryption_key[i] = value;
             } else {
-              fprintf(stderr, "Invalid hlsenckey: %s\n", optarg);
+              log_fatal("invalid hlsenckey: %s\n", optarg);
               print_usage();
               return EXIT_FAILURE;
             }
@@ -2948,7 +2904,7 @@ int main(int argc, char **argv) {
             if (sscanf(optarg + i * 2, "%02x", &value) == 1) {
               hls_encryption_iv[i] = value;
             } else {
-              fprintf(stderr, "Invalid hlsenciv: %s\n", optarg);
+              log_fatal("invalid hlsenciv: %s\n", optarg);
               print_usage();
               return EXIT_FAILURE;
             }
@@ -2957,17 +2913,17 @@ int main(int argc, char **argv) {
           char *end;
           long value = strtol(optarg, &end, 10);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
-            fprintf(stderr, "Invalid recordbuf: %s\n", optarg);
+            log_fatal("invalid recordbuf: %s\n", optarg);
             print_usage();
             return EXIT_FAILURE;
           }
           if (value < 0) {
-            fprintf(stderr, "Invalid recordbuf: %ld (must be >= 0)\n", value);
+            log_fatal("invalid recordbuf: %ld (must be >= 0)\n", value);
             return EXIT_FAILURE;
           }
           record_buffer_keyframes = value;
         } else if (strcmp(long_options[option_index].name, "verbose") == 0) {
-          log_level = LOG_LEVEL_DEBUG;
+          log_set_level(LOG_LEVEL_DEBUG);
         } else if (strcmp(long_options[option_index].name, "help") == 0) {
           print_usage();
           return EXIT_SUCCESS;
@@ -2978,12 +2934,12 @@ int main(int argc, char **argv) {
           char *end;
           long value = strtol(optarg, &end, 10);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
-            fprintf(stderr, "Invalid width: %s\n", optarg);
+            log_fatal("invalid width: %s\n", optarg);
             print_usage();
             return EXIT_FAILURE;
           }
           if (value <= 0) {
-            fprintf(stderr, "Invalid width: %ld (must be > 0)\n", value);
+            log_fatal("invalid width: %ld (must be > 0)\n", value);
             return EXIT_FAILURE;
           }
           video_width = value;
@@ -2994,12 +2950,12 @@ int main(int argc, char **argv) {
           char *end;
           long value = strtol(optarg, &end, 10);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
-            fprintf(stderr, "Invalid height: %s\n", optarg);
+            log_fatal("invalid height: %s\n", optarg);
             print_usage();
             return EXIT_FAILURE;
           }
           if (value <= 0) {
-            fprintf(stderr, "Invalid height: %ld (must be > 0)\n", value);
+            log_fatal("invalid height: %ld (must be > 0)\n", value);
             return EXIT_FAILURE;
           }
           video_height = value;
@@ -3010,12 +2966,12 @@ int main(int argc, char **argv) {
           char *end;
           double value = strtol(optarg, &end, 10);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
-            fprintf(stderr, "Invalid fps: %s\n", optarg);
+            log_fatal("invalid fps: %s\n", optarg);
             print_usage();
             return EXIT_FAILURE;
           }
           if (value <= 0.0) {
-            fprintf(stderr, "Invalid fps: %.1f (must be > 0.0)\n", value);
+            log_fatal("invalid fps: %.1f (must be > 0.0)\n", value);
             return EXIT_FAILURE;
           }
           video_fps = value;
@@ -3026,12 +2982,12 @@ int main(int argc, char **argv) {
           char *end;
           long value = strtol(optarg, &end, 10);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
-            fprintf(stderr, "Invalid gopsize: %s\n", optarg);
+            log_fatal("invalid gopsize: %s\n", optarg);
             print_usage();
             return EXIT_FAILURE;
           }
           if (value <= 0) {
-            fprintf(stderr, "Invalid gopsize: %ld (must be > 0)\n", value);
+            log_fatal("invalid gopsize: %ld (must be > 0)\n", value);
             return EXIT_FAILURE;
           }
           video_gop_size = value;
@@ -3042,12 +2998,12 @@ int main(int argc, char **argv) {
           char *end;
           long value = strtol(optarg, &end, 10);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
-            fprintf(stderr, "Invalid videobitrate: %s\n", optarg);
+            log_fatal("invalid videobitrate: %s\n", optarg);
             print_usage();
             return EXIT_FAILURE;
           }
           if (value <= 0) {
-            fprintf(stderr, "Invalid videobitrate: %ld (must be > 0)\n", value);
+            log_fatal("invalid videobitrate: %ld (must be > 0)\n", value);
             return EXIT_FAILURE;
           }
           video_bitrate = value;
@@ -3058,12 +3014,12 @@ int main(int argc, char **argv) {
           char *end;
           long value = strtol(optarg, &end, 10);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
-            fprintf(stderr, "Invalid audiobitrate: %s\n", optarg);
+            log_fatal("invalid audiobitrate: %s\n", optarg);
             print_usage();
             return EXIT_FAILURE;
           }
           if (value <= 0) {
-            fprintf(stderr, "Invalid audiobitrate: %ld (must be > 0)\n", value);
+            log_fatal("invalid audiobitrate: %ld (must be > 0)\n", value);
             return EXIT_FAILURE;
           }
           audio_bitrate = value;
@@ -3074,12 +3030,12 @@ int main(int argc, char **argv) {
           char *end;
           long value = strtol(optarg, &end, 10);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
-            fprintf(stderr, "Invalid samplerate: %s\n", optarg);
+            log_fatal("invalid samplerate: %s\n", optarg);
             print_usage();
             return EXIT_FAILURE;
           }
           if (value <= 0) {
-            fprintf(stderr, "Invalid samplerate: %ld (must be > 0)\n", value);
+            log_fatal("invalid samplerate: %ld (must be > 0)\n", value);
             return EXIT_FAILURE;
           }
           audio_sample_rate = value;
@@ -3093,7 +3049,7 @@ int main(int argc, char **argv) {
         is_preview_enabled = 1;
         break;
       case 'q':
-        log_level = LOG_LEVEL_ERROR;
+        log_set_level(LOG_LEVEL_ERROR);
         break;
       default:
         print_usage();
@@ -3107,45 +3063,43 @@ int main(int argc, char **argv) {
   audio_max_value = (int) (32767 / audio_volume_multiply);
   keyframe_pointers = calloc(sizeof(int) * record_buffer_keyframes, 1);
   if (keyframe_pointers == NULL) {
-    fprintf(stderr, "can't allocate memory for keyframe_pointers\n");
+    log_fatal("cannot allocate memory for keyframe_pointers\n");
     exit(EXIT_FAILURE);
   }
 
-  if (log_level <= LOG_LEVEL_INFO) {
-    printf("video_width=%d\n", video_width);
-    printf("video_height=%d\n", video_height);
-    printf("video_fps=%.1f\n", video_fps);
-    printf("gop_size=%d\n", video_gop_size);
-    printf("video_bitrate=%ld\n", video_bitrate);
-    printf("alsa_dev=%s\n", alsa_dev);
-    printf("audio_sample_rate=%d\n", audio_sample_rate);
-    printf("audio_bitrate=%ld\n", audio_bitrate);
-    printf("audio_volume_multiply=%f\n", audio_volume_multiply);
-    printf("is_hlsout_enabled=%d\n", is_hlsout_enabled);
-    printf("is_hls_encryption_enabled=%d\n", is_hls_encryption_enabled);
-    printf("hls_encryption_key_uri=%s\n", hls_encryption_key_uri);
-    printf("hls_encryption_key=0x");
-    fprint_hex(stdout, hls_encryption_key, sizeof(hls_encryption_key));
-    printf("\n");
-    printf("hls_encryption_iv=0x");
-    fprint_hex(stdout, hls_encryption_iv, sizeof(hls_encryption_iv));
-    printf("\n");
-    printf("hls_output_dir=%s\n", hls_output_dir);
-    printf("rtsp_enabled=%d\n", is_rtspout_enabled);
-    printf("rtsp_video_control_path=%s\n", rtsp_video_control_path);
-    printf("rtsp_audio_control_path=%s\n", rtsp_audio_control_path);
-    printf("rtsp_video_data_path=%s\n", rtsp_video_data_path);
-    printf("rtsp_audio_data_path=%s\n", rtsp_audio_data_path);
-    printf("tcp_enabled=%d\n", is_tcpout_enabled);
-    printf("tcp_output_dest=%s\n", tcp_output_dest);
-    printf("auto_exposure_enabled=%d\n", is_auto_exposure_enabled);
-    printf("exposure_night_y_threshold=%d\n", exposure_night_y_threshold);
-    printf("exposure_auto_y_threshold=%d\n", exposure_auto_y_threshold);
-    printf("is_preview_enabled=%d\n", is_preview_enabled);
-    printf("record_buffer_keyframes=%d\n", record_buffer_keyframes);
-    printf("state_dir=%s\n", state_dir);
-    printf("hooks_dir=%s\n", hooks_dir);
-  }
+  log_info("video_width=%d\n", video_width);
+  log_info("video_height=%d\n", video_height);
+  log_info("video_fps=%.1f\n", video_fps);
+  log_info("gop_size=%d\n", video_gop_size);
+  log_info("video_bitrate=%ld\n", video_bitrate);
+  log_info("alsa_dev=%s\n", alsa_dev);
+  log_info("audio_sample_rate=%d\n", audio_sample_rate);
+  log_info("audio_bitrate=%ld\n", audio_bitrate);
+  log_info("audio_volume_multiply=%f\n", audio_volume_multiply);
+  log_info("is_hlsout_enabled=%d\n", is_hlsout_enabled);
+  log_info("is_hls_encryption_enabled=%d\n", is_hls_encryption_enabled);
+  log_info("hls_encryption_key_uri=%s\n", hls_encryption_key_uri);
+  log_info("hls_encryption_key=0x");
+  log_hex(LOG_LEVEL_INFO, hls_encryption_key, sizeof(hls_encryption_key));
+  log_info("\n");
+  log_info("hls_encryption_iv=0x");
+  log_hex(LOG_LEVEL_INFO, hls_encryption_iv, sizeof(hls_encryption_iv));
+  log_info("\n");
+  log_info("hls_output_dir=%s\n", hls_output_dir);
+  log_info("rtsp_enabled=%d\n", is_rtspout_enabled);
+  log_info("rtsp_video_control_path=%s\n", rtsp_video_control_path);
+  log_info("rtsp_audio_control_path=%s\n", rtsp_audio_control_path);
+  log_info("rtsp_video_data_path=%s\n", rtsp_video_data_path);
+  log_info("rtsp_audio_data_path=%s\n", rtsp_audio_data_path);
+  log_info("tcp_enabled=%d\n", is_tcpout_enabled);
+  log_info("tcp_output_dest=%s\n", tcp_output_dest);
+  log_info("auto_exposure_enabled=%d\n", is_auto_exposure_enabled);
+  log_info("exposure_night_y_threshold=%d\n", exposure_night_y_threshold);
+  log_info("exposure_auto_y_threshold=%d\n", exposure_auto_y_threshold);
+  log_info("is_preview_enabled=%d\n", is_preview_enabled);
+  log_info("record_buffer_keyframes=%d\n", record_buffer_keyframes);
+  log_info("state_dir=%s\n", state_dir);
+  log_info("hooks_dir=%s\n", hooks_dir);
 
   if (state_create_dir(state_dir) != 0) {
     return EXIT_FAILURE;
@@ -3170,7 +3124,7 @@ int main(int argc, char **argv) {
   state_set(state_dir, "record", "false");
 
   if (clear_hooks(hooks_dir) != 0) {
-    fprintf(stderr, "clear_hooks() failed\n");
+    log_error("clear_hooks() failed\n");
   }
   start_watching_hooks(&hooks_thread, hooks_dir, on_file_create, 1);
 
@@ -3188,7 +3142,7 @@ int main(int argc, char **argv) {
 
   ret = OMX_Init();
   if (ret != OMX_ErrorNone) {
-    fprintf(stderr, "OMX_Init failed: 0x%x\n", ret);
+    log_fatal("OMX_Init failed: 0x%x\n", ret);
     ilclient_destroy(ilclient);
     return 1;
   }
@@ -3196,12 +3150,12 @@ int main(int argc, char **argv) {
 
   ret = openmax_cam_open();
   if (ret != 0) {
-    fprintf(stderr, "openmax_cam_open failed: %d\n", ret);
+    log_fatal("openmax_cam_open failed: %d\n", ret);
     return ret;
   }
   ret = video_encode_startup();
   if (ret != 0) {
-    fprintf(stderr, "video_encode_startup failed: %d\n", ret);
+    log_fatal("video_encode_startup failed: %d\n", ret);
     return ret;
   }
 
@@ -3210,10 +3164,10 @@ int main(int argc, char **argv) {
   if (!disable_audio_capturing) {
     ret = open_audio_capture_device();
     if (ret == -1) {
-      fprintf(stderr, "### WARNING: audio stream is disabled ###\n");
+      log_warn("### WARNING: audio stream is disabled ###\n");
       disable_audio_capturing = 1;
     } else if (ret < 0) {
-      fprintf(stderr, "init_audio failed: %d\n", ret);
+      log_fatal("init_audio failed: %d\n", ret);
       exit(1);
     }
   }
@@ -3274,7 +3228,7 @@ int main(int argc, char **argv) {
   } else {
     ret = configure_audio_capture_device();
     if (ret != 0) {
-      fprintf(stderr, "configure_audio_capture_device error: ret=%d\n", ret);
+      log_fatal("configure_audio_capture_device error: ret=%d\n", ret);
       exit(1);
     }
   }
@@ -3326,9 +3280,7 @@ int main(int argc, char **argv) {
   stop_watching_hooks();
   pthread_join(hooks_thread, NULL);
 
-  if (log_level <= LOG_LEVEL_INFO) {
-    fprintf(stderr, "shutdown successful\n");
-  }
+  log_info("shutdown successful\n");
   return 0;
 }
 
