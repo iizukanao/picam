@@ -1968,7 +1968,6 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
       frame_count++; // will be used for printing stats about FPS, etc.
 
       if (out->nFlags & OMX_BUFFERFLAG_SYNCFRAME) { // keyframe
-        // TODO: Send out nal_unit_type 6 (SEI) before the first I frame
         if (nal_unit_type != 5) {
           log_debug("SYNCFRAME nal_unit_type=%d len=%d\n", nal_unit_type, buf_len);
         }
