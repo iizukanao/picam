@@ -4,11 +4,11 @@
 
 #include "httplivestreaming.h"
 
-// Derived typedefs from libavformat/mpegts.h in FFmpeg source
-// as this is the only way to manipulate continuity counters.
+// Derived the typedefs from libavformat/mpegtsenc.c in FFmpeg source
+// because this is the only way to manipulate continuity counters.
 // Original license claim is as follows.
 /*
- * MPEG2 transport stream defines
+ * MPEG2 transport stream (aka DVB) muxer
  * Copyright (c) 2003 Fabrice Bellard
  *
  * This file is part of FFmpeg.
@@ -74,6 +74,8 @@ typedef struct MpegTSWrite {
     int flags;
     int copyts;
     int tables_version;
+
+    int omit_video_pes_length;
 } MpegTSWrite;
 
 typedef struct MpegTSWriteStream {
