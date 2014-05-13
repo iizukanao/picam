@@ -1701,7 +1701,6 @@ static int openmax_cam_open() {
   // create camera_component
   error = ilclient_create_component(cam_client, &camera_component, "camera",
       ILCLIENT_DISABLE_ALL_PORTS |
-      ILCLIENT_ENABLE_INPUT_BUFFERS |
       ILCLIENT_ENABLE_OUTPUT_BUFFERS);
   if (error != 0) {
     log_fatal("failed to create camera component: 0x%x\n", error);
