@@ -1679,7 +1679,6 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
   } else {
     shutdown_openmax();
     shutdown_video();
-    pthread_exit(0);
   }
 }
 
@@ -2523,11 +2522,6 @@ static void openmax_cam_loop() {
   if (error != OMX_ErrorNone) {
     log_error("error filling camera buffer (1): 0x%x\n", error);
   }
-}
-
-void *video_thread_loop() {
-  openmax_cam_loop();
-  return 0;
 }
 
 static void *audio_nop_loop() {
