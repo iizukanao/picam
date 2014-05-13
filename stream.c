@@ -230,7 +230,7 @@ static ILCLIENT_T *cam_client;
 static COMPONENT_T *camera_component = NULL;
 static COMPONENT_T *render_component = NULL;
 static COMPONENT_T *clock_component = NULL;
-static TUNNEL_T tunnel[4];
+static TUNNEL_T tunnel[3]; // The last element should remain NULL
 static int n_tunnel = 0;
 
 static AVFormatContext *tcp_ctx;
