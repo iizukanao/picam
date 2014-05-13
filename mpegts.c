@@ -19,7 +19,7 @@ void setup_video_stream(AVFormatContext *format_ctx) {
   video_stream = avformat_new_stream(format_ctx, 0);
   if (!video_stream) {
     fprintf(stderr, "avformat_new_stream failed\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   video_stream->id = format_ctx->nb_streams - 1;
 
@@ -64,13 +64,13 @@ void setup_audio_stream(AVFormatContext *format_ctx, MpegTSCodecSettings *settin
   aac_codec = avcodec_find_encoder(AV_CODEC_ID_AAC);
   if (!aac_codec) {
     fprintf(stderr, "codec not found\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   audio_stream = avformat_new_stream(format_ctx, aac_codec);
   if (!audio_stream) {
     fprintf(stderr, "avformat_new_stream for audio error\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   audio_stream->id = format_ctx->nb_streams - 1;
   audio_codec_ctx = audio_stream->codec;
@@ -79,7 +79,7 @@ void setup_audio_stream(AVFormatContext *format_ctx, MpegTSCodecSettings *settin
   if ( ! is_sample_fmt_supported(aac_codec, audio_codec_ctx->sample_fmt) ) {
     fprintf(stderr, "Sample format %s is not supported",
         av_get_sample_fmt_name(audio_codec_ctx->sample_fmt));
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   audio_codec_ctx->time_base.num = 1;
@@ -98,7 +98,7 @@ void setup_audio_stream(AVFormatContext *format_ctx, MpegTSCodecSettings *settin
 
   if (avcodec_open2(audio_codec_ctx, aac_codec, NULL) < 0) {
     fprintf(stderr, "avcodec_open failed\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 }
 
@@ -130,12 +130,12 @@ void mpegts_open_stream(AVFormatContext *format_ctx, char *outputfilename, int d
 
   if (avio_open(&format_ctx->pb, outputfilename, AVIO_FLAG_WRITE) < 0) {
     fprintf(stderr, "avio_open for %s failed\n", outputfilename);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   if (avformat_write_header(format_ctx, NULL)) {
     fprintf(stderr, "avformat_write_header failed\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 }
 
@@ -150,7 +150,7 @@ void mpegts_open_stream_without_header(AVFormatContext *format_ctx, char *output
 
   if (avio_open(&format_ctx->pb, outputfilename, AVIO_FLAG_WRITE) < 0) {
     fprintf(stderr, "avio_open for %s failed\n", outputfilename);
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 }
 
@@ -164,13 +164,13 @@ AVFormatContext *_mpegts_create_context(int use_video, int use_audio, MpegTSCode
   out_fmt->flags |= ~AVFMT_GLOBALHEADER;
   if (!out_fmt) {
     fprintf(stderr, "av_guess_format failed\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   format_ctx = avformat_alloc_context();
   if (!format_ctx) {
     fprintf(stderr, "avformat_alloc_context failed\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
   format_ctx->oformat = out_fmt;
 

@@ -58,11 +58,11 @@ void state_set(char *dir, char *name, char *value) {
     } else {
       perror("stat error");
     }
-    exit(1);
+    exit(EXIT_FAILURE);
   } else {
     if (!S_ISDIR(st.st_mode)) {
       fprintf(stderr, "Error: %s is not a directory\n", dir);
-      exit(1);
+      exit(EXIT_FAILURE);
     }
   }
 
@@ -98,11 +98,11 @@ void state_get(char *dir, char *name, char **buf) {
     } else {
       perror("stat error");
     }
-    exit(1);
+    exit(EXIT_FAILURE);
   } else {
     if (!S_ISDIR(st.st_mode)) {
       fprintf(stderr, "Error: %s is not a directory\n", dir);
-      exit(1);
+      exit(EXIT_FAILURE);
     }
   }
 

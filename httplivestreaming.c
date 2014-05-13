@@ -302,7 +302,7 @@ int hls_write_packet(HTTPLiveStreaming *hls, AVPacket *pkt, int split) {
     stream_cc = malloc(sizeof(int) * nb_streams);
     if (stream_cc == NULL) {
       perror("malloc failed for stream_cc");
-      exit(1);
+      exit(EXIT_FAILURE);
     }
     for (i = 0; i < nb_streams; i++) {
       ts_st = hls->format_ctx->streams[i]->priv_data;

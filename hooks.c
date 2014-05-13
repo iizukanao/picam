@@ -135,7 +135,7 @@ void *watch_for_file_creation(watch_target *target) {
   fd = inotify_init();
   if (fd < 0) {
     perror("inotify_init error");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   struct stat st;
@@ -146,17 +146,17 @@ void *watch_for_file_creation(watch_target *target) {
     } else {
       perror("stat error");
     }
-    exit(1);
+    exit(EXIT_FAILURE);
   } else {
     if (!S_ISDIR(st.st_mode)) {
       fprintf(stderr, "Error: %s is not a directory\n", dir);
-      exit(1);
+      exit(EXIT_FAILURE);
     }
   }
 
   if (access(dir, R_OK) != 0) {
     perror("Can't access hook target directory");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   uint32_t inotify_mask;
