@@ -32,9 +32,9 @@
 
 Build and install these libraries on a Raspberry Pi:
 
-- [FFmpeg](http://www.ffmpeg.org/) ([compilation guide for Raspberry Pi](http://trac.ffmpeg.org/wiki/CompilationGuide/RaspberryPi))
 - [alsa-lib](http://www.alsa-project.org/main/index.php/Main_Page)
 - [fdk-aac](http://sourceforge.net/projects/opencore-amr/)
+- [FFmpeg](http://www.ffmpeg.org/) ([compilation guide for Raspberry Pi](http://trac.ffmpeg.org/wiki/CompilationGuide/RaspberryPi))
 
 #### Compile libilclient
 
