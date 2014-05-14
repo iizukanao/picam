@@ -174,33 +174,6 @@ To unmute microphone, create a file named `hooks/unmute`.
       --help              Print this help
 
 
-### Using picam in combination with nginx-rtmp-module
-
-To use picam with [nginx-rtmp-module](https://github.com/arut/nginx-rtmp-module), add the following lines to nginx.conf:
-
-    rtmp {
-        server {
-            listen 1935;
-            chunk_size 4000;
-            application webcam {
-                live on;
-
-                exec_static /path/to/ffmpeg -i tcp://127.0.0.1:8181?listen
-                                            -c:v copy -ar 44100 -ab 40000
-                                            -f flv rtmp://localhost:1935/webcam/mystream;
-            }
-        }
-    }
-
-Note that `/path/to/ffmpeg` should be replaced with the actual absolute path to ffmpeg command.
-
-Start nginx server, then run:
-
-    $ ./picam --tcpout tcp://127.0.0.1:8181
-
-You can access your live stream at `rtmp://YOUR_RASPBERRYPI_IP/webcam/mystream`.
-
-
 ### HTTP Live Streaming
 
 HTTP Live Streaming is disabled by default. To enable HTTP Live Streaming and generate files in /run/shm/hls, run:
@@ -226,6 +199,33 @@ Put enc.key in /run/shm/hls/ directory. Then, run picam with the following optio
       --hlsenciv 000102030405060708090a0b0c0d0e0f
 
 You can watch the HTTP Live Streaming by accessing /run/shm/hls/index.m3u8 via HTTP or HTTPS with QuickTime Player.
+
+
+### Using picam in combination with nginx-rtmp-module
+
+To use picam with [nginx-rtmp-module](https://github.com/arut/nginx-rtmp-module), add the following lines to nginx.conf:
+
+    rtmp {
+        server {
+            listen 1935;
+            chunk_size 4000;
+            application webcam {
+                live on;
+
+                exec_static /path/to/ffmpeg -i tcp://127.0.0.1:8181?listen
+                                            -c:v copy -ar 44100 -ab 40000
+                                            -f flv rtmp://localhost:1935/webcam/mystream;
+            }
+        }
+    }
+
+Note that `/path/to/ffmpeg` should be replaced with the actual absolute path to ffmpeg command.
+
+Start nginx server, then run:
+
+    $ ./picam --tcpout tcp://127.0.0.1:8181
+
+You can access your live stream at `rtmp://YOUR_RASPBERRYPI_IP/webcam/mystream`.
 
 
 ### Recommended hardware
