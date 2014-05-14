@@ -107,7 +107,7 @@ To convert MPEG-TS to MP4, run:
 
     $ ffmpeg -i test.ts -c:v copy -c:a copy -bsf:a aac_adtstoasc test.mp4
 
-### Mute/Unmute
+#### Mute/Unmute
 
 To mute microphone temporarily, create a file named `hooks/mute`.
 
