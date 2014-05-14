@@ -52,6 +52,73 @@ On a Raspberry Pi, issue the following command:
 
 ### Usage
 
+picam command is a process which continuously reads video from Raspberry Pi Camera and audio from ALSA.
+
+    $ ./picam
+    video_width=1280
+    video_height=720
+    video_fps=30.0
+    gop_size=30
+    video_bitrate=2000000
+    alsa_dev=hw:0,0
+    audio_sample_rate=48000
+    audio_bitrate=40000
+    audio_volume_multiply=1.000000
+    is_hlsout_enabled=0
+    is_hls_encryption_enabled=0
+    hls_encryption_key_uri=stream.key
+    hls_encryption_key=0x75b0a81de17487c88a47507a7e1fdf73
+    hls_encryption_iv=0x000102030405060708090a0b0c0d0e0f
+    hls_output_dir=/run/shm/video
+    rtsp_enabled=0
+    rtsp_video_control_path=/tmp/node_rtsp_rtmp_videoControl
+    rtsp_audio_control_path=/tmp/node_rtsp_rtmp_audioControl
+    rtsp_video_data_path=/tmp/node_rtsp_rtmp_videoData
+    rtsp_audio_data_path=/tmp/node_rtsp_rtmp_audioData
+    tcp_enabled=0
+    tcp_output_dest=
+    auto_exposure_enabled=0
+    exposure_night_y_threshold=40
+    exposure_auto_y_threshold=50
+    is_preview_enabled=0
+    record_buffer_keyframes=5
+    state_dir=state
+    hooks_dir=hooks
+    exposure mode: auto
+    ................................ 31.46 fps k=1
+    .............................. 30.49 fps k=2
+    .............................. 30.55 fps k=3
+
+#### Recording
+
+To start recording, create a file named `hooks/start_record` while picam command is running.
+
+    $ touch hooks/start_record
+
+You will see `start rec` in the picam command output.
+
+To stop recording, create a file named `hooks/stop_record`.
+
+    $ touch hooks/stop_record
+
+The recorded MPEG-TS file is in rec/archive/ directory.
+
+To convert MPEG-TS to MP4, run:
+
+    $ ffmpeg -i test.ts -c:v copy -c:a copy -bsf:a aac_adtstoasc test.mp4
+
+### Mute/Unmute
+
+To mute microphone temporarily, create a file named `hooks/mute`.
+
+    $ touch hooks/mute
+
+To unmute microphone, create a file named `hooks/unmute`.
+
+    $ touch hooks/unmute
+
+#### Command options
+
     $ ./picam --help
     picam version 1.0.0
     Usage: picam [options]
@@ -105,32 +172,6 @@ On a Raspberry Pi, issue the following command:
       --hooksdir <dir>    Set hooks dir (default: hooks)
       -q, --quiet         Turn off most of the log messages
       --help              Print this help
-
-
-### Recording
-
-#### Start recording
-
-    $ cd picam
-    $ touch hooks/start_record
-
-#### Stop recording
-
-    $ cd picam
-    $ touch hooks/stop_record
-
-Recorded files are generated in rec/ directory.
-
-
-### Mute/Unmute
-
-To mute microphone temporarily:
-
-    $ touch hooks/mute
-
-To unmute microphone:
-
-    $ touch hooks/unmute
 
 
 ### Using picam in combination with nginx-rtmp-module
