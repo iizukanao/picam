@@ -187,6 +187,7 @@ Optionally you can enable encryption for HTTP Live Streaming. We will use the fo
 - **HTTP Live Streaming output directory**: /run/shm/hls/
 - **Encryption key**: 0xf0f1f2f3f4f5f6f7f8f9fafbfcfdfeff
 - **Encryption IV**:  0x000102030405060708090a0b0c0d0e0f
+- **Encryption key file**: enc.key
 
 First you have to create a file named "enc.key" which contains 16-byte encryption key. To create such file, run:
 
