@@ -52,7 +52,7 @@ On a Raspberry Pi, issue the following command:
 
 ### Usage
 
-picam command is a process which continuously reads video from Raspberry Pi Camera and audio from ALSA.
+picam command continuously reads video from Raspberry Pi Camera and audio from ALSA.
 
     $ ./picam
     video_width=1280
