@@ -34,7 +34,11 @@ Build and install these libraries on a Raspberry Pi:
 
 - [alsa-lib](http://www.alsa-project.org/main/index.php/Main_Page)
 - [fdk-aac](http://sourceforge.net/projects/opencore-amr/)
-- [FFmpeg](http://www.ffmpeg.org/) ([compilation guide for Raspberry Pi](http://trac.ffmpeg.org/wiki/CompilationGuide/RaspberryPi))
+- [FFmpeg](http://www.ffmpeg.org/) with "--enable-libfdk-aac" configure option ([compilation guide](http://trac.ffmpeg.org/wiki/CompilationGuide/RaspberryPi))
+
+The output of `ffmpeg -codecs | grep aac` should have the following line:
+
+     DEA.L. aac                  AAC (Advanced Audio Coding) (decoders: aac libfdk_aac ) (encoders: aac libfdk_aac )
 
 #### Compile libilclient
 
