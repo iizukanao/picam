@@ -5,7 +5,7 @@
 - Capture video from Raspberry Pi Camera (up to 720p) and encode it to H.264 using hardware encoder
 - Capture audio from USB microphone via ALSA and encode it to AAC-LC using libavcodec (FFmpeg)
 - Record to an MPEG-TS file
-- Built-in support for HTTP Live Streaming with optional encryption
+- Generate files for HTTP Live Streaming with optional encryption
 - If USB microphone is not available, it only records the video
 
 
