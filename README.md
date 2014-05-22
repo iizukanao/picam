@@ -36,7 +36,7 @@ Build and install these libraries on a Raspberry Pi:
 - [fdk-aac](http://sourceforge.net/projects/opencore-amr/)
 - [FFmpeg](http://www.ffmpeg.org/) with "--enable-libfdk-aac" configure option
 
-The output of `ffmpeg -codecs | grep aac` should have the following line:
+The output of `ffmpeg -codecs | grep aac` should contain the following line:
 
      DEA.L. aac                  AAC (Advanced Audio Coding) (decoders: aac libfdk_aac ) (encoders: aac libfdk_aac )
 
