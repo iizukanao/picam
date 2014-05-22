@@ -20,7 +20,7 @@
 
 #### Install libraries
 
-Build and install these libraries on a Raspberry Pi:
+Build and install these libraries on a Raspberry Pi (Raspbian):
 
 - [alsa-lib](http://www.alsa-project.org/main/index.php/Main_Page)
 - [fdk-aac](http://sourceforge.net/projects/opencore-amr/)
