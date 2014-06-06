@@ -43,6 +43,10 @@ On a Raspberry Pi, issue the following command:
     $ cd picam
     $ make
 
+If you want to save some disk space, run:
+
+    $ strip picam
+
 
 ### Usage
 
