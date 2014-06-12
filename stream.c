@@ -2118,7 +2118,6 @@ static int video_encode_startup() {
     exit(EXIT_FAILURE);
   }
 
-  // Set the profile to Baseline 3.0
   memset(&avctype, 0, sizeof(OMX_VIDEO_PARAM_AVCTYPE));
   avctype.nSize = sizeof(OMX_VIDEO_PARAM_AVCTYPE);
   avctype.nVersion.nVersion = OMX_VERSION;
@@ -2136,6 +2135,7 @@ static int video_encode_startup() {
   // Number of B frames between I frames
   avctype.nBFrames = 0;
 
+  // Set the profile to Constrained Baseline Profile, Level 3.1
   avctype.eProfile = OMX_VIDEO_AVCProfileConstrainedBaseline; // Main profile is not playable on Android
   avctype.eLevel = OMX_VIDEO_AVCLevel31; // Level 4.1 is not supported on Raspberry Pi
   // Level 3.1 allows up to 1280x720 @ 30.0 FPS (720p)
