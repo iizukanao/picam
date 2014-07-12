@@ -16,6 +16,12 @@
 - USB microphone (see [Recommended hardware](#recommended-hardware))
 
 
+### Supported operating systems
+
+- Raspbian
+- Arch Linux
+
+
 ### Installation
 
 #### Install libraries
@@ -46,6 +52,19 @@ On a Raspberry Pi, issue the following command:
 If you want to save some disk space, run:
 
     $ strip picam
+
+#### Configuration for Arch Linux
+
+You need to have these two lines in /boot/config.txt.
+
+    start_file=start_x.elf
+    fixup_file=fixup_x.dat
+
+Also, assign at least 128MB for GPU memory.
+
+    gpu_mem_512=128
+
+Reboot the Raspberry Pi for the changes to take effect.
 
 
 ### Usage
