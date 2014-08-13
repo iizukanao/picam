@@ -9,6 +9,26 @@
 - If USB microphone is not available, it only records the video
 
 
+### Performance (Latency)
+
+Time from real motion to playback on Strobe Media Player over RTMP:
+
+| Video bitrate | Minimum latency |
+| ------------: | --------------: |
+| 300 Kbps      |         0.3 sec |
+| 500 Kbps      |         0.6 sec |
+|   1 Mbps      |         0.8 sec |
+|   2 Mbps      |         1.0 sec |
+|   3 Mbps      |         1.3 sec |
+
+Tested with:
+
+- Video: 1280x720, 30 fps, GOP size 30
+- Audio: 48 Khz mono, 40 Kbps
+- RTMP Server: [node-rtsp-rtmp-server](https://github.com/iizukanao/node-rtsp-rtmp-server)
+- Client: Flash Player 14,0,0,145 on Firefox 31.0 for Mac, using [test/strobe_media_playback.html](https://github.com/iizukanao/picam/blob/master/test/strobe_media_playback.html)
+
+
 ### Required hardware
 
 - Raspberry Pi
