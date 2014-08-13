@@ -28,6 +28,7 @@ Tested with:
 - Audio: 48 Khz mono, 40 Kbps
 - RTMP Server: [node-rtsp-rtmp-server](https://github.com/iizukanao/node-rtsp-rtmp-server)
 - Client: Flash Player 14,0,0,145 on Firefox 31.0 for Mac, using [test/strobe_media_playback.html](https://github.com/iizukanao/picam/blob/master/test/strobe_media_playback.html)
+- Network: Wi-Fi network created by a USB dongle attached to Raspberry Pi
 
 
 ### Required hardware
