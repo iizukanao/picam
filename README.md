@@ -1,6 +1,6 @@
 ### picam
 
-#### Features
+### Features
 
 - Capture video from Raspberry Pi Camera (up to 720p) and encode it to H.264 using hardware encoder
 - Capture audio from USB microphone via ALSA and encode it to AAC-LC using libavcodec (FFmpeg)
