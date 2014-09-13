@@ -46,47 +46,7 @@ Tested with:
 
 ### Installation
 
-#### Install libraries
-
-Build and install these libraries on Raspberry Pi.
-
-- [alsa-lib](http://www.alsa-project.org/main/index.php/Main_Page)
-- [fdk-aac](http://sourceforge.net/projects/opencore-amr/)
-- [FFmpeg](http://www.ffmpeg.org/) with "--enable-libfdk-aac" configure option
-
-The output of `ffmpeg -codecs | grep aac` should contain the following line:
-
-     DEA.L. aac                  AAC (Advanced Audio Coding) (decoders: aac libfdk_aac ) (encoders: aac libfdk_aac )
-
-#### Compile libilclient
-
-On a Raspberry Pi, issue the following command:
-
-    $ cd /opt/vc/src/hello_pi/libs/ilclient
-    $ make
-
-#### Compile picam
-
-    $ git clone https://github.com/iizukanao/picam.git
-    $ cd picam
-    $ make
-
-If you want to save some disk space, run:
-
-    $ strip picam
-
-#### Configuration for Arch Linux
-
-You need to have these two lines in /boot/config.txt.
-
-    start_file=start_x.elf
-    fixup_file=fixup_x.dat
-
-Also, assign at least 128MB for GPU memory.
-
-    gpu_mem_512=128
-
-Reboot the Raspberry Pi for the changes to take effect.
+See [INSTALL.md](INSTALL.md).
 
 
 ### Usage
