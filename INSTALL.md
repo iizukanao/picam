@@ -63,7 +63,7 @@ Save the configuration and build.
 
 ## Build fdk-aac
 
-We will use $HOME/pi as a working directory and put compiled binaries and header files in $HOME/pi/build/. Set the environment variable $PIBUILD.
+We will use $HOME/pi/ as a working directory and put compiled binaries and header files in $HOME/pi/build/. Set the environment variable $PIBUILD.
 
     $ export PIBUILD=$HOME/pi/build
     $ mkdir $PIBUILD
@@ -108,7 +108,7 @@ If all goes well, build ffmpeg.
 
 ## Transfer the files to Raspberry Pi
 
-Transfer the contents of $PIBUILD directory to Raspberry Pi, then put them under /usr/local/ so that you have /usr/local/bin/ffmpeg.
+Transfer the contents of $PIBUILD directory to Raspberry Pi, then put them in /usr/local/ so that you have /usr/local/bin/ffmpeg.
 
 If you have transferred the files to ~/build/, you can install them like this:
 
@@ -135,7 +135,7 @@ From now on, all steps are performed on Raspberry Pi.
     $ cd /opt/vc/src/hello_pi/libs/ilclient
     $ make
 
-If you do not have the above directory, download the firmware from https://github.com/raspberrypi/firmware and copy all the contents under /opt/vc/.
+If you do not have the above directory, download the firmware from https://github.com/raspberrypi/firmware and copy all the contents inside /opt/vc/src/.
 
 
 ## Build picam
