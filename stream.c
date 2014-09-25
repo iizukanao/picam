@@ -1507,12 +1507,16 @@ void stopSignalHandler(int signo) {
 
 static void shutdown_video() {
   int i;
+
+  log_debug("shutdown_video\n");
   for (i = 0; i < n_codec_configs; i++) {
     free(codec_configs[i]);
   }
 }
 
 static void shutdown_openmax() {
+  log_debug("shutdown_openmax\n");
+
   if (is_preview_enabled || is_clock_enabled) {
     ilclient_flush_tunnels(tunnel, 0);
   }
@@ -3238,6 +3242,7 @@ int main(int argc, char **argv) {
   } else {
     audio_loop_poll_mmap();
   }
+  log_debug("shutdown sequence start\n");
 
   if (is_recording) {
     rec_thread_needs_write = 1;
@@ -3247,14 +3252,18 @@ int main(int argc, char **argv) {
     pthread_join(rec_thread, NULL);
   }
 
+  log_debug("teardown_audio_encode\n");
   teardown_audio_encode();
 
   if (!disable_audio_capturing) {
+    log_debug("teardown_audio_capture_device\n");
     teardown_audio_capture_device();
   }
 
+  log_debug("hls_destroy\n");
   hls_destroy(hls);
 
+  log_debug("pthread_mutex_destroy\n");
   pthread_mutex_destroy(&mutex_writing);
   pthread_mutex_destroy(&rec_mutex);
   pthread_mutex_destroy(&rec_write_mutex);
@@ -3263,12 +3272,17 @@ int main(int argc, char **argv) {
     teardown_tcp_output();
   }
 
+  log_debug("teardown_socks\n");
   teardown_socks();
 
+  log_debug("free_encoded_packets\n");
   free_encoded_packets();
+  log_debug("free keyframe_pointers\n");
   free(keyframe_pointers);
 
+  log_debug("stop_watching_hooks\n");
   stop_watching_hooks();
+  log_debug("pthread_join hooks_thread\n");
   pthread_join(hooks_thread, NULL);
 
   log_info("shutdown successful\n");
