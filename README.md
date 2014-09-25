@@ -51,15 +51,41 @@ See [INSTALL.md](INSTALL.md).
 
 ### Usage
 
-picam command continuously reads video from Raspberry Pi Camera and audio from ALSA.
+#### Finding ALSA device name
 
-    $ ./picam
+First, find ALSA device name of the USB microphone.
+
+    $ arecord -l
+    **** List of CAPTURE Hardware Devices ****
+    card 1: Device [USB PnP Sound Device], device 0: USB Audio [USB Audio]
+      Subdevices: 1/1
+      Subdevice #0: subdevice #0
+
+ALSA device name is consisted of `hw:<card>,<device>`. In the above example, the ALSA device name is `hw:1,0`.
+
+If you got `no soundcards found` error, try `sudo arecord -l`. If that output looks good, you might want to add your user to `audio` group.
+
+    $ sudo usermod -a -G audio $USER
+    (once logout, then login again)
+    $ groups
+    wheel audio pi  <-- (audio is in the list)
+    $ arecord -l
+    **** List of CAPTURE Hardware Devices ****
+    card 1: Device [USB PnP Sound Device], device 0: USB Audio [USB Audio]
+      Subdevices: 1/1
+      Subdevice #0: subdevice #0
+
+#### Starting picam
+
+Run picam with your ALSA device name.
+
+    $ ./picam --alsadev hw:1,0
     video_width=1280
     video_height=720
     video_fps=30.0
     gop_size=30
     video_bitrate=2000000
-    alsa_dev=hw:0,0
+    alsa_dev=hw:1,0
     audio_sample_rate=48000
     audio_bitrate=40000
     audio_volume_multiply=1.000000

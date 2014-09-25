@@ -46,7 +46,8 @@ Then a configuration screen appears. The followings are for crosstool-ng 1.20.0,
     - Set "binutils version" to "2.22"
 - C-library
     - Set "C library" to "eglibc"
-    - Set "eglibc version" to "2_13"
+    - Set "eglibc version" to "2_13" (if you are using Raspbian)
+    - Set "eglibc version" to "2_18" (if you are using Arch Linux)
 - C compiler
     - Check "Show Linaro versions"
     - Set "gcc version" to "linaro-4.8-2014.01"
@@ -80,13 +81,79 @@ Download fdk-aac-0.1.3.tar.gz (or the latest version) from http://sourceforge.ne
 
 ## Build ffmpeg
 
-You cannot use ffmpeg that can be installed via `apt-get`.
+You cannot use ffmpeg that can be installed via `apt-get` or `pacman`.
 
-Before compiling ffmpeg, you have to copy ALSA header files and shared libraries from Raspberry Pi. Log in to Raspberry Pi and install **libasound2** and **libasound2-dev** via `apt-get`. Then you have /usr/include/alsa/ and /usr/lib/arm-linux-gnueabihf/libasound.so*. Copy those files from Raspberry Pi, and put them in $HOME/pi/ so that you have $HOME/pi/usr/include/ and $HOME/pi/usr/lib/. Set another environment variable $PIUSR.
+### Copying ALSA headers and libs from Raspberry Pi (Raspbian)
+
+Log in to Raspberry Pi and install **libasound2-dev** and **alsa-utils** via `apt-get`.
+
+    $ sudo apt-get install libasound2-dev alsa-utils
+
+Set an environment variable $PIUSR, and copy ALSA headers and libs from Raspberry Pi.
 
     $ export PIUSR=$HOME/pi/usr
-    $ ls $PIUSR
-    include  lib
+    $ mkdir $PIUSR
+    $ cd $PIUSR
+    $ mkdir include lib
+    $ rsync -rav pi@raspberrypi:/usr/include/alsa/ $PIUSR/include/alsa/
+    $ rsync -rav pi@raspberrypi:/usr/lib/arm-linux-gnueabihf/libasound.so* $PIUSR/lib/
+    $ tree --charset=ascii
+    .
+    |-- include
+    |   `-- alsa
+    |       |-- alisp.h
+    :       :   :
+    |       |-- sound
+    |       |   |-- asound_fm.h
+    :       :   :   :
+    |       |   `-- type_compat.h
+    |       |-- timer.h
+    |       |-- use-case.h
+    |       `-- version.h
+    `-- lib
+        |-- libasound.so -> libasound.so.2.0.0
+        |-- libasound.so.2 -> libasound.so.2.0.0
+        `-- libasound.so.2.0.0
+
+    4 directories, 39 files
+
+
+### Copying ALSA headers and libs from Raspberry Pi (Arch Linux)
+
+Log in to Raspberry Pi and install **alsa-lib** and **alsa-utils** via `pacman`.
+
+    $ sudo pacman -S alsa-lib alsa-utils
+
+Set an environment variable $PIUSR, and copy ALSA headers and libs from Raspberry Pi.
+
+    $ export PIUSR=$HOME/pi/usr
+    $ mkdir $PIUSR
+    $ cd $PIUSR
+    $ mkdir include lib
+    $ rsync -rav pi@raspberrypi:/usr/include/alsa/ $PIUSR/include/alsa/
+    $ rsync -rav pi@raspberrypi:/usr/lib/libasound.so* $PIUSR/lib/
+    $ tree --charset=ascii
+    .
+    |-- include
+    |   `-- alsa
+    |       |-- alisp.h
+    :       :   :
+    |       |-- sound
+    |       |   |-- asound_fm.h
+    :       :   :   :
+    |       |   `-- type_compat.h
+    |       |-- timer.h
+    |       |-- use-case.h
+    |       `-- version.h
+    `-- lib
+        |-- libasound.so -> libasound.so.2.0.0
+        |-- libasound.so.2 -> libasound.so.2.0.0
+        `-- libasound.so.2.0.0
+
+    4 directories, 39 files
+
+
+### Configure and make ffmpeg
 
 Next, fetch ffmpeg source and configure it:
 
@@ -117,15 +184,19 @@ If you have transferred the files to ~/build/, you can install them like this:
     bin  include  lib  share
     $ sudo rsync -rav ./ /usr/local/
 
-After you install the files, run `ldconfig` on Raspberry Pi.
+We have done with the powerful machine which was used for cross compiling.
+
+If you don't have /etc/ld.so.conf.d/libc.conf on Raspberry Pi, create that file with the following contents. On Raspbian, /etc/ld.so.conf.d/libc.conf is installed by default.
+
+    /usr/local/lib
+
+Run `ldconfig`.
 
     $ sudo ldconfig
 
 Run `ffmpeg -codecs | grep fdk` and make sure that the output has this line:
 
      DEA.L. aac                  AAC (Advanced Audio Coding) (decoders: aac libfdk_aac ) (encoders: aac libfdk_aac )
-
-We have done with the powerful machine which was used for cross compiling.
 
 
 ## Build libilclient
@@ -135,7 +206,7 @@ From now on, all steps are performed on Raspberry Pi.
     $ cd /opt/vc/src/hello_pi/libs/ilclient
     $ make
 
-If you do not have the above directory, download the firmware from https://github.com/raspberrypi/firmware and copy all the contents inside /opt/vc/src/.
+If you do not have /opt/vc/src/ directory, download the firmware from https://github.com/raspberrypi/firmware and put all the contents under /opt/vc/src/. On Raspbian, /opt/vc/src/ is installed by default.
 
 
 ## Build picam
