@@ -231,27 +231,29 @@ int write_index(HTTPLiveStreaming *hls, int is_end) {
 }
 
 void hls_destroy(HTTPLiveStreaming *hls) {
-  mpegts_close_stream(hls->format_ctx);
-  if (hls->use_encryption) {
-    encrypt_most_recent_file(hls);
-    if (hls->encryption_key_uri != NULL) {
-      free(hls->encryption_key_uri);
+  if (hls->is_started) {
+    mpegts_close_stream(hls->format_ctx);
+    if (hls->use_encryption) {
+      encrypt_most_recent_file(hls);
+      if (hls->encryption_key_uri != NULL) {
+        free(hls->encryption_key_uri);
+      }
+      if (hls->encryption_key != NULL) {
+        free(hls->encryption_key);
+      }
+      if (hls->encryption_iv != NULL) {
+        free(hls->encryption_iv);
+      }
     }
-    if (hls->encryption_key != NULL) {
-      free(hls->encryption_key);
-    }
-    if (hls->encryption_iv != NULL) {
-      free(hls->encryption_iv);
-    }
-  }
 
-  if (++hls->segment_durations_idx == hls->num_recent_files) {
-    hls->segment_durations_idx = 0;
-  }
-  hls->segment_durations[hls->segment_durations_idx] =
-    (hls->last_packet_pts - hls->segment_start_pts) / 90000.0;
+    if (++hls->segment_durations_idx == hls->num_recent_files) {
+      hls->segment_durations_idx = 0;
+    }
+    hls->segment_durations[hls->segment_durations_idx] =
+      (hls->last_packet_pts - hls->segment_start_pts) / 90000.0;
 
-  write_index(hls, 1);
+    write_index(hls, 1);
+  }
   mpegts_destroy_context(hls->format_ctx);
   free(hls->segment_durations);
   free(hls);
