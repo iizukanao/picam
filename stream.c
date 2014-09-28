@@ -230,7 +230,7 @@ static ILCLIENT_T *cam_client;
 static COMPONENT_T *camera_component = NULL;
 static COMPONENT_T *render_component = NULL;
 static COMPONENT_T *clock_component = NULL;
-static TUNNEL_T tunnel[3]; // The last element should remain NULL
+static TUNNEL_T tunnel[3]; // Must be null-terminated
 static int n_tunnel = 0;
 
 static AVFormatContext *tcp_ctx;
@@ -1521,33 +1521,44 @@ static void shutdown_video() {
 }
 
 static void shutdown_openmax() {
-  log_debug("shutdown_openmax\n");
   int i;
 
   if (is_preview_enabled || is_clock_enabled) {
+    log_debug("shutdown_openmax: ilclient_flush_tunnels\n");
     ilclient_flush_tunnels(tunnel, 0);
   }
 
   // Disable port buffers
+  log_debug("shutdown_openmax: disable port buffer for camera 71\n");
   ilclient_disable_port_buffers(camera_component, 71, NULL, NULL, NULL);
+  log_debug("shutdown_openmax: disable port buffer for video_encode 200\n");
   ilclient_disable_port_buffers(video_encode, 200, NULL, NULL, NULL);
+  log_debug("shutdown_openmax: disable port buffer for video_encode 201\n");
   ilclient_disable_port_buffers(video_encode, 201, NULL, NULL, NULL);
 
   if (is_preview_enabled || is_clock_enabled) {
     for (i = 0; i < n_tunnel; i++) {
+      log_debug("shutdown_openmax: disable tunnel[%d]\n", i);
       ilclient_disable_tunnel(&tunnel[i]);
     }
+    log_debug("shutdown_openmax: teardown tunnels\n");
     ilclient_teardown_tunnels(tunnel);
   }
 
+  log_debug("shutdown_openmax: state transition to idle\n");
   ilclient_state_transition(component_list, OMX_StateIdle);
+  log_debug("shutdown_openmax: state transition to loaded\n");
   ilclient_state_transition(component_list, OMX_StateLoaded);
 
+  log_debug("shutdown_openmax: ilclient_cleanup_components\n");
   ilclient_cleanup_components(component_list);
 
+  log_debug("shutdown_openmax: OMX_Deinit\n");
   OMX_Deinit();
 
+  log_debug("shutdown_openmax: ilclient_destroy cam_client\n");
   ilclient_destroy(cam_client);
+  log_debug("shutdown_openmax: ilclient_destroy ilclient\n");
   ilclient_destroy(ilclient);
 }
 
@@ -1561,7 +1572,7 @@ static void set_exposure_to_auto() {
   exposure_type.nPortIndex = OMX_ALL;
   exposure_type.eExposureControl = OMX_ExposureControlAuto;
 
-  log_info("exposure mode: auto\n");
+  log_debug("exposure mode: auto\n");
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexConfigCommonExposure, &exposure_type);
   if (error != OMX_ErrorNone) {
@@ -1580,7 +1591,7 @@ static void set_exposure_to_night() {
   exposure_type.nPortIndex = OMX_ALL;
   exposure_type.eExposureControl = OMX_ExposureControlNight;
 
-  log_info("exposure mode: night\n");
+  log_debug("exposure mode: night\n");
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexConfigCommonExposure, &exposure_type);
   if (error != OMX_ErrorNone) {
@@ -2217,32 +2228,38 @@ static int video_encode_startup() {
   }
 
   // Set video_encode component to idle state
+  log_debug("Set video_encode state to idle\n");
   if (ilclient_change_component_state(video_encode, OMX_StateIdle) == -1) {
     log_fatal("failed to set video_encode to idle state\n");
     exit(EXIT_FAILURE);
   }
 
-  // Enable port buffers for port 71
+  // Enable port buffers for port 71 (camera capture output)
+  log_debug("Enable port buffers for camera 71\n");
   if (ilclient_enable_port_buffers(camera_component, 71, NULL, NULL, NULL) != 0) {
     log_fatal("failed to enable port buffers for camera 71\n");
     exit(EXIT_FAILURE);
   }
 
-  // Enable port buffers for port 200
+  // Enable port buffers for port 200 (video_encode input)
+  log_debug("Enable port buffers for video_encode 200\n");
   if (ilclient_enable_port_buffers(video_encode, 200, NULL, NULL, NULL) != 0) {
     log_fatal("failed to enable port buffers for video_encode 200\n");
     exit(EXIT_FAILURE);
   }
 
-  // Enable port buffers for port 201
+  // Enable port buffers for port 201 (video_encode output)
+  log_debug("Enable port buffers for video_encode 201\n");
   if (ilclient_enable_port_buffers(video_encode, 201, NULL, NULL, NULL) != 0) {
     log_fatal("failed to enable port buffers for video_encode 201\n");
     exit(EXIT_FAILURE);
   }
 
+  log_debug("Set camera state to executing\n");
   // Set camera component to executing state
   ilclient_change_component_state(camera_component, OMX_StateExecuting);
 
+  log_debug("Set video_encode state to executing\n");
   // Set video_encode component to executing state
   ilclient_change_component_state(video_encode, OMX_StateExecuting);
 
@@ -3125,39 +3142,39 @@ int main(int argc, char **argv) {
     exit(EXIT_FAILURE);
   }
 
-  log_info("video_width=%d\n", video_width);
-  log_info("video_height=%d\n", video_height);
-  log_info("video_fps=%.1f\n", video_fps);
-  log_info("gop_size=%d\n", video_gop_size);
-  log_info("video_bitrate=%ld\n", video_bitrate);
-  log_info("alsa_dev=%s\n", alsa_dev);
-  log_info("audio_sample_rate=%d\n", audio_sample_rate);
-  log_info("audio_bitrate=%ld\n", audio_bitrate);
-  log_info("audio_volume_multiply=%f\n", audio_volume_multiply);
-  log_info("is_hlsout_enabled=%d\n", is_hlsout_enabled);
-  log_info("is_hls_encryption_enabled=%d\n", is_hls_encryption_enabled);
-  log_info("hls_encryption_key_uri=%s\n", hls_encryption_key_uri);
-  log_info("hls_encryption_key=0x");
-  log_hex(LOG_LEVEL_INFO, hls_encryption_key, sizeof(hls_encryption_key));
-  log_info("\n");
-  log_info("hls_encryption_iv=0x");
-  log_hex(LOG_LEVEL_INFO, hls_encryption_iv, sizeof(hls_encryption_iv));
-  log_info("\n");
-  log_info("hls_output_dir=%s\n", hls_output_dir);
-  log_info("rtsp_enabled=%d\n", is_rtspout_enabled);
-  log_info("rtsp_video_control_path=%s\n", rtsp_video_control_path);
-  log_info("rtsp_audio_control_path=%s\n", rtsp_audio_control_path);
-  log_info("rtsp_video_data_path=%s\n", rtsp_video_data_path);
-  log_info("rtsp_audio_data_path=%s\n", rtsp_audio_data_path);
-  log_info("tcp_enabled=%d\n", is_tcpout_enabled);
-  log_info("tcp_output_dest=%s\n", tcp_output_dest);
-  log_info("auto_exposure_enabled=%d\n", is_auto_exposure_enabled);
-  log_info("exposure_night_y_threshold=%d\n", exposure_night_y_threshold);
-  log_info("exposure_auto_y_threshold=%d\n", exposure_auto_y_threshold);
-  log_info("is_preview_enabled=%d\n", is_preview_enabled);
-  log_info("record_buffer_keyframes=%d\n", record_buffer_keyframes);
-  log_info("state_dir=%s\n", state_dir);
-  log_info("hooks_dir=%s\n", hooks_dir);
+  log_debug("video_width=%d\n", video_width);
+  log_debug("video_height=%d\n", video_height);
+  log_debug("video_fps=%.1f\n", video_fps);
+  log_debug("gop_size=%d\n", video_gop_size);
+  log_debug("video_bitrate=%ld\n", video_bitrate);
+  log_debug("alsa_dev=%s\n", alsa_dev);
+  log_debug("audio_sample_rate=%d\n", audio_sample_rate);
+  log_debug("audio_bitrate=%ld\n", audio_bitrate);
+  log_debug("audio_volume_multiply=%f\n", audio_volume_multiply);
+  log_debug("is_hlsout_enabled=%d\n", is_hlsout_enabled);
+  log_debug("is_hls_encryption_enabled=%d\n", is_hls_encryption_enabled);
+  log_debug("hls_encryption_key_uri=%s\n", hls_encryption_key_uri);
+  log_debug("hls_encryption_key=0x");
+  log_hex(LOG_LEVEL_DEBUG, hls_encryption_key, sizeof(hls_encryption_key));
+  log_debug("\n");
+  log_debug("hls_encryption_iv=0x");
+  log_hex(LOG_LEVEL_DEBUG, hls_encryption_iv, sizeof(hls_encryption_iv));
+  log_debug("\n");
+  log_debug("hls_output_dir=%s\n", hls_output_dir);
+  log_debug("rtsp_enabled=%d\n", is_rtspout_enabled);
+  log_debug("rtsp_video_control_path=%s\n", rtsp_video_control_path);
+  log_debug("rtsp_audio_control_path=%s\n", rtsp_audio_control_path);
+  log_debug("rtsp_video_data_path=%s\n", rtsp_video_data_path);
+  log_debug("rtsp_audio_data_path=%s\n", rtsp_audio_data_path);
+  log_debug("tcp_enabled=%d\n", is_tcpout_enabled);
+  log_debug("tcp_output_dest=%s\n", tcp_output_dest);
+  log_debug("auto_exposure_enabled=%d\n", is_auto_exposure_enabled);
+  log_debug("exposure_night_y_threshold=%d\n", exposure_night_y_threshold);
+  log_debug("exposure_auto_y_threshold=%d\n", exposure_auto_y_threshold);
+  log_debug("is_preview_enabled=%d\n", is_preview_enabled);
+  log_debug("record_buffer_keyframes=%d\n", record_buffer_keyframes);
+  log_debug("state_dir=%s\n", state_dir);
+  log_debug("hooks_dir=%s\n", hooks_dir);
 
   if (state_create_dir(state_dir) != 0) {
     return EXIT_FAILURE;
@@ -3305,6 +3322,7 @@ int main(int argc, char **argv) {
   } else {
     audio_loop_poll_mmap();
   }
+
   log_debug("shutdown sequence start\n");
 
   if (is_recording) {
@@ -3363,7 +3381,8 @@ int main(int argc, char **argv) {
   log_debug("pthread_join hooks_thread\n");
   pthread_join(hooks_thread, NULL);
 
-  log_info("shutdown successful\n");
+  log_debug("shutdown successful");
+  log_info("\n");
   return 0;
 }
 
