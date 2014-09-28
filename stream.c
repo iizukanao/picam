@@ -2239,7 +2239,9 @@ static void encode_and_send_image() {
     exit(EXIT_FAILURE);
   }
 
-  buf->pBuffer = last_video_buffer;
+  // Do not replace buf->pBuffer.
+  // i.e. Don't do this: buf->pBuffer = last_video_buffer;
+  memcpy(buf->pBuffer, last_video_buffer, last_video_buffer_size);
   buf->nFilledLen = last_video_buffer_size;
 
   // OMX_EmptyThisBuffer takes 22000-27000 usec at 1920x1080
