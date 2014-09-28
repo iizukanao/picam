@@ -89,6 +89,15 @@ extern "C" {
 #define FILL_COLOR_U 128
 #define FILL_COLOR_V 128
 
+// OpenMAX IL ports
+static const int CAMERA_PREVIEW_PORT      = 70;
+static const int CAMERA_CAPTURE_PORT      = 71;
+static const int CAMERA_INPUT_PORT        = 73;
+static const int CLOCK_OUTPUT_1_PORT      = 80;
+static const int VIDEO_RENDER_INPUT_PORT  = 90;
+static const int VIDEO_ENCODE_INPUT_PORT  = 200;
+static const int VIDEO_ENCODE_OUTPUT_PORT = 201;
+
 // Directory to put recorded MPEG-TS files
 static const char *rec_dir = "rec";
 static const char *rec_tmp_dir = "rec/tmp";
@@ -1529,12 +1538,12 @@ static void shutdown_openmax() {
   }
 
   // Disable port buffers
-  log_debug("shutdown_openmax: disable port buffer for camera 71\n");
-  ilclient_disable_port_buffers(camera_component, 71, NULL, NULL, NULL);
-  log_debug("shutdown_openmax: disable port buffer for video_encode 200\n");
-  ilclient_disable_port_buffers(video_encode, 200, NULL, NULL, NULL);
-  log_debug("shutdown_openmax: disable port buffer for video_encode 201\n");
-  ilclient_disable_port_buffers(video_encode, 201, NULL, NULL, NULL);
+  log_debug("shutdown_openmax: disable port buffer for camera %d\n", CAMERA_CAPTURE_PORT);
+  ilclient_disable_port_buffers(camera_component, CAMERA_CAPTURE_PORT, NULL, NULL, NULL);
+  log_debug("shutdown_openmax: disable port buffer for video_encode %d\n", VIDEO_ENCODE_INPUT_PORT);
+  ilclient_disable_port_buffers(video_encode, VIDEO_ENCODE_INPUT_PORT, NULL, NULL, NULL);
+  log_debug("shutdown_openmax: disable port buffer for video_encode %d\n", VIDEO_ENCODE_OUTPUT_PORT);
+  ilclient_disable_port_buffers(video_encode, VIDEO_ENCODE_OUTPUT_PORT, NULL, NULL, NULL);
 
   if (is_preview_enabled || is_clock_enabled) {
     for (i = 0; i < n_tunnel; i++) {
@@ -1656,7 +1665,7 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
   OMX_BUFFERHEADERTYPE *out;
   OMX_ERRORTYPE error;
 
-  out = ilclient_get_output_buffer(camera_component, 71, 1);
+  out = ilclient_get_output_buffer(camera_component, CAMERA_CAPTURE_PORT, 1);
   if (out != NULL) {
     if (out->nFilledLen > 0) {
       last_video_buffer = out->pBuffer;
@@ -1747,15 +1756,16 @@ static int openmax_cam_open() {
   memset(&cam_def, 0, sizeof(OMX_PARAM_PORTDEFINITIONTYPE));
   cam_def.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
   cam_def.nVersion.nVersion = OMX_VERSION;
-  cam_def.nPortIndex = 71;
+  cam_def.nPortIndex = CAMERA_CAPTURE_PORT;
 
-  error = OMX_GetParameter(ILC_GET_HANDLE(camera_component), OMX_IndexParamPortDefinition, &cam_def);
+  error = OMX_GetParameter(ILC_GET_HANDLE(camera_component),
+      OMX_IndexParamPortDefinition, &cam_def);
   if (error != OMX_ErrorNone) {
-    log_fatal("failed to get camera 71 port definition: 0x%x\n", error);
+    log_fatal("failed to get camera %d port definition: 0x%x\n", CAMERA_CAPTURE_PORT, error);
     exit(EXIT_FAILURE);
   }
 
-  // Configure port 71
+  // Configure port 71 (camera capture output)
   cam_def.format.video.nFrameWidth = video_width;
   cam_def.format.video.nFrameHeight = video_height;
 
@@ -1776,7 +1786,7 @@ static int openmax_cam_open() {
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexParamPortDefinition, &cam_def);
   if (error != OMX_ErrorNone) {
-    log_fatal("failed to set camera 71 port definition: 0x%x\n", error);
+    log_fatal("failed to set camera %d port definition: 0x%x\n", CAMERA_CAPTURE_PORT, error);
     exit(EXIT_FAILURE);
   }
 
@@ -1784,12 +1794,12 @@ static int openmax_cam_open() {
   memset(&framerate, 0, sizeof(OMX_CONFIG_FRAMERATETYPE));
   framerate.nSize = sizeof(OMX_CONFIG_FRAMERATETYPE);
   framerate.nVersion.nVersion = OMX_VERSION;
-  framerate.nPortIndex = 71; // capture port
+  framerate.nPortIndex = CAMERA_CAPTURE_PORT; // capture port
   framerate.xEncodeFramerate = fr_q16;
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
       OMX_IndexConfigVideoFramerate, &framerate);
   if (error != OMX_ErrorNone) {
-    log_fatal("failed to set camera 71 framerate: 0x%x\n", error);
+    log_fatal("failed to set camera %d framerate: 0x%x\n", CAMERA_CAPTURE_PORT, error);
     exit(EXIT_FAILURE);
   }
 
@@ -1835,7 +1845,10 @@ static int openmax_cam_open() {
       log_error("failed to set clock state: 0x%x\n", error);
     }
 
-    set_tunnel(tunnel+n_tunnel, clock_component, 80, camera_component, 73);
+    // Set up tunnel from clock to camera
+    set_tunnel(tunnel+n_tunnel,
+        clock_component, CLOCK_OUTPUT_1_PORT,
+        camera_component, CAMERA_INPUT_PORT);
 
     if (ilclient_setup_tunnel(tunnel+(n_tunnel++), 0, 0) != 0) {
       log_fatal("failed to setup tunnel from clock to camera\n");
@@ -1844,15 +1857,16 @@ static int openmax_cam_open() {
   } // if (is_clock_enabled)
 
   if (is_preview_enabled) {
-    // Preview port
+    // Set up preview port
     memset(&portdef, 0, sizeof(OMX_PARAM_PORTDEFINITIONTYPE));
     portdef.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
     portdef.nVersion.nVersion = OMX_VERSION;
-    portdef.nPortIndex = 70;
+    portdef.nPortIndex = CAMERA_PREVIEW_PORT;
 
-    error = OMX_GetParameter(ILC_GET_HANDLE(camera_component), OMX_IndexParamPortDefinition, &portdef);
+    error = OMX_GetParameter(ILC_GET_HANDLE(camera_component),
+        OMX_IndexParamPortDefinition, &portdef);
     if (error != OMX_ErrorNone) {
-      log_fatal("failed to get camera preview 70 port definition: 0x%x\n", error);
+      log_fatal("failed to get camera preview %d port definition: 0x%x\n", CAMERA_PREVIEW_PORT, error);
       exit(EXIT_FAILURE);
     }
 
@@ -1866,19 +1880,19 @@ static int openmax_cam_open() {
     error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
         OMX_IndexParamPortDefinition, &portdef);
     if (error != OMX_ErrorNone) {
-      log_fatal("failed to set camera preview 70 port definition: 0x%x\n", error);
+      log_fatal("failed to set camera preview %d port definition: 0x%x\n", CAMERA_PREVIEW_PORT, error);
       exit(EXIT_FAILURE);
     }
 
     memset(&framerate, 0, sizeof(OMX_CONFIG_FRAMERATETYPE));
     framerate.nSize = sizeof(OMX_CONFIG_FRAMERATETYPE);
     framerate.nVersion.nVersion = OMX_VERSION;
-    framerate.nPortIndex = 70; // preview port
+    framerate.nPortIndex = CAMERA_PREVIEW_PORT;
     framerate.xEncodeFramerate = fr_q16;
     error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
         OMX_IndexConfigVideoFramerate, &framerate);
     if (error != OMX_ErrorNone) {
-      log_fatal("failed to set camera preview 70 framerate: 0x%x\n", error);
+      log_fatal("failed to set camera preview %d framerate: 0x%x\n", CAMERA_PREVIEW_PORT, error);
       exit(EXIT_FAILURE);
     }
 
@@ -1891,7 +1905,10 @@ static int openmax_cam_open() {
     }
     component_list[n_component_list++] = render_component;
 
-    set_tunnel(tunnel+n_tunnel, camera_component, 70, render_component, 90);
+    // Set up tunnel from camera to video_render
+    set_tunnel(tunnel+n_tunnel,
+        camera_component, CAMERA_PREVIEW_PORT,
+        render_component, VIDEO_RENDER_INPUT_PORT);
 
     if (ilclient_setup_tunnel(tunnel+(n_tunnel++), 0, 0) != 0) {
       log_fatal("failed to setup tunnel from camera to render\n");
@@ -2068,7 +2085,7 @@ static int video_encode_startup() {
   OMX_VIDEO_PARAM_AVCTYPE avctype;
   OMX_VIDEO_PARAM_BITRATETYPE bitrate_type;
   OMX_CONFIG_BOOLEANTYPE boolean_type;
-  OMX_PARAM_PORTDEFINITIONTYPE portdef, portdef_201;
+  OMX_PARAM_PORTDEFINITIONTYPE portdef, portdef_encode_output;
   OMX_ERRORTYPE error;
   int r;
 
@@ -2092,15 +2109,15 @@ static int video_encode_startup() {
   memset(&portdef, 0, sizeof(OMX_PARAM_PORTDEFINITIONTYPE));
   portdef.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
   portdef.nVersion.nVersion = OMX_VERSION;
-  portdef.nPortIndex = 200;
+  portdef.nPortIndex = VIDEO_ENCODE_INPUT_PORT;
 
   error = OMX_GetParameter(ILC_GET_HANDLE(video_encode), OMX_IndexParamPortDefinition, &portdef);
   if (error != OMX_ErrorNone) {
-    log_fatal("failed to get video_encode 200 port definition: 0x%x\n", error);
+    log_fatal("failed to get video_encode %d port definition: 0x%x\n", VIDEO_ENCODE_INPUT_PORT, error);
     exit(EXIT_FAILURE);
   }
 
-  // Port 200
+  // Configure port 200 (video_encode input)
   portdef.format.video.nFrameWidth = video_width;
   portdef.format.video.nFrameHeight = video_height;
   portdef.format.video.xFramerate = fr_q16; // specify the frame rate in Q.16 (framerate * 2^16)
@@ -2116,52 +2133,57 @@ static int video_encode_startup() {
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamPortDefinition, &portdef);
   if (error != OMX_ErrorNone) {
-    log_fatal("failed to set video_encode 200 port definition: 0x%x\n", error);
+    log_fatal("failed to set video_encode %d port definition: 0x%x\n",
+        VIDEO_ENCODE_INPUT_PORT, error);
     exit(EXIT_FAILURE);
   }
 
-  memset(&portdef_201, 0, sizeof(OMX_PARAM_PORTDEFINITIONTYPE));
-  portdef_201.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
-  portdef_201.nVersion.nVersion = OMX_VERSION;
-  portdef_201.nPortIndex = 201;
+  memset(&portdef_encode_output, 0, sizeof(OMX_PARAM_PORTDEFINITIONTYPE));
+  portdef_encode_output.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
+  portdef_encode_output.nVersion.nVersion = OMX_VERSION;
+  portdef_encode_output.nPortIndex = VIDEO_ENCODE_OUTPUT_PORT;
 
-  error = OMX_GetParameter(ILC_GET_HANDLE(video_encode), OMX_IndexParamPortDefinition, &portdef_201);
+  error = OMX_GetParameter(ILC_GET_HANDLE(video_encode),
+      OMX_IndexParamPortDefinition, &portdef_encode_output);
   if (error != OMX_ErrorNone) {
-    log_fatal("failed to get video_encode 201 port definition: 0x%x\n", error);
+    log_fatal("failed to get video_encode %d port definition: 0x%x\n",
+        VIDEO_ENCODE_OUTPUT_PORT, error);
     exit(EXIT_FAILURE);
   }
 
-  // Configure port 201
-  portdef_201.nBufferCountActual = N_BUFFER_COUNT_ACTUAL;
+  // Configure port 201 (video_encode output)
+  portdef_encode_output.nBufferCountActual = N_BUFFER_COUNT_ACTUAL;
 
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
-      OMX_IndexParamPortDefinition, &portdef_201);
+      OMX_IndexParamPortDefinition, &portdef_encode_output);
   if (error != OMX_ErrorNone) {
-    log_fatal("failed to set video_encode 201 port definition: 0x%x\n", error);
+    log_fatal("failed to set video_encode %d port definition: 0x%x\n",
+        VIDEO_ENCODE_OUTPUT_PORT, error);
     exit(EXIT_FAILURE);
   }
 
   memset(&format, 0, sizeof(OMX_VIDEO_PARAM_PORTFORMATTYPE));
   format.nSize = sizeof(OMX_VIDEO_PARAM_PORTFORMATTYPE);
   format.nVersion.nVersion = OMX_VERSION;
-  format.nPortIndex = 201;
+  format.nPortIndex = VIDEO_ENCODE_OUTPUT_PORT;
   format.eCompressionFormat = OMX_VIDEO_CodingAVC;
 
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamVideoPortFormat, &format);
   if (error != OMX_ErrorNone) {
-    log_fatal("failed to set video_encode 201 port format: 0x%x\n", error);
+    log_fatal("failed to set video_encode %d port format: 0x%x\n",
+        VIDEO_ENCODE_OUTPUT_PORT, error);
     exit(EXIT_FAILURE);
   }
 
   memset(&avctype, 0, sizeof(OMX_VIDEO_PARAM_AVCTYPE));
   avctype.nSize = sizeof(OMX_VIDEO_PARAM_AVCTYPE);
   avctype.nVersion.nVersion = OMX_VERSION;
-  avctype.nPortIndex = 201;
+  avctype.nPortIndex = VIDEO_ENCODE_OUTPUT_PORT;
 
   error = OMX_GetParameter (ILC_GET_HANDLE(video_encode), OMX_IndexParamVideoAvc, &avctype);
   if (error != OMX_ErrorNone) {
-    log_fatal("failed to get video_encode 201 AVC: 0x%x\n", error);
+    log_fatal("failed to get video_encode %d AVC: 0x%x\n", VIDEO_ENCODE_OUTPUT_PORT, error);
     exit(EXIT_FAILURE);
   }
 
@@ -2194,7 +2216,7 @@ static int video_encode_startup() {
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamVideoAvc, &avctype);
   if (error != OMX_ErrorNone) {
-    log_fatal("failed to set video_encode 201 AVC: 0x%x\n", error);
+    log_fatal("failed to set video_encode %d AVC: 0x%x\n", VIDEO_ENCODE_OUTPUT_PORT, error);
     exit(EXIT_FAILURE);
   }
 
@@ -2202,7 +2224,7 @@ static int video_encode_startup() {
   memset(&bitrate_type, 0, sizeof(OMX_VIDEO_PARAM_BITRATETYPE));
   bitrate_type.nSize = sizeof(OMX_VIDEO_PARAM_BITRATETYPE);
   bitrate_type.nVersion.nVersion = OMX_VERSION;
-  bitrate_type.nPortIndex = 201;
+  bitrate_type.nPortIndex = VIDEO_ENCODE_OUTPUT_PORT;
   bitrate_type.eControlRate = OMX_Video_ControlRateVariable; // TODO: Is this OK?
   bitrate_type.nTargetBitrate = video_bitrate; // in bits per second
 
@@ -2210,7 +2232,7 @@ static int video_encode_startup() {
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamVideoBitrate, &bitrate_type);
   if (error != OMX_ErrorNone) {
-    log_fatal("failed to set video_encode 201 bitrate: 0x%x\n", error);
+    log_fatal("failed to set video_encode %d bitrate: 0x%x\n", VIDEO_ENCODE_OUTPUT_PORT, error);
     exit(EXIT_FAILURE);
   }
 
@@ -2235,23 +2257,23 @@ static int video_encode_startup() {
   }
 
   // Enable port buffers for port 71 (camera capture output)
-  log_debug("Enable port buffers for camera 71\n");
-  if (ilclient_enable_port_buffers(camera_component, 71, NULL, NULL, NULL) != 0) {
-    log_fatal("failed to enable port buffers for camera 71\n");
+  log_debug("Enable port buffers for camera %d\n", CAMERA_CAPTURE_PORT);
+  if (ilclient_enable_port_buffers(camera_component, CAMERA_CAPTURE_PORT, NULL, NULL, NULL) != 0) {
+    log_fatal("failed to enable port buffers for camera %d\n", CAMERA_CAPTURE_PORT);
     exit(EXIT_FAILURE);
   }
 
   // Enable port buffers for port 200 (video_encode input)
-  log_debug("Enable port buffers for video_encode 200\n");
-  if (ilclient_enable_port_buffers(video_encode, 200, NULL, NULL, NULL) != 0) {
-    log_fatal("failed to enable port buffers for video_encode 200\n");
+  log_debug("Enable port buffers for video_encode %d\n", VIDEO_ENCODE_INPUT_PORT);
+  if (ilclient_enable_port_buffers(video_encode, VIDEO_ENCODE_INPUT_PORT, NULL, NULL, NULL) != 0) {
+    log_fatal("failed to enable port buffers for video_encode %d\n", VIDEO_ENCODE_INPUT_PORT);
     exit(EXIT_FAILURE);
   }
 
   // Enable port buffers for port 201 (video_encode output)
-  log_debug("Enable port buffers for video_encode 201\n");
-  if (ilclient_enable_port_buffers(video_encode, 201, NULL, NULL, NULL) != 0) {
-    log_fatal("failed to enable port buffers for video_encode 201\n");
+  log_debug("Enable port buffers for video_encode %d\n", VIDEO_ENCODE_OUTPUT_PORT);
+  if (ilclient_enable_port_buffers(video_encode, VIDEO_ENCODE_OUTPUT_PORT, NULL, NULL, NULL) != 0) {
+    log_fatal("failed to enable port buffers for video_encode %d\n", VIDEO_ENCODE_OUTPUT_PORT);
     exit(EXIT_FAILURE);
   }
 
@@ -2271,7 +2293,7 @@ static void encode_and_send_image() {
   OMX_BUFFERHEADERTYPE *out;
   OMX_ERRORTYPE error;
 
-  buf = ilclient_get_input_buffer(video_encode, 200, 1);
+  buf = ilclient_get_input_buffer(video_encode, VIDEO_ENCODE_INPUT_PORT, 1);
   if (buf == NULL) {
     log_error("cannot get the encoded video buffer\n");
     exit(EXIT_FAILURE);
@@ -2288,7 +2310,7 @@ static void encode_and_send_image() {
     log_error("error emptying buffer: 0x%x\n", error);
   }
 
-  out = ilclient_get_output_buffer(video_encode, 201, 1);
+  out = ilclient_get_output_buffer(video_encode, VIDEO_ENCODE_OUTPUT_PORT, 1);
 
   while (1) {
     error = OMX_FillThisBuffer(ILC_GET_HANDLE(video_encode), out);
@@ -2553,7 +2575,7 @@ static void start_openmax_capturing() {
   memset(&boolean, 0, sizeof(OMX_CONFIG_PORTBOOLEANTYPE));
   boolean.nSize = sizeof(OMX_CONFIG_PORTBOOLEANTYPE);
   boolean.nVersion.nVersion = OMX_VERSION;
-  boolean.nPortIndex = 71;
+  boolean.nPortIndex = CAMERA_CAPTURE_PORT;
   boolean.bEnabled = OMX_TRUE;
 
   log_debug("start capturing video\n");
@@ -2580,7 +2602,7 @@ static void stop_openmax_capturing() {
   memset(&boolean, 0, sizeof(OMX_CONFIG_PORTBOOLEANTYPE));
   boolean.nSize = sizeof(OMX_CONFIG_PORTBOOLEANTYPE);
   boolean.nVersion.nVersion = OMX_VERSION;
-  boolean.nPortIndex = 71;
+  boolean.nPortIndex = CAMERA_CAPTURE_PORT;
   boolean.bEnabled = OMX_FALSE;
 
   log_debug("stop capturing video\n");
@@ -2599,7 +2621,7 @@ static void openmax_cam_loop() {
   start_openmax_capturing();
 
   log_debug("waiting for the first video buffer\n");
-  out = ilclient_get_output_buffer(camera_component, 71, 1);
+  out = ilclient_get_output_buffer(camera_component, CAMERA_CAPTURE_PORT, 1);
 
   error = OMX_FillThisBuffer(ILC_GET_HANDLE(camera_component), out);
   if (error != OMX_ErrorNone) {
