@@ -2218,7 +2218,7 @@ static int video_encode_startup() {
   memset(&boolean_type, 0, sizeof(OMX_CONFIG_BOOLEANTYPE));
   boolean_type.nSize = sizeof(OMX_CONFIG_BOOLEANTYPE);
   boolean_type.nVersion.nVersion = OMX_VERSION;
-  boolean_type.bEnabled = 1;
+  boolean_type.bEnabled = OMX_TRUE;
 
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamBrcmNALSSeparate, &boolean_type);
@@ -2554,7 +2554,7 @@ static void start_openmax_capturing() {
   boolean.nSize = sizeof(OMX_CONFIG_PORTBOOLEANTYPE);
   boolean.nVersion.nVersion = OMX_VERSION;
   boolean.nPortIndex = 71;
-  boolean.bEnabled = 1;
+  boolean.bEnabled = OMX_TRUE;
 
   log_debug("start capturing video\n");
   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
