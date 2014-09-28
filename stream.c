@@ -89,6 +89,14 @@ extern "C" {
 #define FILL_COLOR_U 128
 #define FILL_COLOR_V 128
 
+// Whether or not to pass pBuffer from camera to video_encode directly
+#define ENABLE_PBUFFER_OPTIMIZATION_HACK 1
+
+#if ENABLE_PBUFFER_OPTIMIZATION_HACK
+static OMX_BUFFERHEADERTYPE *video_encode_input_buf = NULL;
+static OMX_U8 *video_encode_input_buf_pBuffer_orig = NULL;
+#endif
+
 // OpenMAX IL ports
 static const int CAMERA_PREVIEW_PORT      = 70;
 static const int CAMERA_CAPTURE_PORT      = 71;
@@ -1719,6 +1727,14 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
     // Clear the callback
     ilclient_set_fill_buffer_done_callback(cam_client, NULL, 0);
 
+#if ENABLE_PBUFFER_OPTIMIZATION_HACK
+    // Revert pBuffer value of video_encode input buffer
+    if (video_encode_input_buf != NULL) {
+      log_debug("Reverting pBuffer to its original value\n");
+      video_encode_input_buf->pBuffer = video_encode_input_buf_pBuffer_orig;
+    }
+#endif
+
     // Notify the main thread that the camera is stopped
     pthread_mutex_lock(&camera_finish_mutex);
     is_camera_finished = 1;
@@ -2299,9 +2315,19 @@ static void encode_and_send_image() {
     exit(EXIT_FAILURE);
   }
 
-  // Do not replace buf->pBuffer.
-  // i.e. Don't do this: buf->pBuffer = last_video_buffer;
+#if ENABLE_PBUFFER_OPTIMIZATION_HACK
+  if (video_encode_input_buf == NULL) {
+    video_encode_input_buf = buf;
+    video_encode_input_buf_pBuffer_orig = buf->pBuffer;
+    buf->pBuffer = last_video_buffer;
+    // buf->pBuffer has to be reverted back to its
+    // original value before disabling port at the end.
+  }
+  // Both camera output and video_encode input have only one buffer
+  assert(buf->pBuffer == last_video_buffer);
+#else
   memcpy(buf->pBuffer, last_video_buffer, last_video_buffer_size);
+#endif
   buf->nFilledLen = last_video_buffer_size;
 
   // OMX_EmptyThisBuffer takes 22000-27000 usec at 1920x1080
