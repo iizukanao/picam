@@ -45,7 +45,7 @@ extern "C" {
 #include "log.h"
 
 #define PROGRAM_NAME     "picam"
-#define PROGRAM_VERSION  "1.0.0"
+#define PROGRAM_VERSION  "1.1.0"
 
 // Audio-only stream is created if this is 1 (for debugging)
 #define AUDIO_ONLY 0
