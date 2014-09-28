@@ -311,6 +311,12 @@ static MpegTSCodecSettings codec_settings;
 
 static int is_audio_muted = 0;
 
+// Will be set to 1 when the camera finishes capturing
+static int is_camera_finished = 0;
+
+static pthread_mutex_t camera_finish_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t camera_finish_cond = PTHREAD_COND_INITIALIZER;
+
 static void unmute_audio() {
   log_info("unmute");
   is_audio_muted = 0;
@@ -1516,6 +1522,7 @@ static void shutdown_video() {
 
 static void shutdown_openmax() {
   log_debug("shutdown_openmax\n");
+  int i;
 
   if (is_preview_enabled || is_clock_enabled) {
     ilclient_flush_tunnels(tunnel, 0);
@@ -1527,7 +1534,9 @@ static void shutdown_openmax() {
   ilclient_disable_port_buffers(video_encode, 201, NULL, NULL, NULL);
 
   if (is_preview_enabled || is_clock_enabled) {
-    ilclient_disable_tunnel(tunnel);
+    for (i = 0; i < n_tunnel; i++) {
+      ilclient_disable_tunnel(&tunnel[i]);
+    }
     ilclient_teardown_tunnels(tunnel);
   }
 
@@ -1681,8 +1690,20 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
       log_error("error filling camera buffer (2): 0x%x\n", error);
     }
   } else {
-    shutdown_openmax();
-    shutdown_video();
+    // Return the buffer (without this, ilclient_disable_port_buffers will hang)
+    error = OMX_FillThisBuffer(ILC_GET_HANDLE(camera_component), out);
+    if (error != OMX_ErrorNone) {
+      log_error("error filling camera buffer (3): 0x%x\n", error);
+    }
+
+    // Clear the callback
+    ilclient_set_fill_buffer_done_callback(cam_client, NULL, 0);
+
+    // Notify the main thread that the camera is stopped
+    pthread_mutex_lock(&camera_finish_mutex);
+    is_camera_finished = 1;
+    pthread_cond_signal(&camera_finish_cond);
+    pthread_mutex_unlock(&camera_finish_mutex);
   }
 }
 
@@ -2491,6 +2512,23 @@ static void start_openmax_clock() {
   }
 }
 
+static void stop_openmax_clock() {
+  OMX_TIME_CONFIG_CLOCKSTATETYPE clock_state;
+  OMX_ERRORTYPE error;
+
+  memset(&clock_state, 0, sizeof(OMX_TIME_CONFIG_CLOCKSTATETYPE));
+  clock_state.nSize = sizeof(OMX_TIME_CONFIG_CLOCKSTATETYPE);
+  clock_state.nVersion.nVersion = OMX_VERSION;
+  clock_state.eState = OMX_TIME_ClockStateStopped;
+
+  error = OMX_SetParameter(ILC_GET_HANDLE(clock_component),
+      OMX_IndexConfigTimeClockState, &clock_state);
+  if (error != OMX_ErrorNone) {
+    log_fatal("failed to stop clock: 0x%x\n", error);
+    exit(EXIT_FAILURE);
+  }
+}
+
 static void start_openmax_capturing() {
   OMX_CONFIG_PORTBOOLEANTYPE boolean;
   OMX_ERRORTYPE error;
@@ -2511,6 +2549,29 @@ static void start_openmax_capturing() {
 
   if (is_clock_enabled) {
     start_openmax_clock();
+  }
+}
+
+static void stop_openmax_capturing() {
+  OMX_CONFIG_PORTBOOLEANTYPE boolean;
+  OMX_ERRORTYPE error;
+
+  if (is_clock_enabled) {
+    stop_openmax_clock();
+  }
+
+  memset(&boolean, 0, sizeof(OMX_CONFIG_PORTBOOLEANTYPE));
+  boolean.nSize = sizeof(OMX_CONFIG_PORTBOOLEANTYPE);
+  boolean.nVersion.nVersion = OMX_VERSION;
+  boolean.nPortIndex = 71;
+  boolean.bEnabled = OMX_FALSE;
+
+  log_debug("stop capturing video\n");
+  error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
+      OMX_IndexConfigPortCapturing, &boolean);
+  if (error != OMX_ErrorNone) {
+    log_fatal("failed to stop capturing video: 0x%x\n", error);
+    exit(EXIT_FAILURE);
   }
 }
 
@@ -3254,6 +3315,18 @@ int main(int argc, char **argv) {
     pthread_join(rec_thread, NULL);
   }
 
+  pthread_mutex_lock(&camera_finish_mutex);
+  // Wait for the camera to finish
+  while (!is_camera_finished) {
+    log_debug("waiting for the camera to finish\n");
+    pthread_cond_wait(&camera_finish_cond, &camera_finish_mutex);
+  }
+  pthread_mutex_unlock(&camera_finish_mutex);
+
+  stop_openmax_capturing();
+  shutdown_openmax();
+  shutdown_video();
+
   log_debug("teardown_audio_encode\n");
   teardown_audio_encode();
 
@@ -3269,6 +3342,9 @@ int main(int argc, char **argv) {
   pthread_mutex_destroy(&mutex_writing);
   pthread_mutex_destroy(&rec_mutex);
   pthread_mutex_destroy(&rec_write_mutex);
+  pthread_mutex_destroy(&camera_finish_mutex);
+  pthread_cond_destroy(&rec_cond);
+  pthread_cond_destroy(&camera_finish_cond);
 
   if (is_tcpout_enabled) {
     teardown_tcp_output();
