@@ -53,7 +53,7 @@ See [INSTALL.md](INSTALL.md).
 
 #### Finding ALSA device name
 
-First, find ALSA device name of the USB microphone.
+First, find ALSA device name of your USB microphone.
 
     $ arecord -l
     **** List of CAPTURE Hardware Devices ****
@@ -66,9 +66,9 @@ ALSA device name is consisted of `hw:<card>,<device>`. In the above example, the
 If you got `no soundcards found` error, try `sudo arecord -l`. If that output looks good, you might want to add your user to `audio` group.
 
     $ sudo usermod -a -G audio $USER
-    (once logout, then login again)
+    (once logout, then login)
     $ groups
-    wheel audio pi  <-- (audio is in the list)
+    wheel audio pi  <-- (make sure that audio is in the list)
     $ arecord -l
     **** List of CAPTURE Hardware Devices ****
     card 1: Device [USB PnP Sound Device], device 0: USB Audio [USB Audio]
