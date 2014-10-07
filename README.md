@@ -80,36 +80,6 @@ If you got `no soundcards found` error, try `sudo arecord -l`. If that output lo
 Run picam with your ALSA device name.
 
     $ ./picam --alsadev hw:1,0
-    video_width=1280
-    video_height=720
-    video_fps=30.0
-    gop_size=30
-    video_bitrate=2000000
-    alsa_dev=hw:1,0
-    audio_sample_rate=48000
-    audio_bitrate=40000
-    audio_volume_multiply=1.000000
-    is_hlsout_enabled=0
-    is_hls_encryption_enabled=0
-    hls_encryption_key_uri=stream.key
-    hls_encryption_key=0x75b0a81de17487c88a47507a7e1fdf73
-    hls_encryption_iv=0x000102030405060708090a0b0c0d0e0f
-    hls_output_dir=/run/shm/video
-    rtsp_enabled=0
-    rtsp_video_control_path=/tmp/node_rtsp_rtmp_videoControl
-    rtsp_audio_control_path=/tmp/node_rtsp_rtmp_audioControl
-    rtsp_video_data_path=/tmp/node_rtsp_rtmp_videoData
-    rtsp_audio_data_path=/tmp/node_rtsp_rtmp_audioData
-    tcp_enabled=0
-    tcp_output_dest=
-    auto_exposure_enabled=0
-    exposure_night_y_threshold=40
-    exposure_auto_y_threshold=50
-    is_preview_enabled=0
-    record_buffer_keyframes=5
-    state_dir=state
-    hooks_dir=hooks
-    exposure mode: auto
     ................................ 31.46 fps k=1
     .............................. 30.49 fps k=2
     .............................. 30.55 fps k=3
