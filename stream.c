@@ -3181,6 +3181,11 @@ int main(int argc, char **argv) {
     }
   }
 
+  // Print a warning if the video size is larger than 1280x720
+  if (video_width * video_height > 1280 * 720) {
+    log_warn("warning: video size larger than 1280x720 may not work (program might hang)\n");
+  }
+
   fr_q16 = video_fps * 65536;
   mpegts_set_config(video_bitrate, video_width, video_height);
   audio_min_value = (int) (-32768 / audio_volume_multiply);
