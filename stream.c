@@ -2808,6 +2808,7 @@ static void print_usage() {
   log_info(" [video]\n");
   log_info("  -w, --width         Width in pixels (default: %d)\n", video_width_default);
   log_info("  -h, --height        Height in pixels (default: %d)\n", video_height_default);
+  log_info("                      (width*height should be <= 1280*720)\n");
 //  log_info("  -f, --fps           Frame rate (default: %d)\n", video_fps_default);
   log_info("  -v, --videobitrate  Video bit rate (default: %ld)\n", video_bitrate_default);
   log_info("  -g, --gopsize       GOP size (default: %d)\n", video_gop_size_default);
