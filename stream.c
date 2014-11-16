@@ -2431,6 +2431,7 @@ static void encode_and_send_audio() {
       av_write_frame(tcp_ctx, &tcp_pkt);
       pthread_mutex_unlock(&tcp_mutex);
 
+      av_freep(&tcp_pkt.data);
       av_free_packet(&tcp_pkt);
     }
 
