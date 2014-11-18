@@ -2877,7 +2877,8 @@ static void print_usage() {
   log_info("                      (default: %d)\n", record_buffer_keyframes_default);
   log_info("  --statedir <dir>    Set state dir (default: %s)\n", state_dir_default);
   log_info("  --hooksdir <dir>    Set hooks dir (default: %s)\n", hooks_dir_default);
-  log_info("  -q, --quiet         Turn off most of the log messages\n");
+  log_info("  -q, --quiet         Suppress all output except errors\n");
+  log_info("  --verbose           Enable verbose output\n");
   log_info("  --version           Print program version\n");
   log_info("  --help              Print this help\n");
 }
