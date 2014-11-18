@@ -1699,6 +1699,7 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
             video_start_time = audio_start_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
             send_audio_start_time();
             send_video_start_time();
+            log_info("capturing started\n");
           }
         }
 
@@ -1707,7 +1708,7 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
             log_debug("dV");
             video_pending_drop_frames--;
           } else {
-            log_info(".");
+            log_debug(".");
             encode_and_send_image();
             previous_previous_capture_frame = previous_capture_frame;
             previous_capture_frame = video_frame_count;
@@ -2074,12 +2075,9 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
           } else {
             fps = 1 / divisor;
           }
-          log_info(" %5.2f fps k=%d", fps, keyframes_count);
-          if (log_get_level() <= LOG_LEVEL_DEBUG) {
-            print_audio_timing();
-          } else {
-            log_info("\n");
-          }
+          log_debug(" %5.2f fps k=%d", fps, keyframes_count);
+          print_audio_timing();
+          log_debug("\n");
           current_audio_frames = 0;
           frame_count = 0;
         }
@@ -2750,6 +2748,7 @@ static void audio_loop_poll_mmap() {
             video_start_time = audio_start_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
             send_audio_start_time();
             send_video_start_time();
+            log_info("capturing started\n");
           }
         }
         if (is_video_recording_started == 1) {
@@ -3282,6 +3281,8 @@ int main(int argc, char **argv) {
   if (is_preview_enabled || is_clock_enabled) {
     memset(tunnel, 0, sizeof(tunnel));
   }
+
+  log_info("configuring devices\n");
 
   bcm_host_init();
 
