@@ -80,9 +80,8 @@ If you got `no soundcards found` error, try `sudo arecord -l`. If that output lo
 Run picam with your ALSA device name.
 
     $ ./picam --alsadev hw:1,0
-    ................................ 31.46 fps k=1
-    .............................. 30.49 fps k=2
-    .............................. 30.55 fps k=3
+    configuring devices
+    capturing started
 
 #### Recording
 
@@ -115,13 +114,14 @@ To unmute microphone, create a file named `hooks/unmute`.
 #### Command options
 
     $ ./picam --help
-    picam version 1.0.0
+    picam version 1.2.0
     Usage: picam [options]
 
     Options:
      [video]
       -w, --width         Width in pixels (default: 1280)
       -h, --height        Height in pixels (default: 720)
+                          (width*height should be <= 1280*720)
       -v, --videobitrate  Video bit rate (default: 2000000)
       -g, --gopsize       GOP size (default: 30)
      [audio]
