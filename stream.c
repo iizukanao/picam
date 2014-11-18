@@ -201,6 +201,7 @@ static const int record_buffer_keyframes_default = 5;
 
 static int64_t video_current_pts = 0;
 static int64_t audio_current_pts = 0;
+static int64_t last_pts = 0;
 
 pts_mode_t pts_mode = PTS_SPEED_NORMAL;
 
@@ -1017,8 +1018,8 @@ static void print_audio_timing() {
   // (cur_time - audio_start_time) * INT64_C(90000) / INT64_C(1000000000);
   int64_t clock_pts = (cur_time - audio_start_time) * 90000.0 / 1000000000.0;
 
-  log_debug(" a-v=%lld c-a=%lld u=%d d=%d\n",
-      avdiff, clock_pts - audio_pts, speed_up_count, speed_down_count);
+  log_debug(" a-v=%lld c-a=%lld u=%d d=%d pts=%" PRId64 "\n",
+      avdiff, clock_pts - audio_pts, speed_up_count, speed_down_count, last_pts);
 }
 
 static void send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts) {
@@ -1131,6 +1132,7 @@ static int send_keyframe(uint8_t *data, size_t data_len, int consume_time) {
 #if ENABLE_PTS_WRAP_AROUND
   pts = pts % PTS_MODULO;
 #endif
+  last_pts = pts;
 
   // PTS (presentation time stamp): Timestamp when a decoder should play this frame
   // DTS (decoding time stamp): Timestamp when a decoder should decode this frame
@@ -1219,6 +1221,7 @@ static int send_pframe(uint8_t *data, size_t data_len, int consume_time) {
 #if ENABLE_PTS_WRAP_AROUND
   pts = pts % PTS_MODULO;
 #endif
+  last_pts = pts;
 
   pkt.pts = pkt.dts = pts;
 
@@ -2408,6 +2411,7 @@ static void encode_and_send_audio() {
 #if ENABLE_PTS_WRAP_AROUND
     pts = pts % PTS_MODULO;
 #endif
+    last_pts = pts;
     pkt.pts = pkt.dts = pts;
 
     // We have to copy AVPacket before av_write_frame()
