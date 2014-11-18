@@ -2837,6 +2837,7 @@ static void print_usage() {
   log_info("  --alsadev <dev>     ALSA microphone device (default: %s)\n", alsa_dev_default);
   log_info("  --volume <num>      Amplify audio by multiplying the volume by <num>\n");
   log_info("                      (default: %.1f)\n", audio_volume_multiply_default);
+  log_info("  --noaudio           Disable audio capturing\n");
   log_info(" [HTTP Live Streaming (HLS)]\n");
   log_info("  -o, --hlsdir <dir>  Generate HTTP Live Streaming files in <dir>\n");
   log_info("  --hlsenc            Enable HLS encryption\n");
@@ -2906,6 +2907,7 @@ int main(int argc, char **argv) {
     { "statedir", required_argument, NULL, 0 },
     { "hooksdir", required_argument, NULL, 0 },
     { "volume", required_argument, NULL, 0 },
+    { "noaudio", no_argument, NULL, 0 },
     { "hlsenc", no_argument, NULL, 0 },
     { "hlsenckeyuri", required_argument, NULL, 0 },
     { "hlsenckey", required_argument, NULL, 0 },
@@ -3026,6 +3028,8 @@ int main(int argc, char **argv) {
             return EXIT_FAILURE;
           }
           audio_volume_multiply = value;
+        } else if (strcmp(long_options[option_index].name, "noaudio") == 0) {
+          disable_audio_capturing = 1;
         } else if (strcmp(long_options[option_index].name, "hlsenc") == 0) {
           is_hls_encryption_enabled = 1;
         } else if (strcmp(long_options[option_index].name, "hlsenckeyuri") == 0) {
@@ -3316,10 +3320,12 @@ int main(int argc, char **argv) {
 
   av_log_set_level(AV_LOG_INFO);
 
-  if (!disable_audio_capturing) {
+  if (disable_audio_capturing) {
+    log_debug("audio capturing is disabled\n");
+  } else {
     ret = open_audio_capture_device();
     if (ret == -1) {
-      log_warn("warning: audio stream is disabled\n");
+      log_warn("warning: audio capturing is disabled\n");
       disable_audio_capturing = 1;
     } else if (ret < 0) {
       log_fatal("error: init_audio failed: %d\n", ret);
@@ -3400,6 +3406,7 @@ int main(int argc, char **argv) {
     pthread_create(&audio_nop_thread, NULL, audio_nop_loop, NULL);
     pthread_join(audio_nop_thread, NULL);
   } else {
+    log_debug("start capturing audio\n");
     audio_loop_poll_mmap();
   }
 
