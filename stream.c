@@ -2815,6 +2815,10 @@ static void ensure_hls_dir_exists() {
   }
 }
 
+static void print_program_version() {
+  log_info(PROGRAM_VERSION "\n");
+}
+
 static void print_usage() {
   log_info(PROGRAM_NAME " version " PROGRAM_VERSION "\n");
   log_info("Usage: " PROGRAM_NAME " [options]\n");
@@ -2873,6 +2877,7 @@ static void print_usage() {
   log_info("  --statedir <dir>    Set state dir (default: %s)\n", state_dir_default);
   log_info("  --hooksdir <dir>    Set hooks dir (default: %s)\n", hooks_dir_default);
   log_info("  -q, --quiet         Turn off most of the log messages\n");
+  log_info("  --version           Print program version\n");
   log_info("  --help              Print this help\n");
 }
 
@@ -2909,6 +2914,7 @@ int main(int argc, char **argv) {
     { "quiet", no_argument, NULL, 'q' },
     { "recordbuf", required_argument, NULL, 0 },
     { "verbose", no_argument, NULL, 0 },
+    { "version", no_argument, NULL, 0 },
     { "help", no_argument, NULL, 0 },
     { 0, 0, 0, 0 },
   };
@@ -3063,6 +3069,9 @@ int main(int argc, char **argv) {
           record_buffer_keyframes = value;
         } else if (strcmp(long_options[option_index].name, "verbose") == 0) {
           log_set_level(LOG_LEVEL_DEBUG);
+        } else if (strcmp(long_options[option_index].name, "version") == 0) {
+          print_program_version();
+          return EXIT_SUCCESS;
         } else if (strcmp(long_options[option_index].name, "help") == 0) {
           print_usage();
           return EXIT_SUCCESS;
