@@ -53,8 +53,13 @@ extern "C" {
 // ALSA buffer size (frames) is multiplied by this number
 #define ALSA_BUFFER_MULTIPLY 100
 
+// If this is 1, PTS will be reset to zero when it exceeds PTS_MODULO
+#define ENABLE_PTS_WRAP_AROUND 0
+
+#if ENABLE_PTS_WRAP_AROUND
 // Both PTS and DTS are 33 bit and wraps around to zero
 #define PTS_MODULO 8589934592
+#endif
 
 // Initial values for audio/video PTS
 #define AUDIO_PTS_START 0
@@ -1123,7 +1128,9 @@ static int send_keyframe(uint8_t *data, size_t data_len, int consume_time) {
 
   send_video_frame(data, data_len, pts);
 
+#if ENABLE_PTS_WRAP_AROUND
   pts = pts % PTS_MODULO;
+#endif
 
   // PTS (presentation time stamp): Timestamp when a decoder should play this frame
   // DTS (decoding time stamp): Timestamp when a decoder should decode this frame
@@ -1209,7 +1216,9 @@ static int send_pframe(uint8_t *data, size_t data_len, int consume_time) {
 
   send_video_frame(data, data_len, pts);
 
+#if ENABLE_PTS_WRAP_AROUND
   pts = pts % PTS_MODULO;
+#endif
 
   pkt.pts = pkt.dts = pts;
 
@@ -2396,7 +2405,9 @@ static void encode_and_send_audio() {
 
     send_audio_frame(pkt.data, pkt.size, pts);
 
+#if ENABLE_PTS_WRAP_AROUND
     pts = pts % PTS_MODULO;
+#endif
     pkt.pts = pkt.dts = pts;
 
     // We have to copy AVPacket before av_write_frame()
