@@ -114,7 +114,7 @@ To unmute microphone, create a file named `hooks/unmute`.
 #### Command options
 
     $ ./picam --help
-    picam version 1.2.0
+    picam version 1.2.1
     Usage: picam [options]
 
     Options:
@@ -130,6 +130,7 @@ To unmute microphone, create a file named `hooks/unmute`.
       --alsadev <dev>     ALSA microphone device (default: hw:0,0)
       --volume <num>      Amplify audio by multiplying the volume by <num>
                           (default: 1.0)
+      --noaudio           Disable audio capturing
      [HTTP Live Streaming (HLS)]
       -o, --hlsdir <dir>  Generate HTTP Live Streaming files in <dir>
       --hlsenc            Enable HLS encryption
@@ -165,7 +166,9 @@ To unmute microphone, create a file named `hooks/unmute`.
                           (default: 5)
       --statedir <dir>    Set state dir (default: state)
       --hooksdir <dir>    Set hooks dir (default: hooks)
-      -q, --quiet         Turn off most of the log messages
+      -q, --quiet         Suppress all output except errors
+      --verbose           Enable verbose output
+      --version           Print program version
       --help              Print this help
 
 
