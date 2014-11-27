@@ -83,7 +83,7 @@ Download fdk-aac-0.1.3.tar.gz (or the latest version) from http://sourceforge.ne
 
 You cannot use ffmpeg that can be installed via `apt-get` or `pacman`.
 
-### Copy ALSA headers and libs from Raspberry Pi (Raspbian)
+### Copy ALSA headers and libs from Raspberry Pi (for Raspbian users)
 
 Log in to Raspberry Pi and install **libasound2-dev** and **alsa-utils** via `apt-get`.
 
@@ -118,7 +118,7 @@ Set an environment variable $PIUSR, and copy ALSA headers and libs from Raspberr
     4 directories, 39 files
 
 
-### Copy ALSA headers and libs from Raspberry Pi (Arch Linux)
+### Copy ALSA headers and libs from Raspberry Pi (for Arch Linux users)
 
 Log in to Raspberry Pi and install **alsa-lib** and **alsa-utils** via `pacman`.
 
