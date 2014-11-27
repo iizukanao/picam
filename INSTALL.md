@@ -81,7 +81,7 @@ Download fdk-aac-0.1.3.tar.gz (or the latest version) from http://sourceforge.ne
 
 ## Build ffmpeg
 
-You cannot use ffmpeg that can be installed via `apt-get` or `pacman`.
+You can't use ffmpeg that can be installed via `apt-get` or `pacman`.
 
 ### Copy ALSA headers and libs from Raspberry Pi (for Raspbian users)
 
