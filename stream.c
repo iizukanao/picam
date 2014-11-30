@@ -564,7 +564,7 @@ void *rec_thread_stop() {
   pthread_mutex_lock(&rec_write_mutex);
   mpegts_close_stream(rec_format_ctx);
   mpegts_destroy_context(rec_format_ctx);
-  log_info("stop rec");
+  log_info("stop rec\n");
   state_set(state_dir, "record", "false");
   pthread_mutex_unlock(&rec_write_mutex);
 
@@ -679,7 +679,7 @@ void *rec_thread_start() {
   rec_format_ctx = mpegts_create_context(&codec_settings);
   mpegts_open_stream(rec_format_ctx, recording_tmp_filepath, 0);
   is_recording = 1;
-  log_info("start rec to %s", recording_tmp_filepath);
+  log_info("start rec to %s\n", recording_tmp_filepath);
   state_set(state_dir, "record", "true");
   pthread_mutex_unlock(&rec_write_mutex);
 
@@ -710,7 +710,7 @@ void *rec_thread_start() {
       wrote_packets = write_encoded_packets(REC_CHASE_PACKETS, rec_start_pts);
       if (wrote_packets <= 2) {
         if (!is_caught_up) {
-          log_info("caught up");
+          log_debug("caught up");
           is_caught_up = 1;
         }
       }
