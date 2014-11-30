@@ -89,7 +89,7 @@ Log in to Raspberry Pi and install **libasound2-dev** and **alsa-utils** via `ap
 
     $ sudo apt-get install libasound2-dev alsa-utils
 
-Set an environment variable $PIUSR, and copy ALSA headers and libs from Raspberry Pi.
+Return to the compiling machine. Set an environment variable $PIUSR, and copy ALSA headers and libs from Raspberry Pi.
 
     $ export PIUSR=$HOME/pi/usr
     $ mkdir $PIUSR
@@ -124,7 +124,7 @@ Log in to Raspberry Pi and install **alsa-lib** and **alsa-utils** via `pacman`.
 
     $ sudo pacman -S alsa-lib alsa-utils
 
-Set an environment variable $PIUSR, and copy ALSA headers and libs from Raspberry Pi.
+Return to the compiling machine. Set an environment variable $PIUSR, and copy ALSA headers and libs from Raspberry Pi.
 
     $ export PIUSR=$HOME/pi/usr
     $ mkdir $PIUSR
