@@ -85,9 +85,9 @@ You can't use ffmpeg that can be installed via `apt-get` or `pacman`.
 
 ### Copy ALSA headers and libs from Raspberry Pi (for Raspbian users)
 
-Log in to Raspberry Pi and install **libasound2-dev**, **alsa-utils**, and **libssl-dev** via `apt-get`.
+Log in to Raspberry Pi and install **libasound2-dev** and **libssl-dev** via `apt-get`.
 
-    $ sudo apt-get install libasound2-dev alsa-utils libssl-dev
+    $ sudo apt-get install libasound2-dev libssl-dev
 
 Return to the compiling machine. Set an environment variable $PIUSR, and copy ALSA headers and libs from Raspberry Pi.
 
