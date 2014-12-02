@@ -1,4 +1,4 @@
-# picam preinstalled Raspbian image
+## picam preinstalled Raspbian image
 
 If you want to avoid compilation process, picam preinstalled Raspbian SD card image is available at <http://s.kyu-mu.net/raspbian-picam/>. If you use a SD card larger than 4GB, run `raspi-config` and expand the filesystem after you boot Raspbian.
 
