@@ -48,6 +48,8 @@ Tested with:
 
 See [INSTALL.md](INSTALL.md).
 
+Alternatively, you can use [picam preinstalled Raspbian image](http://s.kyu-mu.net/raspbian-picam/). If you use a SD card larger than 4GB, run `raspi-config` and expand the filesystem after you boot Raspbian.
+
 
 ### Usage
 
