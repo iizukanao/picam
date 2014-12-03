@@ -2288,15 +2288,20 @@ static int video_encode_startup() {
     exit(EXIT_FAILURE);
   }
 
-  // Set the bitrate
+  // Set bitrate
   memset(&bitrate_type, 0, sizeof(OMX_VIDEO_PARAM_BITRATETYPE));
   bitrate_type.nSize = sizeof(OMX_VIDEO_PARAM_BITRATETYPE);
   bitrate_type.nVersion.nVersion = OMX_VERSION;
   bitrate_type.nPortIndex = VIDEO_ENCODE_OUTPUT_PORT;
-  bitrate_type.eControlRate = OMX_Video_ControlRateVariable; // TODO: Is this OK?
-  bitrate_type.nTargetBitrate = video_bitrate; // in bits per second
+  if (video_bitrate == 0) { // disable rate control
+    log_debug("rate control is disabled for video\n");
+    bitrate_type.eControlRate = OMX_Video_ControlRateDisable;
+    bitrate_type.nTargetBitrate = 0;
+  } else {
+    bitrate_type.eControlRate = OMX_Video_ControlRateVariable;
+    bitrate_type.nTargetBitrate = video_bitrate; // in bits per second
+  }
 
-  // Set bitrate
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamVideoBitrate, &bitrate_type);
   if (error != OMX_ErrorNone) {
@@ -2932,6 +2937,7 @@ static void print_usage() {
   log_info("                      (width*height should be <= 1280*720)\n");
 //  log_info("  -f, --fps           Frame rate (default: %d)\n", video_fps_default);
   log_info("  -v, --videobitrate  Video bit rate (default: %ld)\n", video_bitrate_default);
+  log_info("                      Set 0 to disable rate control\n");
   log_info("  --qpmin <num>       Minimum quantization level (0-51)\n");
   log_info("  --qpmax <num>       Maximum quantization level (0-51)\n");
   log_info("  --qpinit <num>      Initial quantization level\n");
@@ -3357,8 +3363,8 @@ int main(int argc, char **argv) {
             print_usage();
             return EXIT_FAILURE;
           }
-          if (value <= 0) {
-            log_fatal("error: invalid videobitrate: %ld (must be > 0)\n", value);
+          if (value < 0) {
+            log_fatal("error: invalid videobitrate: %ld (must be >= 0)\n", value);
             return EXIT_FAILURE;
           }
           video_bitrate = value;
