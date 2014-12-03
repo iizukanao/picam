@@ -116,7 +116,7 @@ To unmute microphone, create a file named `hooks/unmute`.
 #### Command options
 
     $ ./picam --help
-    picam version 1.2.2
+    picam version 1.2.3
     Usage: picam [options]
     
     Options:
@@ -125,6 +125,11 @@ To unmute microphone, create a file named `hooks/unmute`.
       -h, --height        Height in pixels (default: 720)
                           (width*height should be <= 1280*720)
       -v, --videobitrate  Video bit rate (default: 2000000)
+                          Set 0 to disable rate control
+      --qpmin <num>       Minimum quantization level (0-51)
+      --qpmax <num>       Maximum quantization level (0-51)
+      --qpinit <num>      Initial quantization level
+      --dquant <num>      Slice DQuant level
       -g, --gopsize       GOP size (default: 30)
      [audio]
       -r, --samplerate    Audio sample rate (default: 48000)
