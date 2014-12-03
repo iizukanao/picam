@@ -116,9 +116,9 @@ To unmute microphone, create a file named `hooks/unmute`.
 #### Command options
 
     $ ./picam --help
-    picam version 1.2.1
+    picam version 1.2.2
     Usage: picam [options]
-
+    
     Options:
      [video]
       -w, --width         Width in pixels (default: 1280)
@@ -162,7 +162,9 @@ To unmute microphone, create a file named `hooks/unmute`.
       --expday <num>      Change the exposure to daylight mode if the average
                           value of Y (brightness) is >= <num> while in
                           night mode (default: 50)
-      -p, --preview       Display a preview window for video
+      -p, --preview       Display fullscreen preview
+      --previewrect <x,y,width,height>
+                          Display preview window at specified position
      [misc]
       --recordbuf <num>   Start recording from <num> keyframes ago
                           (default: 5)
