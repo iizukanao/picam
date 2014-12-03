@@ -145,6 +145,14 @@ static int video_gop_size;
 static const int video_gop_size_default = 30;
 static long video_bitrate;
 static const long video_bitrate_default = 2000 * 1000; // 2 Mbps
+static int video_qp_min;
+static const int video_qp_min_default = -1;
+static int video_qp_max;
+static const int video_qp_max_default = -1;
+static int video_qp_initial;
+static const int video_qp_initial_default = -1;
+static int video_slice_dquant;
+static const int video_slice_dquant_default = -1;
 static char alsa_dev[256];
 static const char *alsa_dev_default = "hw:0,0";
 static long audio_bitrate;
@@ -2145,6 +2153,7 @@ static int video_encode_startup() {
   OMX_VIDEO_PARAM_BITRATETYPE bitrate_type;
   OMX_CONFIG_BOOLEANTYPE boolean_type;
   OMX_PARAM_PORTDEFINITIONTYPE portdef, portdef_encode_output;
+  OMX_PARAM_U32TYPE u32;
   OMX_ERRORTYPE error;
   int r;
 
@@ -2293,6 +2302,66 @@ static int video_encode_startup() {
   if (error != OMX_ErrorNone) {
     log_fatal("error: failed to set video_encode %d bitrate: 0x%x\n", VIDEO_ENCODE_OUTPUT_PORT, error);
     exit(EXIT_FAILURE);
+  }
+
+  // Minimum quantization level
+  if (video_qp_min != -1) {
+    memset(&u32, 0, sizeof(OMX_PARAM_U32TYPE));
+    u32.nSize = sizeof(OMX_PARAM_U32TYPE);
+    u32.nVersion.nVersion = OMX_VERSION;
+    u32.nPortIndex = VIDEO_ENCODE_OUTPUT_PORT;
+    u32.nU32 = video_qp_min;
+    error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
+        OMX_IndexParamBrcmVideoEncodeMinQuant, &u32);
+    if (error != OMX_ErrorNone) {
+      log_fatal("error: failed to set video_encode %d min quant: 0x%x\n", u32.nPortIndex, error);
+      exit(EXIT_FAILURE);
+    }
+  }
+
+  // Maximum quantization level
+  if (video_qp_max != -1) {
+    memset(&u32, 0, sizeof(OMX_PARAM_U32TYPE));
+    u32.nSize = sizeof(OMX_PARAM_U32TYPE);
+    u32.nVersion.nVersion = OMX_VERSION;
+    u32.nPortIndex = VIDEO_ENCODE_OUTPUT_PORT;
+    u32.nU32 = video_qp_max;
+    error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
+        OMX_IndexParamBrcmVideoEncodeMaxQuant, &u32);
+    if (error != OMX_ErrorNone) {
+      log_fatal("error: failed to set video_encode %d max quant: 0x%x\n", u32.nPortIndex, error);
+      exit(EXIT_FAILURE);
+    }
+  }
+
+  // Initial quantization level
+  if (video_qp_initial != -1) {
+    memset(&u32, 0, sizeof(OMX_PARAM_U32TYPE));
+    u32.nSize = sizeof(OMX_PARAM_U32TYPE);
+    u32.nVersion.nVersion = OMX_VERSION;
+    u32.nPortIndex = VIDEO_ENCODE_OUTPUT_PORT;
+    u32.nU32 = video_qp_initial;
+    error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
+        OMX_IndexParamBrcmVideoInitialQuant, &u32);
+    if (error != OMX_ErrorNone) {
+      log_fatal("error: failed to set video_encode %d initial quant: 0x%x\n", u32.nPortIndex, error);
+      exit(EXIT_FAILURE);
+    }
+  }
+
+  // Slice DQuant level
+  if (video_slice_dquant != -1) {
+    memset(&u32, 0, sizeof(OMX_PARAM_U32TYPE));
+    u32.nSize = sizeof(OMX_PARAM_U32TYPE);
+    u32.nVersion.nVersion = OMX_VERSION;
+    u32.nPortIndex = VIDEO_ENCODE_OUTPUT_PORT;
+    u32.nU32 = video_slice_dquant;
+    error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
+        OMX_IndexParamBrcmVideoRCSliceDQuant, &u32);
+    if (error != OMX_ErrorNone) {
+      log_fatal("error: failed to set video_encode %d slice dquant: 0x%x\n", u32.nPortIndex, error);
+      exit(EXIT_FAILURE);
+    }
   }
 
   // Separate buffers for each NAL unit
@@ -2863,6 +2932,10 @@ static void print_usage() {
   log_info("                      (width*height should be <= 1280*720)\n");
 //  log_info("  -f, --fps           Frame rate (default: %d)\n", video_fps_default);
   log_info("  -v, --videobitrate  Video bit rate (default: %ld)\n", video_bitrate_default);
+  log_info("  --qpmin <num>       Minimum quantization level (0-51)\n");
+  log_info("  --qpmax <num>       Maximum quantization level (0-51)\n");
+  log_info("  --qpinit <num>      Initial quantization level\n");
+  log_info("  --dquant <num>      Slice DQuant level\n");
   log_info("  -g, --gopsize       GOP size (default: %d)\n", video_gop_size_default);
   log_info(" [audio]\n");
   log_info("  -r, --samplerate    Audio sample rate (default: %d)\n", audio_sample_rate_default);
@@ -2927,6 +3000,10 @@ int main(int argc, char **argv) {
 //    { "fps", required_argument, NULL, 'f' },
     { "gopsize", required_argument, NULL, 'g' },
     { "videobitrate", required_argument, NULL, 'v' },
+    { "qpmin", required_argument, NULL, 0 },
+    { "qpmax", required_argument, NULL, 0 },
+    { "qpinit", required_argument, NULL, 0 },
+    { "dquant", required_argument, NULL, 0 },
     { "alsadev", required_argument, NULL, 0 },
     { "audiobitrate", required_argument, NULL, 'a' },
     { "samplerate", required_argument, NULL, 'r' },
@@ -2972,6 +3049,10 @@ int main(int argc, char **argv) {
   video_fps = video_fps_default;
   video_gop_size = video_gop_size_default;
   video_bitrate = video_bitrate_default;
+  video_qp_min = video_qp_min_default;
+  video_qp_max = video_qp_max_default;
+  video_qp_initial = video_qp_initial_default;
+  video_slice_dquant = video_slice_dquant_default;
   strncpy(alsa_dev, alsa_dev_default, sizeof(alsa_dev));
   audio_bitrate = audio_bitrate_default;
   audio_sample_rate = audio_sample_rate_default;
@@ -3006,7 +3087,51 @@ int main(int argc, char **argv) {
         if (long_options[option_index].flag != 0) {
           break;
         }
-        if (strcmp(long_options[option_index].name, "alsadev") == 0) {
+        if (strcmp(long_options[option_index].name, "qpmin") == 0) {
+          char *end;
+          long value = strtol(optarg, &end, 10);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid qpmin: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          if (value < 0 || value > 51) {
+            log_fatal("error: invalid qpmin: %d (must be 0 <= qpmin <= 51)\n", value);
+            return EXIT_FAILURE;
+          }
+          video_qp_min = value;
+        } else if (strcmp(long_options[option_index].name, "qpmax") == 0) {
+          char *end;
+          long value = strtol(optarg, &end, 10);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid qpmax: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          if (value < 0 || value > 51) {
+            log_fatal("error: invalid qpmax: %d (must be 0 <= qpmax <= 51)\n", value);
+            return EXIT_FAILURE;
+          }
+          video_qp_max = value;
+        } else if (strcmp(long_options[option_index].name, "qpinit") == 0) {
+          char *end;
+          long value = strtol(optarg, &end, 10);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid qpinit: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          video_qp_initial = value;
+        } else if (strcmp(long_options[option_index].name, "dquant") == 0) {
+          char *end;
+          long value = strtol(optarg, &end, 10);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid dquant: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          if (value < 0) {
+            log_fatal("error: invalid dquant: %d (must be >= 0)\n", value);
+            return EXIT_FAILURE;
+          }
+          video_slice_dquant = value;
+        } else if (strcmp(long_options[option_index].name, "alsadev") == 0) {
           strncpy(alsa_dev, optarg, sizeof(alsa_dev));
         } else if (strcmp(long_options[option_index].name, "rtspout") == 0) {
           is_rtspout_enabled = 1;
@@ -3307,6 +3432,10 @@ int main(int argc, char **argv) {
   log_debug("video_fps=%.1f\n", video_fps);
   log_debug("gop_size=%d\n", video_gop_size);
   log_debug("video_bitrate=%ld\n", video_bitrate);
+  log_debug("video_qp_min=%d\n", video_qp_min);
+  log_debug("video_qp_max=%d\n", video_qp_max);
+  log_debug("video_qp_initial=%d\n", video_qp_initial);
+  log_debug("video_slice_dquant=%d\n", video_slice_dquant);
   log_debug("alsa_dev=%s\n", alsa_dev);
   log_debug("audio_sample_rate=%d\n", audio_sample_rate);
   log_debug("audio_bitrate=%ld\n", audio_bitrate);
