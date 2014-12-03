@@ -196,6 +196,12 @@ static uint8_t hls_encryption_iv[16] = {
 };
 static int is_preview_enabled;
 static const int is_preview_enabled_default = 0;
+static int is_previewrect_enabled;
+static const int is_previewrect_enabled_default = 0;
+static int preview_x;
+static int preview_y;
+static int preview_width;
+static int preview_height;
 static int record_buffer_keyframes;
 static const int record_buffer_keyframes_default = 5;
 
@@ -1762,6 +1768,7 @@ static int openmax_cam_open() {
   OMX_ERRORTYPE error;
   OMX_PARAM_PORTDEFINITIONTYPE portdef;
   OMX_PARAM_TIMESTAMPMODETYPE timestamp_mode;
+  OMX_CONFIG_DISPLAYREGIONTYPE display_region;
   int r;
 
   cam_client = ilclient_init();
@@ -1933,6 +1940,32 @@ static int openmax_cam_open() {
       exit(EXIT_FAILURE);
     }
     component_list[n_component_list++] = render_component;
+
+    // Setup display region for preview window
+    memset(&display_region, 0, sizeof(OMX_CONFIG_DISPLAYREGIONTYPE));
+    display_region.nSize = sizeof(OMX_CONFIG_DISPLAYREGIONTYPE);
+    display_region.nVersion.nVersion = OMX_VERSION;
+    display_region.nPortIndex = VIDEO_RENDER_INPUT_PORT;
+
+    if (is_previewrect_enabled) { // display preview window at specified position
+      display_region.set = OMX_DISPLAY_SET_DEST_RECT | OMX_DISPLAY_SET_FULLSCREEN | OMX_DISPLAY_SET_NOASPECT;
+      display_region.dest_rect.x_offset = preview_x;
+      display_region.dest_rect.y_offset = preview_y;
+      display_region.dest_rect.width = preview_width;
+      display_region.dest_rect.height = preview_height;
+      display_region.fullscreen = OMX_FALSE;
+      display_region.noaspect = OMX_TRUE;
+    } else { // fullscreen
+      display_region.set = OMX_DISPLAY_SET_FULLSCREEN;
+      display_region.fullscreen = OMX_TRUE;
+    }
+
+    error = OMX_SetParameter(ILC_GET_HANDLE(render_component),
+        OMX_IndexConfigDisplayRegion, &display_region);
+    if (error != OMX_ErrorNone) {
+      log_fatal("error: failed to set render input %d display region: 0x%x\n", VIDEO_RENDER_INPUT_PORT, error);
+      exit(EXIT_FAILURE);
+    }
 
     // Set up tunnel from camera to video_render
     set_tunnel(tunnel+n_tunnel,
@@ -2871,7 +2904,9 @@ static void print_usage() {
   log_info("  --expday <num>      Change the exposure to daylight mode if the average\n");
   log_info("                      value of Y (brightness) is >= <num> while in\n");
   log_info("                      night mode (default: %d)\n", exposure_auto_y_threshold_default);
-  log_info("  -p, --preview       Display a preview window for video\n");
+  log_info("  -p, --preview       Display fullscreen preview\n");
+  log_info("  --previewrect <x,y,width,height>\n");
+  log_info("                      Display preview window at specified position\n");
   log_info(" [misc]\n");
   log_info("  --recordbuf <num>   Start recording from <num> keyframes ago\n");
   log_info("                      (default: %d)\n", record_buffer_keyframes_default);
@@ -2914,6 +2949,7 @@ int main(int argc, char **argv) {
     { "hlsenckey", required_argument, NULL, 0 },
     { "hlsenciv", required_argument, NULL, 0 },
     { "preview", no_argument, NULL, 'p' },
+    { "previewrect", required_argument, NULL, 0 },
     { "quiet", no_argument, NULL, 'q' },
     { "recordbuf", required_argument, NULL, 0 },
     { "verbose", no_argument, NULL, 0 },
@@ -2961,6 +2997,7 @@ int main(int argc, char **argv) {
   strncpy(hls_encryption_key_uri, hls_encryption_key_uri_default,
       sizeof(hls_encryption_key_uri));
   is_preview_enabled = is_preview_enabled_default;
+  is_previewrect_enabled = is_previewrect_enabled_default;
   record_buffer_keyframes = record_buffer_keyframes_default;
 
   while ((opt = getopt_long(argc, argv, "w:h:g:v:a:r:o:pq", long_options, &option_index)) != -1) {
@@ -3059,6 +3096,46 @@ int main(int argc, char **argv) {
               return EXIT_FAILURE;
             }
           }
+        } else if (strcmp(long_options[option_index].name, "previewrect") == 0) {
+          char *token;
+          char *saveptr = NULL;
+          char *end;
+          int i;
+          long value;
+          for (i = 1; ; i++, optarg = NULL) {
+            token = strtok_r(optarg, ",", &saveptr);
+            if (token == NULL) {
+              break;
+            }
+            value = strtol(token, &end, 10);
+            if (end == token || *end != '\0' || errno == ERANGE) { // parse error
+              log_fatal("error: invalid previewrect number: %s\n", token);
+              return EXIT_FAILURE;
+            }
+            switch (i) {
+              case 1:
+                preview_x = value;
+                break;
+              case 2:
+                preview_y = value;
+                break;
+              case 3:
+                preview_width = value;
+                break;
+              case 4:
+                preview_height = value;
+                break;
+              default: // too many tokens
+                log_fatal("error: invalid previewrect\n");
+                return EXIT_FAILURE;
+            }
+          }
+          if (i != 5) { // too few tokens
+            log_fatal("error: invalid previewrect\n");
+            return EXIT_FAILURE;
+          }
+          is_preview_enabled = 1;
+          is_previewrect_enabled = 1;
         } else if (strcmp(long_options[option_index].name, "recordbuf") == 0) {
           char *end;
           long value = strtol(optarg, &end, 10);
@@ -3255,6 +3332,11 @@ int main(int argc, char **argv) {
   log_debug("exposure_night_y_threshold=%d\n", exposure_night_y_threshold);
   log_debug("exposure_auto_y_threshold=%d\n", exposure_auto_y_threshold);
   log_debug("is_preview_enabled=%d\n", is_preview_enabled);
+  log_debug("is_previewrect_enabled=%d\n", is_previewrect_enabled);
+  log_debug("preview_x=%d\n", preview_x);
+  log_debug("preview_y=%d\n", preview_y);
+  log_debug("preview_width=%d\n", preview_width);
+  log_debug("preview_height=%d\n", preview_height);
   log_debug("record_buffer_keyframes=%d\n", record_buffer_keyframes);
   log_debug("state_dir=%s\n", state_dir);
   log_debug("hooks_dir=%s\n", hooks_dir);
