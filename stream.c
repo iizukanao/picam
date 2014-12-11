@@ -143,6 +143,12 @@ static float video_fps;
 static const float video_fps_default = 30.0;
 static int video_gop_size;
 static const int video_gop_size_default = 30;
+static int video_rotation;
+static const int video_rotation_default = 0;
+static int video_hflip;
+static const int video_hflip_default = 0;
+static int video_vflip;
+static const int video_vflip_default = 0;
 static long video_bitrate;
 static const long video_bitrate_default = 2000 * 1000; // 2 Mbps
 static int video_qp_min;
@@ -1777,6 +1783,8 @@ static int openmax_cam_open() {
   OMX_PARAM_PORTDEFINITIONTYPE portdef;
   OMX_PARAM_TIMESTAMPMODETYPE timestamp_mode;
   OMX_CONFIG_DISPLAYREGIONTYPE display_region;
+  OMX_CONFIG_ROTATIONTYPE rotation;
+  OMX_CONFIG_MIRRORTYPE mirror;
   int r;
 
   cam_client = ilclient_init();
@@ -1859,6 +1867,40 @@ static int openmax_cam_open() {
     exit(EXIT_FAILURE);
   }
 
+  // image rotation
+  memset(&rotation, 0, sizeof(OMX_CONFIG_ROTATIONTYPE));
+  rotation.nSize = sizeof(OMX_CONFIG_ROTATIONTYPE);
+  rotation.nVersion.nVersion = OMX_VERSION;
+  rotation.nPortIndex = CAMERA_CAPTURE_PORT;
+  rotation.nRotation = video_rotation;
+  error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
+      OMX_IndexConfigCommonRotate, &rotation);
+  if (error != OMX_ErrorNone) {
+    log_fatal("error: failed to set camera capture %d rotation: 0x%x\n", CAMERA_CAPTURE_PORT, error);
+    exit(EXIT_FAILURE);
+  }
+
+  // image mirroring (horizontal/vertical flip)
+  memset(&mirror, 0, sizeof(OMX_CONFIG_MIRRORTYPE));
+  mirror.nSize = sizeof(OMX_CONFIG_MIRRORTYPE);
+  mirror.nVersion.nVersion = OMX_VERSION;
+  mirror.nPortIndex = CAMERA_CAPTURE_PORT;
+  if (video_hflip && video_vflip) {
+    mirror.eMirror = OMX_MirrorBoth;
+  } else if (video_hflip) {
+    mirror.eMirror = OMX_MirrorHorizontal;
+  } else if (video_vflip) {
+    mirror.eMirror = OMX_MirrorVertical;
+  } else {
+    mirror.eMirror = OMX_MirrorNone;
+  }
+  error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
+      OMX_IndexConfigCommonMirror, &mirror);
+  if (error != OMX_ErrorNone) {
+    log_fatal("error: failed to set camera capture %d mirror (hflip/vflip): 0x%x\n", CAMERA_CAPTURE_PORT, error);
+    exit(EXIT_FAILURE);
+  }
+
   set_exposure_to_auto();
 
   // Set camera component to idle state
@@ -1937,6 +1979,40 @@ static int openmax_cam_open() {
         OMX_IndexConfigVideoFramerate, &framerate);
     if (error != OMX_ErrorNone) {
       log_fatal("error: failed to set camera preview %d framerate: 0x%x\n", CAMERA_PREVIEW_PORT, error);
+      exit(EXIT_FAILURE);
+    }
+
+    // image rotation
+    memset(&rotation, 0, sizeof(OMX_CONFIG_ROTATIONTYPE));
+    rotation.nSize = sizeof(OMX_CONFIG_ROTATIONTYPE);
+    rotation.nVersion.nVersion = OMX_VERSION;
+    rotation.nPortIndex = CAMERA_PREVIEW_PORT;
+    rotation.nRotation = video_rotation;
+    error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
+        OMX_IndexConfigCommonRotate, &rotation);
+    if (error != OMX_ErrorNone) {
+      log_fatal("error: failed to set camera preview %d rotation: 0x%x\n", CAMERA_PREVIEW_PORT, error);
+      exit(EXIT_FAILURE);
+    }
+
+    // image mirroring (horizontal/vertical flip)
+    memset(&mirror, 0, sizeof(OMX_CONFIG_MIRRORTYPE));
+    mirror.nSize = sizeof(OMX_CONFIG_MIRRORTYPE);
+    mirror.nVersion.nVersion = OMX_VERSION;
+    mirror.nPortIndex = CAMERA_PREVIEW_PORT;
+    if (video_hflip && video_vflip) {
+      mirror.eMirror = OMX_MirrorBoth;
+    } else if (video_hflip) {
+      mirror.eMirror = OMX_MirrorHorizontal;
+    } else if (video_vflip) {
+      mirror.eMirror = OMX_MirrorVertical;
+    } else {
+      mirror.eMirror = OMX_MirrorNone;
+    }
+    error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
+        OMX_IndexConfigCommonMirror, &mirror);
+    if (error != OMX_ErrorNone) {
+      log_fatal("error: failed to set camera preview %d mirror (hflip/vflip): 0x%x\n", CAMERA_PREVIEW_PORT, error);
       exit(EXIT_FAILURE);
     }
 
@@ -2938,11 +3014,15 @@ static void print_usage() {
 //  log_info("  -f, --fps           Frame rate (default: %d)\n", video_fps_default);
   log_info("  -v, --videobitrate  Video bit rate (default: %ld)\n", video_bitrate_default);
   log_info("                      Set 0 to disable rate control\n");
+  log_info("  -g, --gopsize       GOP size (default: %d)\n", video_gop_size_default);
+  log_info("  --rotation <num>    Image rotation in clockwise degrees\n");
+  log_info("                      (0, 90, 180, 270)\n");
+  log_info("  --hflip             Flip image horizontally\n");
+  log_info("  --vflip             Flip image vertically\n");
   log_info("  --qpmin <num>       Minimum quantization level (0-51)\n");
   log_info("  --qpmax <num>       Maximum quantization level (0-51)\n");
   log_info("  --qpinit <num>      Initial quantization level\n");
   log_info("  --dquant <num>      Slice DQuant level\n");
-  log_info("  -g, --gopsize       GOP size (default: %d)\n", video_gop_size_default);
   log_info(" [audio]\n");
   log_info("  -r, --samplerate    Audio sample rate (default: %d)\n", audio_sample_rate_default);
   log_info("  -a, --audiobitrate  Audio bit rate (default: %ld)\n", audio_bitrate_default);
@@ -3004,8 +3084,11 @@ int main(int argc, char **argv) {
     { "width", required_argument, NULL, 'w' },
     { "height", required_argument, NULL, 'h' },
 //    { "fps", required_argument, NULL, 'f' },
-    { "gopsize", required_argument, NULL, 'g' },
     { "videobitrate", required_argument, NULL, 'v' },
+    { "gopsize", required_argument, NULL, 'g' },
+    { "rotation", required_argument, NULL, 0 },
+    { "hflip", no_argument, NULL, 0 },
+    { "vflip", no_argument, NULL, 0 },
     { "qpmin", required_argument, NULL, 0 },
     { "qpmax", required_argument, NULL, 0 },
     { "qpinit", required_argument, NULL, 0 },
@@ -3093,7 +3176,23 @@ int main(int argc, char **argv) {
         if (long_options[option_index].flag != 0) {
           break;
         }
-        if (strcmp(long_options[option_index].name, "qpmin") == 0) {
+        if (strcmp(long_options[option_index].name, "rotation") == 0) {
+          char *end;
+          int value = strtol(optarg, &end, 10);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid rotation: %s\n", optarg);
+            print_usage();
+            return EXIT_FAILURE;
+          }
+          video_rotation = value;
+          break;
+        } else if (strcmp(long_options[option_index].name, "hflip") == 0) {
+          video_hflip = 1;
+          break;
+        } else if (strcmp(long_options[option_index].name, "vflip") == 0) {
+          video_vflip = 1;
+          break;
+        } else if (strcmp(long_options[option_index].name, "qpmin") == 0) {
           char *end;
           long value = strtol(optarg, &end, 10);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
@@ -3437,6 +3536,9 @@ int main(int argc, char **argv) {
   log_debug("video_height=%d\n", video_height);
   log_debug("video_fps=%.1f\n", video_fps);
   log_debug("gop_size=%d\n", video_gop_size);
+  log_debug("video_rotation=%d\n", video_rotation);
+  log_debug("video_hflip=%d\n", video_hflip);
+  log_debug("video_vflip=%d\n", video_vflip);
   log_debug("video_bitrate=%ld\n", video_bitrate);
   log_debug("video_qp_min=%d\n", video_qp_min);
   log_debug("video_qp_max=%d\n", video_qp_max);
