@@ -161,6 +161,8 @@ static char alsa_dev[256];
 static const char *alsa_dev_default = "hw:0,0";
 static long audio_bitrate;
 static const long audio_bitrate_default = 40000; // 40 Kbps
+static int audio_channels;
+static const int audio_channels_default = 1; // mono
 static int audio_sample_rate;
 static const int audio_sample_rate_default = 48000;
 static int is_hlsout_enabled;
@@ -311,7 +313,6 @@ static int audio_fd_count;
 static struct pollfd *poll_fds; // file descriptors for polling audio
 static int is_first_audio;
 static int period_size;
-static int channels = 1;
 
 // threads
 static pthread_mutex_t mutex_writing = PTHREAD_MUTEX_INITIALIZER;
@@ -520,7 +521,7 @@ void setup_av_frame(AVFormatContext *format_ctx) {
   }
 #endif
 
-  period_size = buffer_size / channels / sizeof(short);
+  period_size = buffer_size / audio_channels / sizeof(short);
   audio_pts_step_base = 90000.0 * period_size / audio_sample_rate;
   log_debug("audio_pts_step_base: %d\n", audio_pts_step_base);
 
@@ -1430,10 +1431,20 @@ static int configure_audio_capture_device() {
   }
 
   // set the number of channels
-  err = snd_pcm_hw_params_set_channels(capture_handle, hw_params, channels);
+  err = snd_pcm_hw_params_set_channels(capture_handle, hw_params, audio_channels);
   if (err < 0) {
-    log_fatal("error: cannot set channel count for microphone (%s)\n", snd_strerror(err));
-    exit(EXIT_FAILURE);
+    if (audio_channels == 1) {
+      log_debug("cannot use mono audio; trying stereo\n");
+      audio_channels = 2;
+    } else {
+      log_debug("cannot use stereo audio; trying mono\n");
+      audio_channels = 1;
+    }
+    err = snd_pcm_hw_params_set_channels(capture_handle, hw_params, audio_channels);
+    if (err < 0) {
+      log_fatal("error: cannot set channel count for microphone (%s)\n", snd_strerror(err));
+      exit(EXIT_FAILURE);
+    }
   }
 
   // set the buffer size
@@ -2710,7 +2721,7 @@ static int read_audio_poll_mmap() {
       }
       is_first_audio = 1;
     } 
-    memcpy(this_samples + read_size, (my_areas[0].addr)+(offset*sizeof(short)*channels), frames*sizeof(short)*channels);
+    memcpy(this_samples + read_size, (my_areas[0].addr)+(offset*sizeof(short)*audio_channels), frames*sizeof(short)*audio_channels);
     read_size += frames;
 
     commitres = snd_pcm_mmap_commit(capture_handle, offset, frames);
@@ -2725,7 +2736,7 @@ static int read_audio_poll_mmap() {
   }
 
   if (audio_volume_multiply != 1.0) {
-    int total_samples = period_size * channels;
+    int total_samples = period_size * audio_channels;
     int i;
     for (i = 0; i < total_samples; i++) {
       int16_t value = (int16_t)this_samples[i];
@@ -2917,7 +2928,7 @@ static void audio_loop_poll_mmap() {
       read_audio_poll_mmap();
 #if AUDIO_BUFFER_CHUNKS > 0
       if (AUDIO_BUFFER_CHUNKS == 0 || is_audio_buffer_filled) {
-        memcpy(samples, audio_buffer[audio_buffer_index], period_size * sizeof(short) * channels);
+        memcpy(samples, audio_buffer[audio_buffer_index], period_size * sizeof(short) * audio_channels);
 #else
       if (1) {
 #endif
@@ -2938,7 +2949,7 @@ static void audio_loop_poll_mmap() {
             audio_pending_drop_frames--;
           } else {
             if (is_audio_muted) {
-              memset(samples, 0, period_size * sizeof(short) * channels);
+              memset(samples, 0, period_size * sizeof(short) * audio_channels);
             }
             encode_and_send_audio();
           }
@@ -3026,6 +3037,8 @@ static void print_usage() {
   log_info(" [audio]\n");
   log_info("  -r, --samplerate    Audio sample rate (default: %d)\n", audio_sample_rate_default);
   log_info("  -a, --audiobitrate  Audio bit rate (default: %ld)\n", audio_bitrate_default);
+  log_info("  -c, --channels <num>  Audio channels (1=mono, 2=stereo)\n");
+  log_info("                      Default is 1, then 2 if it fails.");
   log_info("  --alsadev <dev>     ALSA microphone device (default: %s)\n", alsa_dev_default);
   log_info("  --volume <num>      Amplify audio by multiplying the volume by <num>\n");
   log_info("                      (default: %.1f)\n", audio_volume_multiply_default);
@@ -3096,6 +3109,7 @@ int main(int argc, char **argv) {
     { "dquant", required_argument, NULL, 0 },
     { "alsadev", required_argument, NULL, 0 },
     { "audiobitrate", required_argument, NULL, 'a' },
+    { "channels", required_argument, NULL, 'c' },
     { "samplerate", required_argument, NULL, 'r' },
     { "hlsdir", required_argument, NULL, 'o' },
     { "rtspout", no_argument, NULL, 0 },
@@ -3146,6 +3160,7 @@ int main(int argc, char **argv) {
   video_slice_dquant = video_slice_dquant_default;
   strncpy(alsa_dev, alsa_dev_default, sizeof(alsa_dev));
   audio_bitrate = audio_bitrate_default;
+  audio_channels = audio_channels_default;
   audio_sample_rate = audio_sample_rate_default;
   is_hlsout_enabled = is_hlsout_enabled_default;
   strncpy(hls_output_dir, hls_output_dir_default, sizeof(hls_output_dir));
@@ -3501,6 +3516,22 @@ int main(int argc, char **argv) {
           audio_bitrate = value;
           break;
         }
+      case 'c':
+        {
+          char *end;
+          long value = strtol(optarg, &end, 10);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid channels: %s\n", optarg);
+            print_usage();
+            return EXIT_FAILURE;
+          }
+          if (value != 1 && value != 2) {
+            log_fatal("error: invalid channels: %ld (must be 1 or 2)\n", value);
+            return EXIT_FAILURE;
+          }
+          audio_channels = value;
+          break;
+        }
       case 'r':
         {
           char *end;
@@ -3634,6 +3665,7 @@ int main(int argc, char **argv) {
   log_debug("video_qp_initial=%d\n", video_qp_initial);
   log_debug("video_slice_dquant=%d\n", video_slice_dquant);
   log_debug("alsa_dev=%s\n", alsa_dev);
+  log_debug("audio_channels=%d\n", audio_channels);
   log_debug("audio_sample_rate=%d\n", audio_sample_rate);
   log_debug("audio_bitrate=%ld\n", audio_bitrate);
   log_debug("audio_volume_multiply=%f\n", audio_volume_multiply);
@@ -3676,7 +3708,7 @@ int main(int argc, char **argv) {
 
   codec_settings.audio_sample_rate = audio_sample_rate;
   codec_settings.audio_bit_rate = audio_bitrate;
-  codec_settings.audio_channels = 1;
+  codec_settings.audio_channels = audio_channels;
   codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
 
   create_dir(rec_dir);
@@ -3793,7 +3825,7 @@ int main(int argc, char **argv) {
   setup_av_frame(hls->format_ctx);
 
   if (disable_audio_capturing) {
-    memset(samples, 0, period_size * sizeof(short) * channels);
+    memset(samples, 0, period_size * sizeof(short) * audio_channels);
     is_audio_recording_started = 1;
   } else {
     ret = configure_audio_capture_device();
