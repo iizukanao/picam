@@ -7,7 +7,6 @@
 - Record audio/video to MPEG-TS files
 - Generate files for HTTP Live Streaming with optional encryption
 - If USB microphone is not available, it only records the video
-- Only 30 FPS is supported
 
 
 ### Performance (Latency)
