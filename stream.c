@@ -1037,7 +1037,7 @@ static void print_audio_timing() {
   // (cur_time - audio_start_time) * INT64_C(90000) / INT64_C(1000000000);
   int64_t clock_pts = (cur_time - audio_start_time) * 90000.0 / 1000000000.0;
 
-  log_debug(" a-v=%lld c-a=%lld u=%d d=%d pts=%" PRId64 "\n",
+  log_debug(" a-v=%lld c-a=%lld u=%d d=%d pts=%" PRId64,
       avdiff, clock_pts - audio_pts, speed_up_count, speed_down_count, last_pts);
 }
 
