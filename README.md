@@ -116,24 +116,33 @@ To unmute microphone, create a file named `hooks/unmute`.
 #### Command options
 
     $ ./picam --help
-    picam version 1.2.3
+    picam version 1.2.4
     Usage: picam [options]
     
     Options:
      [video]
-      -w, --width         Width in pixels (default: 1280)
-      -h, --height        Height in pixels (default: 720)
+      -w, --width <num>   Width in pixels (default: 1280)
+      -h, --height <num>  Height in pixels (default: 720)
                           (width*height should be <= 1280*720)
-      -v, --videobitrate  Video bit rate (default: 2000000)
+      -v, --videobitrate <num>  Video bit rate (default: 2000000)
                           Set 0 to disable rate control
+      -f, --fps <num>     Frame rate (default: 0)
+      --ptsstep <num>     PTS increment for each video frame
+                          Default value is calculated based on fps
+      -g, --gopsize <num>  GOP size (default: same value as fps)
+      --rotation <num>    Image rotation in clockwise degrees
+                          (0, 90, 180, 270)
+      --hflip             Flip image horizontally
+      --vflip             Flip image vertically
       --qpmin <num>       Minimum quantization level (0-51)
       --qpmax <num>       Maximum quantization level (0-51)
       --qpinit <num>      Initial quantization level
       --dquant <num>      Slice DQuant level
-      -g, --gopsize       GOP size (default: 30)
      [audio]
-      -r, --samplerate    Audio sample rate (default: 48000)
-      -a, --audiobitrate  Audio bit rate (default: 40000)
+      -c, --channels <num>  Audio channels (1=mono, 2=stereo)
+                          Default is mono. If it fails, stereo is used.
+      -r, --samplerate <num>  Audio sample rate (default: 48000)
+      -a, --audiobitrate <num>  Audio bit rate (default: 40000)
       --alsadev <dev>     ALSA microphone device (default: hw:0,0)
       --volume <num>      Amplify audio by multiplying the volume by <num>
                           (default: 1.0)
