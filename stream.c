@@ -3187,7 +3187,7 @@ int main(int argc, char **argv) {
   is_previewrect_enabled = is_previewrect_enabled_default;
   record_buffer_keyframes = record_buffer_keyframes_default;
 
-  while ((opt = getopt_long(argc, argv, "w:h:g:v:a:r:o:pq", long_options, &option_index)) != -1) {
+  while ((opt = getopt_long(argc, argv, "w:h:v:f:g:c:r:a:o:pq", long_options, &option_index)) != -1) {
     switch (opt) {
       case 0:
         if (long_options[option_index].flag != 0) {
