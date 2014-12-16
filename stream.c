@@ -161,6 +161,7 @@ static char alsa_dev[256];
 static const char *alsa_dev_default = "hw:0,0";
 static long audio_bitrate;
 static const long audio_bitrate_default = 40000; // 40 Kbps
+static int is_audio_channels_specified = 0;
 static int audio_channels;
 static const int audio_channels_default = 1; // mono
 static int audio_sample_rate;
@@ -1434,10 +1435,18 @@ static int configure_audio_capture_device() {
   err = snd_pcm_hw_params_set_channels(capture_handle, hw_params, audio_channels);
   if (err < 0) {
     if (audio_channels == 1) {
-      log_debug("cannot use mono audio; trying stereo\n");
+      if (is_audio_channels_specified) {
+        log_info("cannot use mono audio; trying stereo\n");
+      } else {
+        log_debug("cannot use mono audio; trying stereo\n");
+      }
       audio_channels = 2;
     } else {
-      log_debug("cannot use stereo audio; trying mono\n");
+      if (is_audio_channels_specified) {
+        log_info("cannot use stereo audio; trying mono\n");
+      } else {
+        log_debug("cannot use stereo audio; trying mono\n");
+      }
       audio_channels = 1;
     }
     err = snd_pcm_hw_params_set_channels(capture_handle, hw_params, audio_channels);
@@ -3530,6 +3539,7 @@ int main(int argc, char **argv) {
             return EXIT_FAILURE;
           }
           audio_channels = value;
+          is_audio_channels_specified = 1;
           break;
         }
       case 'r':
