@@ -68,10 +68,6 @@ extern "C" {
 // Internal flag indicates that audio is available for read
 #define AVAIL_AUDIO 2
 
-// Each video frame's PTS is incremented by this in normal condition
-// 90000 / 2955 = 30.46 FPS
-#define VIDEO_PTS_STEP 2955
-
 // If this value is increased, audio gets faster than video
 #define N_BUFFER_COUNT_ACTUAL 1
 
@@ -140,9 +136,11 @@ static const int video_width_default = 1280;
 static int video_height;
 static const int video_height_default = 720;
 static float video_fps;
-static const float video_fps_default = 30.0;
+static const float video_fps_default = 30.0f;
+static int video_pts_step;
+static const int video_pts_step_default = 0;
 static int video_gop_size;
-static const int video_gop_size_default = 30;
+static const int video_gop_size_default = 0;
 static int video_rotation;
 static const int video_rotation_default = 0;
 static int video_hflip;
@@ -974,8 +972,8 @@ static int64_t get_next_video_pts() {
   int64_t pts;
   video_frame_count++;
 
-  int pts_diff = audio_current_pts - video_current_pts - VIDEO_PTS_STEP;
-  int tolerance = (VIDEO_PTS_STEP + audio_pts_step_base) * 2;
+  int pts_diff = audio_current_pts - video_current_pts - video_pts_step;
+  int tolerance = (video_pts_step + audio_pts_step_base) * 2;
   if (pts_diff >= PTS_DIFF_TOO_LARGE) {
     // video PTS is too slow
     log_debug("vR%d", pts_diff);
@@ -988,7 +986,7 @@ static int64_t get_next_video_pts() {
       log_debug("vSPEED_UP(%d)", pts_diff);
     }
     // Catch up with audio PTS if the delay is too large.
-    pts = video_current_pts + VIDEO_PTS_STEP + 150;
+    pts = video_current_pts + video_pts_step + 150;
   } else if (pts_diff <= -tolerance) {
     if (pts_mode != PTS_SPEED_DOWN) {
       // speed down video PTS
@@ -996,9 +994,9 @@ static int64_t get_next_video_pts() {
       speed_down_count++;
       log_debug("vSPEED_DOWN(%d)", pts_diff);
     }
-    pts = video_current_pts + VIDEO_PTS_STEP - 150;
+    pts = video_current_pts + video_pts_step - 150;
   } else {
-    pts = video_current_pts + VIDEO_PTS_STEP;
+    pts = video_current_pts + video_pts_step;
     if (pts_diff < 2000 && pts_diff > -2000) {
       if (pts_mode != PTS_SPEED_NORMAL) {
         // video PTS has caught up with audio PTS
@@ -3011,10 +3009,12 @@ static void print_usage() {
   log_info("  -w, --width         Width in pixels (default: %d)\n", video_width_default);
   log_info("  -h, --height        Height in pixels (default: %d)\n", video_height_default);
   log_info("                      (width*height should be <= 1280*720)\n");
-//  log_info("  -f, --fps           Frame rate (default: %d)\n", video_fps_default);
   log_info("  -v, --videobitrate  Video bit rate (default: %ld)\n", video_bitrate_default);
   log_info("                      Set 0 to disable rate control\n");
-  log_info("  -g, --gopsize       GOP size (default: %d)\n", video_gop_size_default);
+  log_info("  -f, --fps <num>     Frame rate (default: %d)\n", video_fps_default);
+  log_info("  --ptsstep <num>     PTS increment for each video frame\n");
+  log_info("                      Default value is calculated based on fps\n");
+  log_info("  -g, --gopsize <num>  GOP size (default: same value as fps)\n");
   log_info("  --rotation <num>    Image rotation in clockwise degrees\n");
   log_info("                      (0, 90, 180, 270)\n");
   log_info("  --hflip             Flip image horizontally\n");
@@ -3083,7 +3083,8 @@ int main(int argc, char **argv) {
   static struct option long_options[] = {
     { "width", required_argument, NULL, 'w' },
     { "height", required_argument, NULL, 'h' },
-//    { "fps", required_argument, NULL, 'f' },
+    { "fps", required_argument, NULL, 'f' },
+    { "ptsstep", required_argument, NULL, 0 },
     { "videobitrate", required_argument, NULL, 'v' },
     { "gopsize", required_argument, NULL, 'g' },
     { "rotation", required_argument, NULL, 0 },
@@ -3136,6 +3137,7 @@ int main(int argc, char **argv) {
   video_width = video_width_default;
   video_height = video_height_default;
   video_fps = video_fps_default;
+  video_pts_step = video_pts_step_default;
   video_gop_size = video_gop_size_default;
   video_bitrate = video_bitrate_default;
   video_qp_min = video_qp_min_default;
@@ -3176,7 +3178,21 @@ int main(int argc, char **argv) {
         if (long_options[option_index].flag != 0) {
           break;
         }
-        if (strcmp(long_options[option_index].name, "rotation") == 0) {
+        if (strcmp(long_options[option_index].name, "ptsstep") == 0) {
+          char *end;
+          int value = strtol(optarg, &end, 10);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid ptsstep: %s\n", optarg);
+            print_usage();
+            return EXIT_FAILURE;
+          }
+          if (value <= 0) {
+            log_fatal("error: invalid ptsstep: %d (must be > 0)\n", value);
+            return EXIT_FAILURE;
+          }
+          video_pts_step = value;
+          break;
+        } else if (strcmp(long_options[option_index].name, "rotation") == 0) {
           char *end;
           int value = strtol(optarg, &end, 10);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
@@ -3424,7 +3440,7 @@ int main(int argc, char **argv) {
       case 'f':
         {
           char *end;
-          double value = strtol(optarg, &end, 10);
+          double value = strtod(optarg, &end);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
             log_fatal("error: invalid fps: %s\n", optarg);
             print_usage();
@@ -3523,6 +3539,77 @@ int main(int argc, char **argv) {
   }
 
   fr_q16 = video_fps * 65536;
+  if (video_pts_step == video_pts_step_default) {
+    if (video_fps == 30.0f) {
+      video_pts_step = 2955;
+    } else if (video_fps == 29.97f) {
+      video_pts_step = 2959;
+    } else if (video_fps == 29.0f) {
+      video_pts_step = 3058;
+    } else if (video_fps == 28.0f) {
+      video_pts_step = 3168;
+    } else if (video_fps == 27.0f) {
+      video_pts_step = 3285;
+    } else if (video_fps == 26.0f) {
+      video_pts_step = 3411;
+    } else if (video_fps == 25.0f) {
+      video_pts_step = 3547;
+    } else if (video_fps == 24.0f) {
+      video_pts_step = 3695;
+    } else if (video_fps == 23.0f) {
+      video_pts_step = 3856;
+    } else if (video_fps == 22.0f) {
+      video_pts_step = 4031;
+    } else if (video_fps == 21.0f) {
+      video_pts_step = 4224;
+    } else if (video_fps == 20.0f) {
+      video_pts_step = 4435;
+    } else if (video_fps == 19.0f) {
+      video_pts_step = 4669;
+    } else if (video_fps == 18.0f) {
+      video_pts_step = 4928;
+    } else if (video_fps == 17.0f) {
+      video_pts_step = 5216;
+    } else if (video_fps == 16.0f) {
+      video_pts_step = 5544;
+    } else if (video_fps == 15.0f) {
+      video_pts_step = 5912;
+    } else if (video_fps == 14.0f) {
+      video_pts_step = 6336;
+    } else if (video_fps == 13.0f) {
+      video_pts_step = 6823;
+    } else if (video_fps == 12.0f) {
+      video_pts_step = 7392;
+    } else if (video_fps == 11.0f) {
+      video_pts_step = 8062;
+    } else if (video_fps == 10.0f) {
+      video_pts_step = 8869;
+    } else if (video_fps == 9.0f) {
+      video_pts_step = 9855;
+    } else if (video_fps == 8.0f) {
+      video_pts_step = 11088;
+    } else if (video_fps == 7.0f) {
+      video_pts_step = 12672;
+    } else if (video_fps == 6.0f) {
+      video_pts_step = 14783;
+    } else if (video_fps == 5.0f) {
+      video_pts_step = 17739;
+    } else if (video_fps == 4.0f) {
+      video_pts_step = 22176;
+    } else if (video_fps == 3.0f) {
+      video_pts_step = 29567;
+    } else if (video_fps == 2.0f) {
+      video_pts_step = 44351;
+    } else if (video_fps == 1.0f) { // XXX: won't work?
+      video_pts_step = 68480;
+    } else {
+      float pts_delta = (88698.86675f - 88645.21441) / (30 - 2);
+      video_pts_step = ceil(88698.86675f - pts_delta * (video_fps - 2.0f));
+    }
+  }
+  if (video_gop_size == video_gop_size_default) {
+    video_gop_size = ceil(video_fps);
+  }
   mpegts_set_config(video_bitrate, video_width, video_height);
   audio_min_value = (int) (-32768 / audio_volume_multiply);
   audio_max_value = (int) (32767 / audio_volume_multiply);
@@ -3535,7 +3622,9 @@ int main(int argc, char **argv) {
   log_debug("video_width=%d\n", video_width);
   log_debug("video_height=%d\n", video_height);
   log_debug("video_fps=%.1f\n", video_fps);
-  log_debug("gop_size=%d\n", video_gop_size);
+  log_debug("fr_q16=%d\n", fr_q16);
+  log_debug("video_pts_step=%d\n", video_pts_step);
+  log_debug("video_gop_size=%d\n", video_gop_size);
   log_debug("video_rotation=%d\n", video_rotation);
   log_debug("video_hflip=%d\n", video_hflip);
   log_debug("video_vflip=%d\n", video_vflip);
