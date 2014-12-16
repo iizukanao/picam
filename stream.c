@@ -3017,10 +3017,10 @@ static void print_usage() {
   log_info("\n");
   log_info("Options:\n");
   log_info(" [video]\n");
-  log_info("  -w, --width         Width in pixels (default: %d)\n", video_width_default);
-  log_info("  -h, --height        Height in pixels (default: %d)\n", video_height_default);
+  log_info("  -w, --width <num>   Width in pixels (default: %d)\n", video_width_default);
+  log_info("  -h, --height <num>  Height in pixels (default: %d)\n", video_height_default);
   log_info("                      (width*height should be <= 1280*720)\n");
-  log_info("  -v, --videobitrate  Video bit rate (default: %ld)\n", video_bitrate_default);
+  log_info("  -v, --videobitrate <num>  Video bit rate (default: %ld)\n", video_bitrate_default);
   log_info("                      Set 0 to disable rate control\n");
   log_info("  -f, --fps <num>     Frame rate (default: %d)\n", video_fps_default);
   log_info("  --ptsstep <num>     PTS increment for each video frame\n");
@@ -3035,10 +3035,10 @@ static void print_usage() {
   log_info("  --qpinit <num>      Initial quantization level\n");
   log_info("  --dquant <num>      Slice DQuant level\n");
   log_info(" [audio]\n");
-  log_info("  -r, --samplerate    Audio sample rate (default: %d)\n", audio_sample_rate_default);
-  log_info("  -a, --audiobitrate  Audio bit rate (default: %ld)\n", audio_bitrate_default);
   log_info("  -c, --channels <num>  Audio channels (1=mono, 2=stereo)\n");
-  log_info("                      Default is 1, then 2 if it fails.");
+  log_info("                      Default is mono. If it fails, stereo is used.\n");
+  log_info("  -r, --samplerate <num>  Audio sample rate (default: %d)\n", audio_sample_rate_default);
+  log_info("  -a, --audiobitrate <num>  Audio bit rate (default: %ld)\n", audio_bitrate_default);
   log_info("  --alsadev <dev>     ALSA microphone device (default: %s)\n", alsa_dev_default);
   log_info("  --volume <num>      Amplify audio by multiplying the volume by <num>\n");
   log_info("                      (default: %.1f)\n", audio_volume_multiply_default);
