@@ -216,6 +216,7 @@ If you do not have /opt/vc/src/ directory, download the firmware from https://gi
 
 ## Build picam
 
+    $ cd (to anywhere you like)
     $ git clone https://github.com/iizukanao/picam.git
     $ cd picam
     $ make
