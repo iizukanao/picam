@@ -50,7 +50,7 @@ extern "C" {
 // Audio-only stream is created if this is 1 (for debugging)
 #define AUDIO_ONLY 0
 
-// ALSA buffer size (frames) is multiplied by this number
+// ALSA buffer size (frames) is multiplied by this number by default
 #define ALSA_BUFFER_MULTIPLY 100
 
 // If this is 1, PTS will be reset to zero when it exceeds PTS_MODULO
@@ -1457,10 +1457,21 @@ static int configure_audio_capture_device() {
   }
 
   // set the buffer size
+  int alsa_buffer_multiply = ALSA_BUFFER_MULTIPLY;
   err = snd_pcm_hw_params_set_buffer_size(capture_handle, hw_params,
-      buffer_size * ALSA_BUFFER_MULTIPLY);
+      buffer_size * alsa_buffer_multiply);
+  while (err < 0) {
+    log_debug("failed to set buffer size for microphone: buffer_size=%d multiply=%d\n", buffer_size, alsa_buffer_multiply);
+    alsa_buffer_multiply /= 2;
+    if (alsa_buffer_multiply == 0) {
+      break;
+    }
+    log_debug("trying smaller buffer size for microphone: buffer_size=%d multiply=%d\n", buffer_size, alsa_buffer_multiply);
+    err = snd_pcm_hw_params_set_buffer_size(capture_handle, hw_params,
+        buffer_size * alsa_buffer_multiply);
+  }
   if (err < 0) {
-    log_fatal("error: failed to set buffer size for microphone (%s)\n", snd_strerror(err));
+    log_fatal("error: failed to set buffer size for microphone: buffer_size=%d multiply=%d (%s)\n", buffer_size, alsa_buffer_multiply, snd_strerror(err));
     exit(EXIT_FAILURE);
   }
 
@@ -1470,7 +1481,7 @@ static int configure_audio_capture_device() {
     log_fatal("error: failed to get buffer size from microphone (%s)\n", snd_strerror(err));
     exit(EXIT_FAILURE);
   }
-  log_debug("microphone: buffer size: %d frames\n", (int)real_buffer_size);
+  log_debug("microphone: buffer size: %d frames (buffer_size=%d multiply=%d)\n", (int)real_buffer_size, buffer_size, alsa_buffer_multiply);
 
   dir = 0;
   // set the period size
