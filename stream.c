@@ -494,9 +494,9 @@ void setup_av_frame(AVFormatContext *format_ctx) {
   audio_codec_ctx = format_ctx->streams[1]->codec;
 #endif
 
-  av_frame = avcodec_alloc_frame();
+  av_frame = av_frame_alloc();
   if (!av_frame) {
-    log_error("error: avcodec_alloc_frame failed\n");
+    log_error("error: av_frame_alloc failed\n");
     exit(EXIT_FAILURE);
   }
 
