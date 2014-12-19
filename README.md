@@ -3,10 +3,10 @@
 ### Features
 
 - Capture video from Raspberry Pi Camera (up to 720p) and encode it to H.264 using hardware encoder
-- Capture audio from USB microphone via ALSA and encode it to AAC-LC using libavcodec (FFmpeg)
+- Capture audio from USB microphone or Wolfson Audio Card via ALSA and encode it to AAC-LC using libavcodec (FFmpeg)
 - Record audio/video to MPEG-TS files
 - Generate files for HTTP Live Streaming with optional encryption
-- If USB microphone is not available, it only records the video
+- If microphone is not available, it only records the video
 
 
 ### Performance (Latency)
@@ -34,7 +34,7 @@ Tested with:
 
 - Raspberry Pi
 - Raspberry Pi Camera Board
-- USB microphone (see [Recommended hardware](#recommended-hardware))
+- USB microphone (see [Recommended hardware](#recommended-hardware)) or Wolfson Audio Card
 
 
 ### Supported operating systems
@@ -54,7 +54,7 @@ Alternatively, you can use [picam preinstalled Raspbian image](http://s.kyu-mu.n
 
 #### Finding ALSA device name
 
-First, find ALSA device name of your USB microphone.
+First, find ALSA device name of your microphone.
 
     $ arecord -l
     **** List of CAPTURE Hardware Devices ****
