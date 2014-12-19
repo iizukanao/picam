@@ -501,9 +501,16 @@ void setup_av_frame(AVFormatContext *format_ctx) {
   }
 
   av_frame->sample_rate = audio_codec_ctx->sample_rate;
+  log_debug("sample_rate: %d\n", audio_codec_ctx->sample_rate);
   av_frame->nb_samples = audio_codec_ctx->frame_size;
+  log_debug("nb_samples: %d\n", audio_codec_ctx->frame_size);
   av_frame->format = audio_codec_ctx->sample_fmt;
+  log_debug("sample_fmt: %d\n", audio_codec_ctx->sample_fmt);
   av_frame->channel_layout = audio_codec_ctx->channel_layout;
+  log_debug("audio_codec_ctx->channel_layout: %" PRIu64 "\n", audio_codec_ctx->channel_layout);
+  log_debug("av_frame->channel_layout: %" PRIu64 "\n", av_frame->channel_layout);
+  log_debug("audio_codec_ctx->channels: %d\n", audio_codec_ctx->channels);
+  log_debug("av_frame->channels: %d\n", av_frame->channels);
 
   buffer_size = av_samples_get_buffer_size(NULL, audio_codec_ctx->channels,
       audio_codec_ctx->frame_size, audio_codec_ctx->sample_fmt, 0);
@@ -512,6 +519,7 @@ void setup_av_frame(AVFormatContext *format_ctx) {
     log_error("error: av_malloc for samples failed\n");
     exit(EXIT_FAILURE);
   }
+  log_debug("allocated %d bytes for audio samples\n", buffer_size);
 #if AUDIO_BUFFER_CHUNKS > 0
   int i;
   for (i = 0; i < AUDIO_BUFFER_CHUNKS; i++) {
