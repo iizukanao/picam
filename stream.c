@@ -3820,7 +3820,7 @@ int main(int argc, char **argv) {
   // the duration of the Playlist file minus the duration of the segment
   // is less than three times the target duration.
   //
-  // So, 3 should be set as num_recent_files.
+  // So, num_recent_files should be 3 at the minimum.
 #if AUDIO_ONLY
   hls = hls_create_audio_only(2, &codec_settings); // 2 == num_recent_files
 #else
