@@ -308,6 +308,7 @@ static int access_unit_delimiter_length = 6;
 
 // sound
 static snd_pcm_t *capture_handle;
+static snd_pcm_hw_params_t *alsa_hw_params;
 static uint16_t *samples;
 static AVFrame *av_frame;
 static int audio_fd_count;
@@ -1360,79 +1361,28 @@ static int open_audio_capture_device() {
   return 0;
 }
 
-static int configure_audio_capture_device() {
-  // ALSA
+// Configure the microphone before main setup
+static void preconfigure_microphone() {
   int err;
-  snd_pcm_hw_params_t *hw_params;
 
-  // libavcodec
-#if AUDIO_ONLY
-  AVCodecContext *ctx = hls->format_ctx->streams[0]->codec;
-#else
-  AVCodecContext *ctx = hls->format_ctx->streams[1]->codec;
-#endif
-  int buffer_size;
-
-  // ALSA poll mmap
-  snd_pcm_uframes_t real_buffer_size; // real buffer size in frames
-  int dir;
-
-  buffer_size = av_samples_get_buffer_size(NULL, ctx->channels,
-      ctx->frame_size, ctx->sample_fmt, 0);
-
-  err = snd_pcm_hw_params_malloc(&hw_params);
+  // allocate an invalid snd_pcm_hw_params_t using standard malloc
+  err = snd_pcm_hw_params_malloc(&alsa_hw_params);
   if (err < 0) {
     log_fatal("error: cannot allocate hardware parameter structure (%s)\n",
         snd_strerror(err));
     exit(EXIT_FAILURE);
   }
 
-  err = snd_pcm_hw_params_any(capture_handle, hw_params);
+  // fill hw_params with a full configuration space for a PCM.
+  err = snd_pcm_hw_params_any(capture_handle, alsa_hw_params);
   if (err < 0) {
     log_fatal("error: cannot initialize hardware parameter structure (%s)\n",
         snd_strerror(err));
     exit(EXIT_FAILURE);
   }
 
-  // use mmap
-  err = snd_pcm_hw_params_set_access(capture_handle, hw_params,
-      SND_PCM_ACCESS_MMAP_INTERLEAVED);
-  if (err < 0) {
-    log_fatal("error: cannot set access type (%s)\n", snd_strerror(err));
-    exit(EXIT_FAILURE);
-  }
-
-  // SND_PCM_FORMAT_S16_LE => PCM 16 bit signed little endian
-  err = snd_pcm_hw_params_set_format(capture_handle, hw_params, SND_PCM_FORMAT_S16_LE);
-  if (err < 0) {
-    log_fatal("error: cannot set sample format (%s)\n", snd_strerror(err));
-    exit(EXIT_FAILURE);
-  }
-
-  // set the sample rate
-  unsigned int rate = audio_sample_rate;
-  err = snd_pcm_hw_params_set_rate_near(capture_handle, hw_params, &rate, 0);
-  if (err < 0) {
-    log_fatal("error: cannot set sample rate (%s)\n", snd_strerror(err));
-    exit(EXIT_FAILURE);
-  }
-
-  unsigned int actual_rate;
-  int actual_dir;
-  err = snd_pcm_hw_params_get_rate(hw_params, &actual_rate, &actual_dir);
-  if (err < 0) {
-    log_fatal("error: failed to get sample rate from microphone (%s)\n", snd_strerror(err));
-    exit(EXIT_FAILURE);
-  }
-  log_debug("actual sample rate=%u dir=%d\n", actual_rate, actual_dir);
-  if (actual_rate != audio_sample_rate) {
-    log_fatal("error: failed to set sample rate for microphone to %d (got %d)\n",
-        audio_sample_rate, actual_rate);
-    exit(EXIT_FAILURE);
-  }
-
   // set the number of channels
-  err = snd_pcm_hw_params_set_channels(capture_handle, hw_params, audio_channels);
+  err = snd_pcm_hw_params_set_channels(capture_handle, alsa_hw_params, audio_channels);
   if (err < 0) {
     if (audio_channels == 1) {
       if (is_audio_channels_specified) {
@@ -1449,16 +1399,74 @@ static int configure_audio_capture_device() {
       }
       audio_channels = 1;
     }
-    err = snd_pcm_hw_params_set_channels(capture_handle, hw_params, audio_channels);
+    err = snd_pcm_hw_params_set_channels(capture_handle, alsa_hw_params, audio_channels);
     if (err < 0) {
       log_fatal("error: cannot set channel count for microphone (%s)\n", snd_strerror(err));
       exit(EXIT_FAILURE);
     }
   }
+  log_debug("final audio_channels: %d\n", audio_channels);
+}
+
+static int configure_audio_capture_device() {
+  // ALSA
+  int err;
+
+  // libavcodec
+#if AUDIO_ONLY
+  AVCodecContext *ctx = hls->format_ctx->streams[0]->codec;
+#else
+  AVCodecContext *ctx = hls->format_ctx->streams[1]->codec;
+#endif
+  int buffer_size;
+
+  // ALSA poll mmap
+  snd_pcm_uframes_t real_buffer_size; // real buffer size in frames
+  int dir;
+
+  buffer_size = av_samples_get_buffer_size(NULL, ctx->channels,
+      ctx->frame_size, ctx->sample_fmt, 0);
+
+  // use mmap
+  err = snd_pcm_hw_params_set_access(capture_handle, alsa_hw_params,
+      SND_PCM_ACCESS_MMAP_INTERLEAVED);
+  if (err < 0) {
+    log_fatal("error: cannot set access type (%s)\n", snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  // SND_PCM_FORMAT_S16_LE => PCM 16 bit signed little endian
+  err = snd_pcm_hw_params_set_format(capture_handle, alsa_hw_params, SND_PCM_FORMAT_S16_LE);
+  if (err < 0) {
+    log_fatal("error: cannot set sample format (%s)\n", snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  // set the sample rate
+  unsigned int rate = audio_sample_rate;
+  err = snd_pcm_hw_params_set_rate_near(capture_handle, alsa_hw_params, &rate, 0);
+  if (err < 0) {
+    log_fatal("error: cannot set sample rate (%s)\n", snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  unsigned int actual_rate;
+  int actual_dir;
+  err = snd_pcm_hw_params_get_rate(alsa_hw_params, &actual_rate, &actual_dir);
+  if (err < 0) {
+    log_fatal("error: failed to get sample rate from microphone (%s)\n", snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+  log_debug("actual sample rate=%u dir=%d\n", actual_rate, actual_dir);
+  if (actual_rate != audio_sample_rate) {
+    log_fatal("error: failed to set sample rate for microphone to %d (got %d)\n",
+        audio_sample_rate, actual_rate);
+    exit(EXIT_FAILURE);
+  }
 
   // set the buffer size
   int alsa_buffer_multiply = ALSA_BUFFER_MULTIPLY;
-  err = snd_pcm_hw_params_set_buffer_size(capture_handle, hw_params,
+  err = snd_pcm_hw_params_set_buffer_size(capture_handle, alsa_hw_params,
       buffer_size * alsa_buffer_multiply);
   while (err < 0) {
     log_debug("failed to set buffer size for microphone: buffer_size=%d multiply=%d\n", buffer_size, alsa_buffer_multiply);
@@ -1467,7 +1475,7 @@ static int configure_audio_capture_device() {
       break;
     }
     log_debug("trying smaller buffer size for microphone: buffer_size=%d multiply=%d\n", buffer_size, alsa_buffer_multiply);
-    err = snd_pcm_hw_params_set_buffer_size(capture_handle, hw_params,
+    err = snd_pcm_hw_params_set_buffer_size(capture_handle, alsa_hw_params,
         buffer_size * alsa_buffer_multiply);
   }
   if (err < 0) {
@@ -1476,16 +1484,17 @@ static int configure_audio_capture_device() {
   }
 
   // check the value of the buffer size
-  err = snd_pcm_hw_params_get_buffer_size(hw_params, &real_buffer_size);
+  err = snd_pcm_hw_params_get_buffer_size(alsa_hw_params, &real_buffer_size);
   if (err < 0) {
     log_fatal("error: failed to get buffer size from microphone (%s)\n", snd_strerror(err));
     exit(EXIT_FAILURE);
   }
-  log_debug("microphone: buffer size: %d frames (buffer_size=%d multiply=%d)\n", (int)real_buffer_size, buffer_size, alsa_buffer_multiply);
+  log_debug("microphone: buffer size: %d frames (channels=%d buffer_size=%d multiply=%d)\n", (int)real_buffer_size, audio_channels, buffer_size, alsa_buffer_multiply);
 
+  log_debug("microphone: setting period size to %d\n", period_size);
   dir = 0;
   // set the period size
-  err = snd_pcm_hw_params_set_period_size_near(capture_handle, hw_params,
+  err = snd_pcm_hw_params_set_period_size_near(capture_handle, alsa_hw_params,
       (snd_pcm_uframes_t *)&period_size, &dir);
   if (err < 0) {
     log_fatal("error: failed to set period size for microphone (%s)\n", snd_strerror(err));
@@ -1493,7 +1502,7 @@ static int configure_audio_capture_device() {
   }
 
   snd_pcm_uframes_t actual_period_size;
-  err = snd_pcm_hw_params_get_period_size(hw_params, &actual_period_size, &dir);
+  err = snd_pcm_hw_params_get_period_size(alsa_hw_params, &actual_period_size, &dir);
   if (err < 0) {
     log_fatal("error: failed to get period size from microphone (%s)\n", snd_strerror(err));
     exit(EXIT_FAILURE);
@@ -1501,14 +1510,14 @@ static int configure_audio_capture_device() {
   log_debug("actual_period_size=%lu dir=%d\n", actual_period_size, dir);
 
   // apply the hardware configuration
-  err = snd_pcm_hw_params (capture_handle, hw_params);
+  err = snd_pcm_hw_params (capture_handle, alsa_hw_params);
   if (err < 0) {
     log_fatal("error: cannot set PCM hardware parameters for microphone (%s)\n", snd_strerror(err));
     exit(EXIT_FAILURE);
   }
 
   // end of configuration
-  snd_pcm_hw_params_free (hw_params);
+  snd_pcm_hw_params_free(alsa_hw_params);
 
   err = snd_pcm_prepare(capture_handle);
   if (err < 0) {
@@ -2741,8 +2750,9 @@ static int read_audio_poll_mmap() {
       }
       is_first_audio = 1;
     } 
-    memcpy(this_samples + read_size, (my_areas[0].addr)+(offset*sizeof(short)*audio_channels), frames*sizeof(short)*audio_channels);
-    read_size += frames;
+    size_t copy_size = frames * sizeof(short) * audio_channels;
+    memcpy(this_samples + read_size, (my_areas[0].addr)+(offset*sizeof(short)*audio_channels), copy_size);
+    read_size += copy_size;
 
     commitres = snd_pcm_mmap_commit(capture_handle, offset, frames);
     if (commitres < 0 || (snd_pcm_uframes_t)commitres != frames) {
@@ -3727,11 +3737,6 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
-  codec_settings.audio_sample_rate = audio_sample_rate;
-  codec_settings.audio_bit_rate = audio_bitrate;
-  codec_settings.audio_channels = audio_channels;
-  codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
-
   create_dir(rec_dir);
   create_dir(rec_tmp_dir);
   create_dir(rec_archive_dir);
@@ -3796,7 +3801,17 @@ int main(int argc, char **argv) {
   }
 
   if (disable_audio_capturing) {
+    audio_channels = 1;
+    codec_settings.audio_sample_rate = audio_sample_rate;
     codec_settings.audio_bit_rate = 1000;
+    codec_settings.audio_channels = audio_channels;
+    codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
+  } else {
+    preconfigure_microphone();
+    codec_settings.audio_sample_rate = audio_sample_rate;
+    codec_settings.audio_bit_rate = audio_bitrate;
+    codec_settings.audio_channels = audio_channels;
+    codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
   }
 
   // From http://tools.ietf.org/html/draft-pantos-http-live-streaming-12#section-6.2.1
