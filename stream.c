@@ -194,7 +194,7 @@ static const char *state_dir_default = "state";
 static char hooks_dir[256];
 static const char *hooks_dir_default = "hooks";
 static float audio_volume_multiply;
-static const float audio_volume_multiply_default = 1.0;
+static const float audio_volume_multiply_default = 1.0f;
 static int audio_min_value;
 static int audio_max_value;
 static int is_hls_encryption_enabled;
@@ -2765,7 +2765,7 @@ static int read_audio_poll_mmap() {
     size -= frames; // needed in the condition of the while loop to check if period is filled
   }
 
-  if (audio_volume_multiply != 1.0) {
+  if (audio_volume_multiply != 1.0f) {
     int total_samples = period_size * audio_channels;
     int i;
     for (i = 0; i < total_samples; i++) {
