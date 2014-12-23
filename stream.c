@@ -361,6 +361,8 @@ static int is_camera_finished = 0;
 static pthread_mutex_t camera_finish_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t camera_finish_cond = PTHREAD_COND_INITIALIZER;
 
+static char errbuf[1024];
+
 static void unmute_audio() {
   log_info("unmute");
   is_audio_muted = 0;
@@ -428,7 +430,8 @@ static int write_encoded_packets(int max_packets, int origin_pts) {
     avpkt.flags = enc_pkt->flags;
     ret = av_write_frame(rec_format_ctx, &avpkt);
     if (ret < 0) {
-      log_error("error: write_encoded_packets: av_write_frame: ret=%d\n", ret);
+      av_strerror(ret, errbuf, sizeof(errbuf));
+      log_error("error: write_encoded_packets: av_write_frame: %s\n", errbuf);
     }
     if (++rec_thread_frame == encoded_packets_size) {
       rec_thread_frame = 0;
@@ -538,7 +541,8 @@ void setup_av_frame(AVFormatContext *format_ctx) {
   ret = avcodec_fill_audio_frame(av_frame, audio_codec_ctx->channels, audio_codec_ctx->sample_fmt,
       (const uint8_t*)samples, buffer_size, 0);
   if (ret < 0) {
-    log_error("error: avcodec_fill_audio_frame failed: ret=%d\n", ret);
+    av_strerror(ret, errbuf, sizeof(errbuf));
+    log_error("error: avcodec_fill_audio_frame failed: %s\n", errbuf);
     exit(EXIT_FAILURE);
   }
 }
@@ -1199,7 +1203,8 @@ static int send_keyframe(uint8_t *data, size_t data_len, int consume_time) {
     ret = hls_write_packet(hls, &pkt, split);
     pthread_mutex_unlock(&mutex_writing);
     if (ret < 0) {
-      log_error("keyframe write error (hls): %d\n", ret);
+      av_strerror(ret, errbuf, sizeof(errbuf));
+      log_error("keyframe write error (hls): %s\n", errbuf);
       log_error("please check if the disk is full\n");
     }
   }
@@ -1278,7 +1283,8 @@ static int send_pframe(uint8_t *data, size_t data_len, int consume_time) {
     ret = hls_write_packet(hls, &pkt, 0);
     pthread_mutex_unlock(&mutex_writing);
     if (ret < 0) {
-      log_error("P frame write error (hls): %d\n", ret);
+      av_strerror(ret, errbuf, sizeof(errbuf));
+      log_error("P frame write error (hls): %s\n", errbuf);
       log_error("please check if the disk is full\n");
     }
   }
@@ -1572,7 +1578,8 @@ static void teardown_audio_encode() {
     ret = avcodec_encode_audio2(ctx, &pkt, NULL, &got_output);
     av_free_packet(&pkt);
     if (ret < 0) {
-      log_error("error encoding frame\n");
+      av_strerror(ret, errbuf, sizeof(errbuf));
+      log_error("error encoding frame: %s\n", errbuf);
       break;
     }
   }
@@ -2621,7 +2628,8 @@ static void encode_and_send_audio() {
   // encode the samples
   ret = avcodec_encode_audio2(ctx, &pkt, av_frame, &got_output);
   if (ret < 0) {
-    log_error("error encoding audio frame\n");
+    av_strerror(ret, errbuf, sizeof(errbuf));
+    log_error("error encoding audio frame: %s\n", errbuf);
     exit(EXIT_FAILURE);
   }
   if (got_output) {
@@ -2682,7 +2690,8 @@ static void encode_and_send_audio() {
       ret = hls_write_packet(hls, &pkt, 0);
       pthread_mutex_unlock(&mutex_writing);
       if (ret < 0) {
-        log_error("audio frame write error (hls): %d\n", ret);
+        av_strerror(ret, errbuf, sizeof(errbuf));
+        log_error("audio frame write error (hls): %s\n", errbuf);
         log_error("please check if the disk is full\n");
       }
     }

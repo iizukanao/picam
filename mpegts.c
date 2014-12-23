@@ -5,6 +5,7 @@
 static long video_bitrate;
 static int video_width;
 static int video_height;
+static char errbuf[1024];
 
 void mpegts_set_config(long bitrate, int width, int height) {
   video_bitrate = bitrate;
@@ -60,6 +61,7 @@ void setup_audio_stream(AVFormatContext *format_ctx, MpegTSCodecSettings *settin
   AVCodec *aac_codec;
   AVCodecContext *audio_codec_ctx = NULL;
   AVStream *audio_stream;
+  int ret;
 
   aac_codec = avcodec_find_encoder(AV_CODEC_ID_AAC);
   if (!aac_codec) {
@@ -96,8 +98,10 @@ void setup_audio_stream(AVFormatContext *format_ctx, MpegTSCodecSettings *settin
   }
   audio_codec_ctx->channels = av_get_channel_layout_nb_channels(audio_codec_ctx->channel_layout);
 
-  if (avcodec_open2(audio_codec_ctx, aac_codec, NULL) < 0) {
-    fprintf(stderr, "avcodec_open failed\n");
+  ret = avcodec_open2(audio_codec_ctx, aac_codec, NULL);
+  if (ret < 0) {
+    av_strerror(ret, errbuf, sizeof(errbuf));
+    fprintf(stderr, "avcodec_open2 failed: %s\n", errbuf);
     exit(EXIT_FAILURE);
   }
 }
@@ -120,6 +124,8 @@ void mpegts_close_stream_without_trailer(AVFormatContext *format_ctx) {
 }
 
 void mpegts_open_stream(AVFormatContext *format_ctx, char *outputfilename, int dump_format) {
+  int ret;
+
   if (dump_format) {
     av_dump_format(format_ctx, 0, outputfilename, 1);
   }
@@ -128,8 +134,10 @@ void mpegts_open_stream(AVFormatContext *format_ctx, char *outputfilename, int d
     outputfilename = "pipe:1";
   }
 
-  if (avio_open(&format_ctx->pb, outputfilename, AVIO_FLAG_WRITE) < 0) {
-    fprintf(stderr, "avio_open for %s failed\n", outputfilename);
+  ret = avio_open(&format_ctx->pb, outputfilename, AVIO_FLAG_WRITE);
+  if (ret < 0) {
+    av_strerror(ret, errbuf, sizeof(errbuf));
+    fprintf(stderr, "avio_open for %s failed: %s\n", outputfilename, errbuf);
     exit(EXIT_FAILURE);
   }
 
@@ -140,6 +148,8 @@ void mpegts_open_stream(AVFormatContext *format_ctx, char *outputfilename, int d
 }
 
 void mpegts_open_stream_without_header(AVFormatContext *format_ctx, char *outputfilename, int dump_format) {
+  int ret;
+
   if (dump_format) {
     av_dump_format(format_ctx, 0, outputfilename, 1);
   }
@@ -148,8 +158,10 @@ void mpegts_open_stream_without_header(AVFormatContext *format_ctx, char *output
     outputfilename = "pipe:1";
   }
 
-  if (avio_open(&format_ctx->pb, outputfilename, AVIO_FLAG_WRITE) < 0) {
-    fprintf(stderr, "avio_open for %s failed\n", outputfilename);
+  ret = avio_open(&format_ctx->pb, outputfilename, AVIO_FLAG_WRITE);
+  if (ret < 0) {
+    av_strerror(ret, errbuf, sizeof(errbuf));
+    fprintf(stderr, "avio_open for %s failed: %s\n", outputfilename, errbuf);
     exit(EXIT_FAILURE);
   }
 }
