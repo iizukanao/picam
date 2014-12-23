@@ -3015,7 +3015,6 @@ static void setup_tcp_output() {
 static void teardown_tcp_output() {
   mpegts_close_stream(tcp_ctx);
   mpegts_destroy_context(tcp_ctx);
-  pthread_mutex_destroy(&tcp_mutex);
   avformat_network_deinit();
 }
 
@@ -3943,6 +3942,7 @@ int main(int argc, char **argv) {
   pthread_mutex_destroy(&rec_mutex);
   pthread_mutex_destroy(&rec_write_mutex);
   pthread_mutex_destroy(&camera_finish_mutex);
+  pthread_mutex_destroy(&tcp_mutex);
   pthread_cond_destroy(&rec_cond);
   pthread_cond_destroy(&camera_finish_cond);
 
