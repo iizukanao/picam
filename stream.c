@@ -3762,10 +3762,6 @@ int main(int argc, char **argv) {
 
   setup_socks();
 
-  if (is_tcpout_enabled) {
-    setup_tcp_output();
-  }
-
   if (is_preview_enabled || is_clock_enabled) {
     memset(tunnel, 0, sizeof(tunnel));
   }
@@ -3820,6 +3816,10 @@ int main(int argc, char **argv) {
     codec_settings.audio_bit_rate = audio_bitrate;
     codec_settings.audio_channels = audio_channels;
     codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
+  }
+
+  if (is_tcpout_enabled) {
+    setup_tcp_output();
   }
 
   // From http://tools.ietf.org/html/draft-pantos-http-live-streaming-12#section-6.2.1
