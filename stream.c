@@ -3016,6 +3016,7 @@ static void teardown_tcp_output() {
   mpegts_close_stream(tcp_ctx);
   mpegts_destroy_context(tcp_ctx);
   pthread_mutex_destroy(&tcp_mutex);
+  avformat_network_deinit();
 }
 
 // Check if hls_output_dir is accessible.
