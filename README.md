@@ -115,7 +115,7 @@ To unmute microphone, create a file named `hooks/unmute`.
 #### Command options
 
     $ ./picam --help
-    picam version 1.2.5
+    picam version 1.2.6
     Usage: picam [options]
     
     Options:
