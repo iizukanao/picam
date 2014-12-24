@@ -7,7 +7,7 @@ To install:
 
 Edit /etc/default/picam to match your environment.
 
-To make picam starts automatically on boot:
+To start picam automatically on boot:
 
     $ sudo update-rc.d picam defaults
 
