@@ -1966,7 +1966,8 @@ static int openmax_cam_open() {
 
   // Set camera component to idle state
   if (ilclient_change_component_state(camera_component, OMX_StateIdle) == -1) {
-    log_fatal("error: failed to set camera to idle state (perhaps you need to reboot the machine)\n");
+    log_fatal("error: failed to set camera to idle state\n");
+    log_fatal("perhaps another program is using camera, otherwise you need to reboot this pi\n");
     exit(EXIT_FAILURE);
   }
 
