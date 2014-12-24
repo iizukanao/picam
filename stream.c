@@ -205,7 +205,15 @@ static uint8_t hls_encryption_key[16] = {
   0x75, 0xb0, 0xa8, 0x1d, 0xe1, 0x74, 0x87, 0xc8,
   0x8a, 0x47, 0x50, 0x7a, 0x7e, 0x1f, 0xdf, 0x73,
 };
+static uint8_t hls_encryption_key_default[16] = {
+  0x75, 0xb0, 0xa8, 0x1d, 0xe1, 0x74, 0x87, 0xc8,
+  0x8a, 0x47, 0x50, 0x7a, 0x7e, 0x1f, 0xdf, 0x73,
+};
 static uint8_t hls_encryption_iv[16] = {
+  0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
+  0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+};
+static uint8_t hls_encryption_iv_default[16] = {
   0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
   0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
 };
@@ -3096,11 +3104,11 @@ static void print_usage() {
   log_info("  --hlsenckeyuri <uri>  Set HLS encryption key URI (default: %s)\n", hls_encryption_key_uri_default);
   log_info("  --hlsenckey <hex>   Set HLS encryption key in hex string\n");
   log_info("                      (default: ");
-  log_hex(LOG_LEVEL_INFO, hls_encryption_key, sizeof(hls_encryption_key));
+  log_hex(LOG_LEVEL_INFO, hls_encryption_key_default, sizeof(hls_encryption_key_default));
   log_info(")\n");
   log_info("  --hlsenciv <hex>    Set HLS encryption IV in hex string\n");
   log_info("                      (default: ");
-  log_hex(LOG_LEVEL_INFO, hls_encryption_iv, sizeof(hls_encryption_iv));
+  log_hex(LOG_LEVEL_INFO, hls_encryption_iv_default, sizeof(hls_encryption_iv_default));
   log_info(")\n");
   log_info(" [output for node-rtsp-rtmp-server]\n");
   log_info("  --rtspout           Enable output for node-rtsp-rtmp-server\n");
