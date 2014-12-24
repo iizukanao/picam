@@ -1,0 +1,75 @@
+## Change this to prevent picam from being started as a system service (for
+## example, if you want to run it from a regular user account)
+START_PICAM=true
+
+## absolute path to picam directory
+PICAM_DIR=/home/pi/picam
+
+## absolute path to picam command
+PICAM_COMMAND=$PICAM_DIR/picam
+
+## user:group to run picam
+UGID="pi:pi"
+
+## pid file
+PIDFILE=/var/run/picam.pid
+
+## video frame rate
+VIDEO_FRAMERATE=30
+
+## image width in pixels
+VIDEO_WIDTH=1280
+
+## image height in pixels
+VIDEO_HEIGHT=720
+
+## image rotation in clockwise degrees
+VIDEO_ROTATION=0
+
+## flip image horizontally
+VIDEO_HORIZONTAL_FLIP=false
+
+## flip image vertically
+VIDEO_VERTICAL_FLIP=false
+
+## video stream bitrate in bits/s
+VIDEO_BITRATE=2000000
+
+## minimum quantization level for video encoding
+VIDEO_QPMIN="1"
+
+## maximum quantization level for video encoding
+VIDEO_QPMAX="24"
+
+## initial quantization level for video encoding
+VIDEO_QPINIT="1"
+
+## alsa device name
+ALSADEV="hw:0,0"
+
+## enable audio recording
+ENABLE_AUDIO=true
+
+## enable HTTP Live Streaming (HLS)
+ENABLE_HLS=false
+
+## directory to output HLS files
+HLS_DIR="/run/shm/hls"
+
+## enable encryption
+ENABLE_HLS_ENCRYPTION=true
+
+## encryption key file
+HLS_ENCRYPTION_KEY_FILE="enc.key"
+
+## create encryption key file in $HLS_DIR on startup
+HLS_CREATE_ENCRYPTION_KEY_FILE=true
+
+## HLS encryption key (hexstring)
+HLS_ENCRYPTION_KEY="000102030405060708090a0b0c0d0e0f"
+
+## HLS encryption initialization vector (hexstring)
+HLS_ENCRYPTION_IV="101112131415161718191a1b1c1d1e1f"
+
+## other command line options
+OTHER_OPTIONS=""
