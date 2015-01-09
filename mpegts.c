@@ -36,6 +36,8 @@ void setup_video_stream(AVFormatContext *format_ctx) {
 
   video_stream->time_base.num = 1;
   video_stream->time_base.den = 180000;
+  video_codec_ctx->time_base.num = 1;
+  video_codec_ctx->time_base.den = 180000;
   video_codec_ctx->ticks_per_frame = 2;
   video_codec_ctx->pix_fmt       = 0;
   video_codec_ctx->width         = video_width;
@@ -86,6 +88,8 @@ void setup_audio_stream(AVFormatContext *format_ctx, MpegTSCodecSettings *settin
 
   audio_stream->time_base.num = 1;
   audio_stream->time_base.den = settings->audio_sample_rate;
+  audio_codec_ctx->time_base.num = 1;
+  audio_codec_ctx->time_base.den = settings->audio_sample_rate;
   audio_codec_ctx->ticks_per_frame = 1;
   audio_codec_ctx->bit_rate = settings->audio_bit_rate;
   audio_codec_ctx->codec_type = AVMEDIA_TYPE_AUDIO;
