@@ -61,10 +61,6 @@ extern "C" {
 #define PTS_MODULO 8589934592
 #endif
 
-// Initial values for audio/video PTS
-#define AUDIO_PTS_START 0
-#define VIDEO_PTS_START 0
-
 // Internal flag indicates that audio is available for read
 #define AVAIL_AUDIO 2
 
@@ -185,10 +181,8 @@ static const int is_tcpout_enabled_default = 0;
 static char tcp_output_dest[256];
 static int is_auto_exposure_enabled;
 static const int is_auto_exposure_enabled_default = 0;
-static int exposure_night_y_threshold;
-static const int exposure_night_y_threshold_default = 40;
-static int exposure_auto_y_threshold;
-static const int exposure_auto_y_threshold_default = 50;
+static float auto_exposure_threshold;
+static const float auto_exposure_threshold_default = 5.0f;
 static char state_dir[256];
 static const char *state_dir_default = "state";
 static char hooks_dir[256];
@@ -261,7 +255,6 @@ void stop_record();
 
 static long long video_frame_count = 0;
 static long long audio_frame_count = 0;
-static int video_frame_advantage = 0;
 static int64_t video_start_time;
 static int64_t audio_start_time;
 static int is_video_recording_started = 0;
@@ -289,9 +282,6 @@ static AVFormatContext *tcp_ctx;
 static pthread_mutex_t tcp_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static int current_exposure_mode = EXPOSURE_AUTO;
-
-static long long previous_capture_frame = 0;
-static long long previous_previous_capture_frame = 0;
 
 static int keepRunning = 1;
 static int frame_count = 0;
@@ -985,13 +975,15 @@ static int64_t get_next_audio_pts() {
   return pts;
 }
 
-static int64_t get_video_pts_for_frame(int frame_number) {
-  // To play on QuickTime correctly, align PTS at regular intervals like this
-  return VIDEO_PTS_START +
-    (int64_t)((frame_number + video_frame_advantage) * (double)90000 / (double)video_fps);
+// Return next video PTS for variable frame rate
+static int64_t get_next_video_pts_vfr() {
+  video_frame_count++;
+  video_current_pts = audio_current_pts;
+  return video_current_pts;
 }
 
-static int64_t get_next_video_pts() {
+// Return next video PTS for constant frame rate
+static int64_t get_next_video_pts_cfr() {
   int64_t pts;
   video_frame_count++;
 
@@ -1038,6 +1030,15 @@ static int64_t get_next_video_pts() {
   video_current_pts = pts;
 
   return pts;
+}
+
+// Return next PTS for video stream
+static int64_t get_next_video_pts() {
+  if (is_auto_exposure_enabled) {
+    return get_next_video_pts_vfr();
+  } else {
+    return get_next_video_pts_cfr();
+  }
 }
 
 static int64_t get_next_audio_write_time() {
@@ -1165,7 +1166,7 @@ static int send_keyframe(uint8_t *data, size_t data_len, int consume_time) {
   if (consume_time) {
     pts = get_next_video_pts();
   } else {
-    pts = get_video_pts_for_frame(video_frame_count);
+    pts = video_current_pts;
   }
 
   send_video_frame(data, data_len, pts);
@@ -1255,7 +1256,7 @@ static int send_pframe(uint8_t *data, size_t data_len, int consume_time) {
   if (consume_time) {
     pts = get_next_video_pts();
   } else {
-    pts = get_video_pts_for_frame(video_frame_count);
+    pts = video_current_pts;
   }
 
   send_video_frame(data, data_len, pts);
@@ -1710,10 +1711,7 @@ static void set_exposure_to_night() {
   current_exposure_mode = EXPOSURE_NIGHT;
 }
 
-static void auto_select_exposure(int width, int height, uint8_t *data) {
-  if (previous_previous_capture_frame == 0) {
-    return;
-  }
+static void auto_select_exposure(int width, int height, uint8_t *data, float fps) {
   const int width32 = ((width + 31) & ~31); // nearest smaller number that is multiple of 32
   const int height16 = ((height + 15) & ~15); // nearest smaller number that is multiple of 16
   int i = width32 * height16 / 4; // * (3 / 2) / 6
@@ -1738,25 +1736,20 @@ static void auto_select_exposure(int width, int height, uint8_t *data) {
   if (count == 0) {
     return;
   }
-  int average_y = total_y / count;
+  float average_y = (float)total_y / (float)count;
 
-  int diff_frames = previous_capture_frame - previous_previous_capture_frame;
-  if (diff_frames > 2) {
-    diff_frames = 2;
-  }
-  if (diff_frames == 0) { // Avoid SIGFPE
-    return;
-  }
-  if (current_exposure_mode == EXPOSURE_NIGHT) {
-    average_y /= diff_frames;
-  }
-  log_debug("y=%d(%d) ", average_y, diff_frames);
-  if (average_y <= exposure_night_y_threshold) { // dark
+  // Approximate exposure time
+  float msec_per_frame = 1000.0f / fps;
+  float y_per_10msec = average_y * 10.0f / msec_per_frame;
+  log_debug(" y=%.1f", y_per_10msec);
+  if (y_per_10msec < auto_exposure_threshold) { // in the dark
     if (current_exposure_mode == EXPOSURE_AUTO) {
+      log_debug(" ");
       set_exposure_to_night();
     }
-  } else if (average_y >= exposure_auto_y_threshold) { // in the light
+  } else if (y_per_10msec >= auto_exposure_threshold) { // in the light
     if (current_exposure_mode == EXPOSURE_NIGHT) {
+      log_debug(" ");
       set_exposure_to_auto();
     }
   }
@@ -1791,8 +1784,6 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
           } else {
             log_debug(".");
             encode_and_send_image();
-            previous_previous_capture_frame = previous_capture_frame;
-            previous_capture_frame = video_frame_count;
           }
         }
       } else {
@@ -1839,7 +1830,6 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
 
 static int openmax_cam_open() {
   OMX_PARAM_PORTDEFINITIONTYPE cam_def;
-  OMX_CONFIG_FRAMERATETYPE framerate;
   OMX_ERRORTYPE error;
   OMX_PARAM_PORTDEFINITIONTYPE portdef;
   OMX_PARAM_TIMESTAMPMODETYPE timestamp_mode;
@@ -1889,7 +1879,12 @@ static int openmax_cam_open() {
   cam_def.format.video.nSliceHeight = (video_height+15)&~15;
 
   cam_def.format.video.eCompressionFormat = OMX_VIDEO_CodingUnused;
-  cam_def.format.video.xFramerate = fr_q16; // specify the frame rate in Q.16 (framerate * 2^16)
+  if (is_auto_exposure_enabled) {
+    log_debug("using variable frame rate\n");
+    cam_def.format.video.xFramerate = 0x0; // variable frame rate
+  } else {
+    cam_def.format.video.xFramerate = fr_q16; // specify the frame rate in Q.16 (framerate * 2^16)
+  }
 
   // This specifies the input pixel format.
   // See http://www.khronos.org/files/openmax_il_spec_1_0.pdf for details.
@@ -1900,19 +1895,6 @@ static int openmax_cam_open() {
       OMX_IndexParamPortDefinition, &cam_def);
   if (error != OMX_ErrorNone) {
     log_fatal("error: failed to set camera %d port definition: 0x%x\n", CAMERA_CAPTURE_PORT, error);
-    exit(EXIT_FAILURE);
-  }
-
-  // Set frame rate
-  memset(&framerate, 0, sizeof(OMX_CONFIG_FRAMERATETYPE));
-  framerate.nSize = sizeof(OMX_CONFIG_FRAMERATETYPE);
-  framerate.nVersion.nVersion = OMX_VERSION;
-  framerate.nPortIndex = CAMERA_CAPTURE_PORT; // capture port
-  framerate.xEncodeFramerate = fr_q16;
-  error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
-      OMX_IndexConfigVideoFramerate, &framerate);
-  if (error != OMX_ErrorNone) {
-    log_fatal("error: failed to set camera %d framerate: 0x%x\n", CAMERA_CAPTURE_PORT, error);
     exit(EXIT_FAILURE);
   }
 
@@ -2029,18 +2011,6 @@ static int openmax_cam_open() {
         OMX_IndexParamPortDefinition, &portdef);
     if (error != OMX_ErrorNone) {
       log_fatal("error: failed to set camera preview %d port definition: 0x%x\n", CAMERA_PREVIEW_PORT, error);
-      exit(EXIT_FAILURE);
-    }
-
-    memset(&framerate, 0, sizeof(OMX_CONFIG_FRAMERATETYPE));
-    framerate.nSize = sizeof(OMX_CONFIG_FRAMERATETYPE);
-    framerate.nVersion.nVersion = OMX_VERSION;
-    framerate.nPortIndex = CAMERA_PREVIEW_PORT;
-    framerate.xEncodeFramerate = fr_q16;
-    error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
-        OMX_IndexConfigVideoFramerate, &framerate);
-    if (error != OMX_ErrorNone) {
-      log_fatal("error: failed to set camera preview %d framerate: 0x%x\n", CAMERA_PREVIEW_PORT, error);
       exit(EXIT_FAILURE);
     }
 
@@ -2255,10 +2225,17 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
             fps = 1 / divisor;
           }
           log_debug(" %5.2f fps k=%d", fps, keyframes_count);
-          print_audio_timing();
-          log_debug("\n");
+          if (log_get_level() <= LOG_LEVEL_DEBUG) {
+            print_audio_timing();
+          }
           current_audio_frames = 0;
           frame_count = 0;
+
+          if (is_auto_exposure_enabled) {
+            auto_select_exposure(video_width, video_height, last_video_buffer, fps);
+          }
+
+          log_debug("\n");
         }
         clock_gettime(CLOCK_MONOTONIC, &tsBegin);
       } else { // inter frame
@@ -2610,12 +2587,6 @@ static void encode_and_send_image() {
       break;
       // If out->nFlags doesn't have ENDOFFRAME,
       // there is remaining buffer for this frame.
-    }
-  }
-
-  if (is_auto_exposure_enabled) {
-    if (video_frame_count > 0 && video_frame_count % (int)video_fps == 0) {
-      auto_select_exposure(video_width, video_height, last_video_buffer);
     }
   }
 }
@@ -3125,13 +3096,15 @@ static void print_usage() {
   log_info("  --tcpout <url>      Enable TCP output to <url>\n");
   log_info("                      (e.g. --tcpout tcp://127.0.0.1:8181)\n");
   log_info(" [camera]\n");
-  log_info("  --autoexposure      Enable automatic changing of exposure\n");
-  log_info("  --expnight <num>    Change the exposure to night mode if the average\n");
-  log_info("                      value of Y (brightness) is <= <num> while in\n");
-  log_info("                      daylight mode (default: %d)\n", exposure_night_y_threshold_default);
-  log_info("  --expday <num>      Change the exposure to daylight mode if the average\n");
-  log_info("                      value of Y (brightness) is >= <num> while in\n");
-  log_info("                      night mode (default: %d)\n", exposure_auto_y_threshold_default);
+  log_info("  --autoex            Enable automatic control of camera exposure between\n");
+  log_info("                      daylight and night modes. This forces variable frame rate.\n");
+  log_info("  --autoexthreshold <num>  When average value of Y (brightness) for\n");
+  log_info("                      10 milliseconds of captured image falls below <num>,\n");
+  log_info("                      camera exposure will change to night mode. Otherwise\n");
+  log_info("                      camera exposure is in daylight mode. Effective only if\n");
+  log_info("                      --autoex option is enabled. (default: %.1f)\n", auto_exposure_threshold_default);
+  log_info("                      If --verbose option is enabled as well, average value of\n");
+  log_info("                      Y is printed like y=28.0.\n");
   log_info("  -p, --preview       Display fullscreen preview\n");
   log_info("  --previewrect <x,y,width,height>\n");
   log_info("                      Display preview window at specified position\n");
@@ -3174,9 +3147,8 @@ int main(int argc, char **argv) {
     { "rtspaudiocontrol", required_argument, NULL, 0 },
     { "rtspaudiodata", required_argument, NULL, 0 },
     { "tcpout", required_argument, NULL, 0 },
-    { "autoexposure", no_argument, NULL, 0 },
-    { "expnight", required_argument, NULL, 0 },
-    { "expday", required_argument, NULL, 0 },
+    { "autoex", no_argument, NULL, 0 },
+    { "autoexthreshold", required_argument, NULL, 0 },
     { "statedir", required_argument, NULL, 0 },
     { "hooksdir", required_argument, NULL, 0 },
     { "volume", required_argument, NULL, 0 },
@@ -3231,8 +3203,7 @@ int main(int argc, char **argv) {
       sizeof(rtsp_audio_data_path));
   is_tcpout_enabled = is_tcpout_enabled_default;
   is_auto_exposure_enabled = is_auto_exposure_enabled_default;
-  exposure_night_y_threshold = exposure_night_y_threshold_default;
-  exposure_auto_y_threshold = exposure_auto_y_threshold_default;
+  auto_exposure_threshold = auto_exposure_threshold_default;
   strncpy(state_dir, state_dir_default, sizeof(state_dir));
   strncpy(hooks_dir, hooks_dir_default, sizeof(hooks_dir));
   audio_volume_multiply = audio_volume_multiply_default;
@@ -3338,34 +3309,17 @@ int main(int argc, char **argv) {
         } else if (strcmp(long_options[option_index].name, "tcpout") == 0) {
           is_tcpout_enabled = 1;
           strncpy(tcp_output_dest, optarg, sizeof(tcp_output_dest));
-        } else if (strcmp(long_options[option_index].name, "autoexposure") == 0) {
+        } else if (strcmp(long_options[option_index].name, "autoex") == 0) {
           is_auto_exposure_enabled = 1;
-        } else if (strcmp(long_options[option_index].name, "expnight") == 0) {
+        } else if (strcmp(long_options[option_index].name, "autoexthreshold") == 0) {
           char *end;
-          long value = strtol(optarg, &end, 10);
+          double value = strtod(optarg, &end);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
-            log_fatal("error: invalid expnight: %s\n", optarg);
+            log_fatal("error: invalid autoexthreshold: %s\n", optarg);
             print_usage();
             return EXIT_FAILURE;
           }
-          if (value < 0) {
-            log_fatal("error: invalid expnight: %ld (must be >= 0)\n", value);
-            return EXIT_FAILURE;
-          }
-          exposure_night_y_threshold = value;
-        } else if (strcmp(long_options[option_index].name, "expday") == 0) {
-          char *end;
-          long value = strtol(optarg, &end, 10);
-          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
-            log_fatal("error: invalid expday: %s\n", optarg);
-            print_usage();
-            return EXIT_FAILURE;
-          }
-          if (value < 0) {
-            log_fatal("error: invalid expday: %ld (must be >= 0)\n", value);
-            return EXIT_FAILURE;
-          }
-          exposure_auto_y_threshold = value;
+          auto_exposure_threshold = value;
         } else if (strcmp(long_options[option_index].name, "statedir") == 0) {
           strncpy(state_dir, optarg, sizeof(state_dir));
         } else if (strcmp(long_options[option_index].name, "hooksdir") == 0) {
@@ -3744,8 +3698,7 @@ int main(int argc, char **argv) {
   log_debug("tcp_enabled=%d\n", is_tcpout_enabled);
   log_debug("tcp_output_dest=%s\n", tcp_output_dest);
   log_debug("auto_exposure_enabled=%d\n", is_auto_exposure_enabled);
-  log_debug("exposure_night_y_threshold=%d\n", exposure_night_y_threshold);
-  log_debug("exposure_auto_y_threshold=%d\n", exposure_auto_y_threshold);
+  log_debug("auto_exposure_threshold=%f\n", auto_exposure_threshold);
   log_debug("is_preview_enabled=%d\n", is_preview_enabled);
   log_debug("is_previewrect_enabled=%d\n", is_previewrect_enabled);
   log_debug("preview_x=%d\n", preview_x);
