@@ -115,7 +115,7 @@ To unmute microphone, create a file named `hooks/unmute`.
 #### Command options
 
     $ ./picam --help
-    picam version 1.2.6
+    picam version 1.2.7
     Usage: picam [options]
     
     Options:
@@ -168,13 +168,15 @@ To unmute microphone, create a file named `hooks/unmute`.
       --tcpout <url>      Enable TCP output to <url>
                           (e.g. --tcpout tcp://127.0.0.1:8181)
      [camera]
-      --autoexposure      Enable automatic changing of exposure
-      --expnight <num>    Change the exposure to night mode if the average
-                          value of Y (brightness) is <= <num> while in
-                          daylight mode (default: 40)
-      --expday <num>      Change the exposure to daylight mode if the average
-                          value of Y (brightness) is >= <num> while in
-                          night mode (default: 50)
+      --autoex            Enable automatic control of camera exposure between
+                          daylight and night modes. This forces variable frame rate.
+      --autoexthreshold <num>  When average value of Y (brightness) for
+                          10 milliseconds of captured image falls below <num>,
+                          camera exposure will change to night mode. Otherwise
+                          camera exposure is in daylight mode. Effective only if
+                          --autoex option is enabled. (default: 5.0)
+                          If --verbose option is enabled as well, average value of
+                          Y is printed like y=28.0.
       -p, --preview       Display fullscreen preview
       --previewrect <x,y,width,height>
                           Display preview window at specified position
