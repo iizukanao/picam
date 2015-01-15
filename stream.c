@@ -94,6 +94,8 @@ static OMX_BUFFERHEADERTYPE *video_encode_input_buf = NULL;
 static OMX_U8 *video_encode_input_buf_pBuffer_orig = NULL;
 #endif
 
+#define ENABLE_AUTO_GOP_SIZE_CONTROL_FOR_VFR 1
+
 // OpenMAX IL ports
 static const int CAMERA_PREVIEW_PORT      = 70;
 static const int CAMERA_CAPTURE_PORT      = 71;
@@ -181,6 +183,8 @@ static const int is_tcpout_enabled_default = 0;
 static char tcp_output_dest[256];
 static int is_auto_exposure_enabled;
 static const int is_auto_exposure_enabled_default = 0;
+static int is_vfr_enabled; // whether variable frame rate is enabled
+static const int is_vfr_enabled_default = 0;
 static float auto_exposure_threshold;
 static const float auto_exposure_threshold_default = 5.0f;
 static char state_dir[256];
@@ -252,6 +256,9 @@ static void encode_and_send_image();
 static void encode_and_send_audio();
 void start_record();
 void stop_record();
+#if ENABLE_AUTO_GOP_SIZE_CONTROL_FOR_VFR
+static void set_gop_size(int gop_size);
+#endif
 
 static long long video_frame_count = 0;
 static long long audio_frame_count = 0;
@@ -356,6 +363,12 @@ static int is_audio_muted = 0;
 // Will be set to 1 when the camera finishes capturing
 static int is_camera_finished = 0;
 
+#if ENABLE_AUTO_GOP_SIZE_CONTROL_FOR_VFR
+// Variables for variable frame rate
+static int64_t last_keyframe_pts = 0;
+static int frames_since_last_keyframe = 0;
+#endif
+
 static pthread_mutex_t camera_finish_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t camera_finish_cond = PTHREAD_COND_INITIALIZER;
 
@@ -455,6 +468,14 @@ static void add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_
   }
   packet = encoded_packets[current_encoded_packet];
   if (packet != NULL) {
+    int next_keyframe_pointer = current_keyframe_pointer + 1;
+    if (next_keyframe_pointer >= record_buffer_keyframes) {
+      next_keyframe_pointer = 0;
+    }
+    if (current_encoded_packet == keyframe_pointers[next_keyframe_pointer]) {
+      log_warn("warning: Record buffer is starving. Recorded file may not start from keyframe. Try reducing the value of --gopsize.\n");
+    }
+
     av_free(packet->data);
   } else {
     packet = malloc(sizeof(EncodedPacket));
@@ -1034,9 +1055,9 @@ static int64_t get_next_video_pts_cfr() {
 
 // Return next PTS for video stream
 static int64_t get_next_video_pts() {
-  if (is_auto_exposure_enabled) {
+  if (is_vfr_enabled) { // variable frame rate
     return get_next_video_pts_vfr();
-  } else {
+  } else { // constant frame rate
     return get_next_video_pts_cfr();
   }
 }
@@ -1169,6 +1190,24 @@ static int send_keyframe(uint8_t *data, size_t data_len, int consume_time) {
     pts = video_current_pts;
   }
 
+#if ENABLE_AUTO_GOP_SIZE_CONTROL_FOR_VFR
+  if (is_vfr_enabled) {
+    int64_t pts_between_keyframes = pts - last_keyframe_pts;
+    if (pts_between_keyframes < 80000) { // < .89 seconds
+      // Frame rate is running faster than we thought
+      int ideal_video_gop_size = (frames_since_last_keyframe + 1)
+        * 90000.0f / pts_between_keyframes;
+      if (ideal_video_gop_size > video_gop_size) {
+        video_gop_size = ideal_video_gop_size;
+        log_debug("increase gop_size to %d ", ideal_video_gop_size);
+        set_gop_size(video_gop_size);
+      }
+    }
+    last_keyframe_pts = pts;
+    frames_since_last_keyframe = 0;
+  }
+#endif
+
   send_video_frame(data, data_len, pts);
 
 #if ENABLE_PTS_WRAP_AROUND
@@ -1258,6 +1297,24 @@ static int send_pframe(uint8_t *data, size_t data_len, int consume_time) {
   } else {
     pts = video_current_pts;
   }
+
+#if ENABLE_AUTO_GOP_SIZE_CONTROL_FOR_VFR
+  if (is_vfr_enabled) {
+    if (video_current_pts - last_keyframe_pts >= 100000) { // >= 1.11 seconds
+      // Frame rate is running slower than we thought
+      int ideal_video_gop_size = frames_since_last_keyframe;
+      if (ideal_video_gop_size == 0) {
+        ideal_video_gop_size = 1;
+      }
+      if (ideal_video_gop_size < video_gop_size) {
+        video_gop_size = ideal_video_gop_size;
+        log_debug("decrease gop_size to %d ", video_gop_size);
+        set_gop_size(video_gop_size);
+      }
+    }
+    frames_since_last_keyframe++;
+  }
+#endif
 
   send_video_frame(data, data_len, pts);
 
@@ -1673,6 +1730,31 @@ static void shutdown_openmax() {
   ilclient_destroy(ilclient);
 }
 
+#if ENABLE_AUTO_GOP_SIZE_CONTROL_FOR_VFR
+static void set_gop_size(int gop_size) {
+  OMX_VIDEO_CONFIG_AVCINTRAPERIOD avc_intra_period;
+  OMX_ERRORTYPE error;
+
+  memset(&avc_intra_period, 0, sizeof(OMX_VIDEO_CONFIG_AVCINTRAPERIOD));
+  avc_intra_period.nSize = sizeof(OMX_VIDEO_CONFIG_AVCINTRAPERIOD);
+  avc_intra_period.nVersion.nVersion = OMX_VERSION;
+  avc_intra_period.nPortIndex = VIDEO_ENCODE_OUTPUT_PORT;
+
+  // Distance between two IDR frames
+  avc_intra_period.nIDRPeriod = gop_size;
+
+  // It seems this value has no effect for the encoding.
+  avc_intra_period.nPFrames = gop_size;
+
+  error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
+      OMX_IndexConfigVideoAVCIntraPeriod, &avc_intra_period);
+  if (error != OMX_ErrorNone) {
+    log_fatal("error: failed to set video_encode %d AVC intra period: 0x%x\n", VIDEO_ENCODE_OUTPUT_PORT, error);
+    exit(EXIT_FAILURE);
+  }
+}
+#endif
+
 static void set_exposure_to_auto() {
   OMX_CONFIG_EXPOSURECONTROLTYPE exposure_type;
   OMX_ERRORTYPE error;
@@ -1879,7 +1961,7 @@ static int openmax_cam_open() {
   cam_def.format.video.nSliceHeight = (video_height+15)&~15;
 
   cam_def.format.video.eCompressionFormat = OMX_VIDEO_CodingUnused;
-  if (is_auto_exposure_enabled) {
+  if (is_vfr_enabled) {
     log_debug("using variable frame rate\n");
     cam_def.format.video.xFramerate = 0x0; // variable frame rate
   } else {
@@ -3097,7 +3179,8 @@ static void print_usage() {
   log_info("                      (e.g. --tcpout tcp://127.0.0.1:8181)\n");
   log_info(" [camera]\n");
   log_info("  --autoex            Enable automatic control of camera exposure between\n");
-  log_info("                      daylight and night modes. This forces variable frame rate.\n");
+  log_info("                      daylight and night modes. This forces variable\n");
+  log_info("                      frame rate and automatic control of GOP size.\n");
   log_info("  --autoexthreshold <num>  When average value of Y (brightness) for\n");
   log_info("                      10 milliseconds of captured image falls below <num>,\n");
   log_info("                      camera exposure will change to night mode. Otherwise\n");
@@ -3203,6 +3286,7 @@ int main(int argc, char **argv) {
       sizeof(rtsp_audio_data_path));
   is_tcpout_enabled = is_tcpout_enabled_default;
   is_auto_exposure_enabled = is_auto_exposure_enabled_default;
+  is_vfr_enabled = is_vfr_enabled_default;
   auto_exposure_threshold = auto_exposure_threshold_default;
   strncpy(state_dir, state_dir_default, sizeof(state_dir));
   strncpy(hooks_dir, hooks_dir_default, sizeof(hooks_dir));
@@ -3311,6 +3395,7 @@ int main(int argc, char **argv) {
           strncpy(tcp_output_dest, optarg, sizeof(tcp_output_dest));
         } else if (strcmp(long_options[option_index].name, "autoex") == 0) {
           is_auto_exposure_enabled = 1;
+          is_vfr_enabled = 1;
         } else if (strcmp(long_options[option_index].name, "autoexthreshold") == 0) {
           char *end;
           double value = strtod(optarg, &end);
@@ -3699,6 +3784,7 @@ int main(int argc, char **argv) {
   log_debug("tcp_output_dest=%s\n", tcp_output_dest);
   log_debug("auto_exposure_enabled=%d\n", is_auto_exposure_enabled);
   log_debug("auto_exposure_threshold=%f\n", auto_exposure_threshold);
+  log_debug("is_vfr_enabled=%d\n", is_vfr_enabled);
   log_debug("is_preview_enabled=%d\n", is_preview_enabled);
   log_debug("is_previewrect_enabled=%d\n", is_previewrect_enabled);
   log_debug("preview_x=%d\n", preview_x);
