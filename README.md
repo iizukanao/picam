@@ -169,7 +169,8 @@ To unmute microphone, create a file named `hooks/unmute`.
                           (e.g. --tcpout tcp://127.0.0.1:8181)
      [camera]
       --autoex            Enable automatic control of camera exposure between
-                          daylight and night modes. This forces variable frame rate.
+                          daylight and night modes. This forces variable
+                          frame rate and automatic control of GOP size.
       --autoexthreshold <num>  When average value of Y (brightness) for
                           10 milliseconds of captured image falls below <num>,
                           camera exposure will change to night mode. Otherwise
