@@ -3225,6 +3225,12 @@ static void print_usage() {
   log_info("  --ptsstep <num>     PTS increment for each video frame\n");
   log_info("                      Default value is calculated based on fps\n");
   log_info("  -g, --gopsize <num>  GOP size (default: same value as fps)\n");
+  log_info("  --vfr               Enable variable frame rate. Also, GOP size will be\n");
+  log_info("                      controlled automatically.\n");
+  log_info("  --minfps <num>      Minimum frames per second. Implies --vfr.\n");
+  log_info("                      It might not work if width / height >= 1.45.\n");
+  log_info("  --maxfps <num>      Maximum frames per second. Implies --vfr.\n");
+  log_info("                      It might not work if width / height >= 1.45.\n");
   log_info("  --rotation <num>    Image rotation in clockwise degrees\n");
   log_info("                      (0, 90, 180, 270)\n");
   log_info("  --hflip             Flip image horizontally\n");
@@ -3268,12 +3274,6 @@ static void print_usage() {
   log_info("  --tcpout <url>      Enable TCP output to <url>\n");
   log_info("                      (e.g. --tcpout tcp://127.0.0.1:8181)\n");
   log_info(" [camera]\n");
-  log_info("  --vfr               Enable variable frame rate. Also, GOP size will be\n");
-  log_info("                      controlled automatically.\n");
-  log_info("  --minfps <num>      Minimum frames per second. Implies --vfr.\n");
-  log_info("                      It might not work if width / height >= 1.45.\n");
-  log_info("  --maxfps <num>      Maximum frames per second. Implies --vfr.\n");
-  log_info("                      It might not work if width / height >= 1.45.\n");
   log_info("  --autoex            Enable automatic control of camera exposure between\n");
   log_info("                      daylight and night modes. This forces --vfr enabled.\n");
   log_info("  --autoexthreshold <num>  When average value of Y (brightness) for\n");
