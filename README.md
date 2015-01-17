@@ -129,6 +129,12 @@ To unmute microphone, create a file named `hooks/unmute`.
       --ptsstep <num>     PTS increment for each video frame
                           Default value is calculated based on fps
       -g, --gopsize <num>  GOP size (default: same value as fps)
+      --vfr               Enable variable frame rate. Also, GOP size will be
+                          controlled automatically.
+      --minfps <num>      Minimum frames per second. Implies --vfr.
+                          It might not work if width / height >= 1.45.
+      --maxfps <num>      Maximum frames per second. Implies --vfr.
+                          It might not work if width / height >= 1.45.
       --rotation <num>    Image rotation in clockwise degrees
                           (0, 90, 180, 270)
       --hflip             Flip image horizontally
@@ -168,12 +174,6 @@ To unmute microphone, create a file named `hooks/unmute`.
       --tcpout <url>      Enable TCP output to <url>
                           (e.g. --tcpout tcp://127.0.0.1:8181)
      [camera]
-      --vfr               Enable variable frame rate. Also, GOP size will be
-                          controlled automatically.
-      --minfps <num>      Minimum frames per second. Implies --vfr.
-                          It might not work if width / height >= 1.45.
-      --maxfps <num>      Maximum frames per second. Implies --vfr.
-                          It might not work if width / height >= 1.45.
       --autoex            Enable automatic control of camera exposure between
                           daylight and night modes. This forces --vfr enabled.
       --autoexthreshold <num>  When average value of Y (brightness) for
