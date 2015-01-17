@@ -2422,7 +2422,11 @@ static int video_encode_startup() {
   // Configure port 200 (video_encode input)
   portdef.format.video.nFrameWidth = video_width;
   portdef.format.video.nFrameHeight = video_height;
-  portdef.format.video.xFramerate = fr_q16; // specify the frame rate in Q.16 (framerate * 2^16)
+  if (is_vfr_enabled) {
+    portdef.format.video.xFramerate = 0x0; // variable frame rate
+  } else {
+    portdef.format.video.xFramerate = fr_q16; // specify the frame rate in Q.16 (framerate * 2^16)
+  }
   portdef.format.video.nBitrate = 0x0;
   portdef.format.video.nSliceHeight = portdef.format.video.nFrameHeight;
   portdef.format.video.nStride = portdef.format.video.nFrameWidth;
