@@ -3225,8 +3225,8 @@ static void print_usage() {
   log_info("  --ptsstep <num>     PTS increment for each video frame\n");
   log_info("                      Default value is calculated based on fps\n");
   log_info("  -g, --gopsize <num>  GOP size (default: same value as fps)\n");
-  log_info("  --vfr               Enable variable frame rate. Also, GOP size will be\n");
-  log_info("                      controlled automatically.\n");
+  log_info("  --vfr               Enable variable frame rate. GOP size will be\n");
+  log_info("                      dynamically controlled.\n");
   log_info("  --minfps <num>      Minimum frames per second. Implies --vfr.\n");
   log_info("                      It might not work if width / height >= 1.45.\n");
   log_info("  --maxfps <num>      Maximum frames per second. Implies --vfr.\n");
