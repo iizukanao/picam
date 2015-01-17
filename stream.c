@@ -3270,10 +3270,10 @@ static void print_usage() {
   log_info(" [camera]\n");
   log_info("  --vfr               Enable variable frame rate. Also, GOP size will be\n");
   log_info("                      controlled automatically.\n");
-  log_info("  --minfps <num>      Minimum frame rate per second. Implies --vfr.\n");
-  log_info("                      It might not work if width / height >= 1.45\n");
-  log_info("  --maxfps <num>      Maximum frame rate per second. Implies --vfr.\n");
-  log_info("                      It might not work if width / height >= 1.45\n");
+  log_info("  --minfps <num>      Minimum frames per second. Implies --vfr.\n");
+  log_info("                      It might not work if width / height >= 1.45.\n");
+  log_info("  --maxfps <num>      Maximum frames per second. Implies --vfr.\n");
+  log_info("                      It might not work if width / height >= 1.45.\n");
   log_info("  --autoex            Enable automatic control of camera exposure between\n");
   log_info("                      daylight and night modes. This forces --vfr enabled.\n");
   log_info("  --autoexthreshold <num>  When average value of Y (brightness) for\n");
@@ -3286,7 +3286,7 @@ static void print_usage() {
   log_info("  -p, --preview       Display fullscreen preview\n");
   log_info("  --previewrect <x,y,width,height>\n");
   log_info("                      Display preview window at specified position\n");
-  log_info("  --query             Query camera capabilities and exit\n");
+  log_info("  --query             Query camera capabilities then exit\n");
   log_info(" [misc]\n");
   log_info("  --recordbuf <num>   Start recording from <num> keyframes ago\n");
   log_info("                      (default: %d)\n", record_buffer_keyframes_default);
