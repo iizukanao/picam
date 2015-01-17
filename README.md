@@ -129,8 +129,8 @@ To unmute microphone, create a file named `hooks/unmute`.
       --ptsstep <num>     PTS increment for each video frame
                           Default value is calculated based on fps
       -g, --gopsize <num>  GOP size (default: same value as fps)
-      --vfr               Enable variable frame rate. Also, GOP size will be
-                          controlled automatically.
+      --vfr               Enable variable frame rate. GOP size will be
+                          dynamically controlled.
       --minfps <num>      Minimum frames per second. Implies --vfr.
                           It might not work if width / height >= 1.45.
       --maxfps <num>      Maximum frames per second. Implies --vfr.
