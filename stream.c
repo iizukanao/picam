@@ -371,6 +371,9 @@ static float min_fps = -1.0f;
 static float max_fps = -1.0f;
 #endif
 
+// Query camera capabilities and exit
+static int query_and_exit = 0;
+
 static pthread_mutex_t camera_finish_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t camera_finish_cond = PTHREAD_COND_INITIALIZER;
 
@@ -1756,6 +1759,47 @@ static void set_gop_size(int gop_size) {
   }
 }
 #endif
+
+static void query_sensor_mode() {
+  OMX_CONFIG_CAMERASENSORMODETYPE sensor_mode;
+  OMX_ERRORTYPE error;
+  int num_modes;
+  int i;
+
+  memset(&sensor_mode, 0, sizeof(OMX_CONFIG_CAMERASENSORMODETYPE));
+  sensor_mode.nSize = sizeof(OMX_CONFIG_CAMERASENSORMODETYPE);
+  sensor_mode.nVersion.nVersion = OMX_VERSION;
+  sensor_mode.nPortIndex = OMX_ALL;
+  sensor_mode.nModeIndex = 0;
+
+  error = OMX_GetParameter(ILC_GET_HANDLE(camera_component),
+      OMX_IndexConfigCameraSensorModes, &sensor_mode);
+  if (error != OMX_ErrorNone) {
+    log_error("error: failed to get camera sensor mode: 0x%x\n", error);
+    return;
+  }
+
+  num_modes = sensor_mode.nNumModes;
+  for (i = 0; i < num_modes; i++) {
+    log_info("\n[camera sensor mode %d]\n", i);
+    sensor_mode.nModeIndex = i;
+    error = OMX_GetParameter(ILC_GET_HANDLE(camera_component),
+        OMX_IndexConfigCameraSensorModes, &sensor_mode);
+    if (error != OMX_ErrorNone) {
+      log_error("error: failed to get camera sensor mode: 0x%x\n", error);
+      return;
+    }
+    log_info("nWidth: %u\n", sensor_mode.nWidth);
+    log_info("nHeight: %u\n", sensor_mode.nHeight);
+    log_info("nPaddingRight: %u\n", sensor_mode.nPaddingRight);
+    log_info("nPaddingDown: %u\n", sensor_mode.nPaddingDown);
+    log_info("eColorFormat: %d\n", sensor_mode.eColorFormat);
+    log_info("nFrameRateMax: %u (%.2f fps)\n",
+        sensor_mode.nFrameRateMax, sensor_mode.nFrameRateMax / 256.0f);
+    log_info("nFrameRateMin: %u (%.2f fps)\n",
+        sensor_mode.nFrameRateMin, sensor_mode.nFrameRateMin / 256.0f);
+  }
+}
 
 static void set_framerate_range(float min_fps, float max_fps) {
   OMX_PARAM_BRCMFRAMERATERANGETYPE framerate_range;
@@ -3242,6 +3286,7 @@ static void print_usage() {
   log_info("  -p, --preview       Display fullscreen preview\n");
   log_info("  --previewrect <x,y,width,height>\n");
   log_info("                      Display preview window at specified position\n");
+  log_info("  --query             Query camera capabilities and exit\n");
   log_info(" [misc]\n");
   log_info("  --recordbuf <num>   Start recording from <num> keyframes ago\n");
   log_info("                      (default: %d)\n", record_buffer_keyframes_default);
@@ -3286,6 +3331,7 @@ int main(int argc, char **argv) {
     { "maxfps", required_argument, NULL, 0 },
     { "autoex", no_argument, NULL, 0 },
     { "autoexthreshold", required_argument, NULL, 0 },
+    { "query", no_argument, NULL, 0 },
     { "statedir", required_argument, NULL, 0 },
     { "hooksdir", required_argument, NULL, 0 },
     { "volume", required_argument, NULL, 0 },
@@ -3489,6 +3535,8 @@ int main(int argc, char **argv) {
           }
           max_fps = value;
           is_vfr_enabled = 1;
+        } else if (strcmp(long_options[option_index].name, "query") == 0) {
+          query_and_exit = 1;
         } else if (strcmp(long_options[option_index].name, "statedir") == 0) {
           strncpy(state_dir, optarg, sizeof(state_dir));
         } else if (strcmp(long_options[option_index].name, "hooksdir") == 0) {
@@ -3887,29 +3935,31 @@ int main(int argc, char **argv) {
   log_debug("state_dir=%s\n", state_dir);
   log_debug("hooks_dir=%s\n", hooks_dir);
 
-  if (state_create_dir(state_dir) != 0) {
-    return EXIT_FAILURE;
+  if (!query_and_exit) {
+    if (state_create_dir(state_dir) != 0) {
+      return EXIT_FAILURE;
+    }
+    if (hooks_create_dir(hooks_dir) != 0) {
+      return EXIT_FAILURE;
+    }
+
+    create_dir(rec_dir);
+    create_dir(rec_tmp_dir);
+    create_dir(rec_archive_dir);
+
+    if (is_hlsout_enabled) {
+      ensure_hls_dir_exists();
+    }
+
+    state_set(state_dir, "record", "false");
+
+    if (clear_hooks(hooks_dir) != 0) {
+      log_error("error: clear_hooks() failed\n");
+    }
+    start_watching_hooks(&hooks_thread, hooks_dir, on_file_create, 1);
+
+    setup_socks();
   }
-  if (hooks_create_dir(hooks_dir) != 0) {
-    return EXIT_FAILURE;
-  }
-
-  create_dir(rec_dir);
-  create_dir(rec_tmp_dir);
-  create_dir(rec_archive_dir);
-
-  if (is_hlsout_enabled) {
-    ensure_hls_dir_exists();
-  }
-
-  state_set(state_dir, "record", "false");
-
-  if (clear_hooks(hooks_dir) != 0) {
-    log_error("error: clear_hooks() failed\n");
-  }
-  start_watching_hooks(&hooks_thread, hooks_dir, on_file_create, 1);
-
-  setup_socks();
 
   if (is_preview_enabled || is_clock_enabled) {
     memset(tunnel, 0, sizeof(tunnel));
@@ -3940,142 +3990,150 @@ int main(int argc, char **argv) {
 
   av_log_set_level(AV_LOG_INFO);
 
-  if (disable_audio_capturing) {
-    log_debug("audio capturing is disabled\n");
-  } else {
-    ret = open_audio_capture_device();
-    if (ret == -1) {
-      log_warn("warning: audio capturing is disabled\n");
-      disable_audio_capturing = 1;
-    } else if (ret < 0) {
-      log_fatal("error: init_audio failed: %d\n", ret);
-      exit(EXIT_FAILURE);
+  if (!query_and_exit) {
+    if (disable_audio_capturing) {
+      log_debug("audio capturing is disabled\n");
+    } else {
+      ret = open_audio_capture_device();
+      if (ret == -1) {
+        log_warn("warning: audio capturing is disabled\n");
+        disable_audio_capturing = 1;
+      } else if (ret < 0) {
+        log_fatal("error: init_audio failed: %d\n", ret);
+        exit(EXIT_FAILURE);
+      }
     }
-  }
 
-  if (disable_audio_capturing) {
-    audio_channels = 1;
-    codec_settings.audio_sample_rate = audio_sample_rate;
-    codec_settings.audio_bit_rate = 1000;
-    codec_settings.audio_channels = audio_channels;
-    codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
-  } else {
-    preconfigure_microphone();
-    codec_settings.audio_sample_rate = audio_sample_rate;
-    codec_settings.audio_bit_rate = audio_bitrate;
-    codec_settings.audio_channels = audio_channels;
-    codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
-  }
+    if (disable_audio_capturing) {
+      audio_channels = 1;
+      codec_settings.audio_sample_rate = audio_sample_rate;
+      codec_settings.audio_bit_rate = 1000;
+      codec_settings.audio_channels = audio_channels;
+      codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
+    } else {
+      preconfigure_microphone();
+      codec_settings.audio_sample_rate = audio_sample_rate;
+      codec_settings.audio_bit_rate = audio_bitrate;
+      codec_settings.audio_channels = audio_channels;
+      codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
+    }
 
-  if (is_tcpout_enabled) {
-    setup_tcp_output();
-  }
+    if (is_tcpout_enabled) {
+      setup_tcp_output();
+    }
 
-  // From http://tools.ietf.org/html/draft-pantos-http-live-streaming-12#section-6.2.1
-  //
-  // The server MUST NOT remove a media segment from the Playlist file if
-  // the duration of the Playlist file minus the duration of the segment
-  // is less than three times the target duration.
-  //
-  // So, num_recent_files should be 3 at the minimum.
+    // From http://tools.ietf.org/html/draft-pantos-http-live-streaming-12#section-6.2.1
+    //
+    // The server MUST NOT remove a media segment from the Playlist file if
+    // the duration of the Playlist file minus the duration of the segment
+    // is less than three times the target duration.
+    //
+    // So, num_recent_files should be 3 at the minimum.
 #if AUDIO_ONLY
-  hls = hls_create_audio_only(2, &codec_settings); // 2 == num_recent_files
+    hls = hls_create_audio_only(2, &codec_settings); // 2 == num_recent_files
 #else
-  hls = hls_create(2, &codec_settings); // 2 == num_recent_files
+    hls = hls_create(2, &codec_settings); // 2 == num_recent_files
 #endif
 
-  if (is_hlsout_enabled) {
-    hls->dir = hls_output_dir;
-    hls->target_duration = 1;
-    hls->num_retained_old_files = 10;
-    if (is_hls_encryption_enabled) {
-      hls->use_encryption = 1;
+    if (is_hlsout_enabled) {
+      hls->dir = hls_output_dir;
+      hls->target_duration = 1;
+      hls->num_retained_old_files = 10;
+      if (is_hls_encryption_enabled) {
+        hls->use_encryption = 1;
 
-      int uri_len = strlen(hls_encryption_key_uri) + 1;
-      hls->encryption_key_uri = malloc(uri_len);
-      if (hls->encryption_key_uri == NULL) {
-        perror("malloc for hls->encryption_key_uri");
-        return 1;
-      }
-      memcpy(hls->encryption_key_uri, hls_encryption_key_uri, uri_len);
+        int uri_len = strlen(hls_encryption_key_uri) + 1;
+        hls->encryption_key_uri = malloc(uri_len);
+        if (hls->encryption_key_uri == NULL) {
+          perror("malloc for hls->encryption_key_uri");
+          return 1;
+        }
+        memcpy(hls->encryption_key_uri, hls_encryption_key_uri, uri_len);
 
-      hls->encryption_key = malloc(16);
-      if (hls->encryption_key == NULL) {
-        perror("malloc for hls->encryption_key");
-        return 1;
-      }
-      memcpy(hls->encryption_key, hls_encryption_key, 16);
+        hls->encryption_key = malloc(16);
+        if (hls->encryption_key == NULL) {
+          perror("malloc for hls->encryption_key");
+          return 1;
+        }
+        memcpy(hls->encryption_key, hls_encryption_key, 16);
 
-      hls->encryption_iv = malloc(16);
-      if (hls->encryption_iv == NULL) {
-        perror("malloc for hls->encryption_iv");
-        return 1;
-      }
-      memcpy(hls->encryption_iv, hls_encryption_iv, 16);
-    } // if (enable_hls_encryption)
-  }
-
-  setup_av_frame(hls->format_ctx);
-
-  if (disable_audio_capturing) {
-    memset(samples, 0, period_size * sizeof(short) * audio_channels);
-    is_audio_recording_started = 1;
-  } else {
-    ret = configure_audio_capture_device();
-    if (ret != 0) {
-      log_fatal("error: configure_audio_capture_device: ret=%d\n", ret);
-      exit(EXIT_FAILURE);
+        hls->encryption_iv = malloc(16);
+        if (hls->encryption_iv == NULL) {
+          perror("malloc for hls->encryption_iv");
+          return 1;
+        }
+        memcpy(hls->encryption_iv, hls_encryption_iv, 16);
+      } // if (enable_hls_encryption)
     }
-  }
 
-  prepare_encoded_packets();
+    setup_av_frame(hls->format_ctx);
+
+    if (disable_audio_capturing) {
+      memset(samples, 0, period_size * sizeof(short) * audio_channels);
+      is_audio_recording_started = 1;
+    } else {
+      ret = configure_audio_capture_device();
+      if (ret != 0) {
+        log_fatal("error: configure_audio_capture_device: ret=%d\n", ret);
+        exit(EXIT_FAILURE);
+      }
+    }
+
+    prepare_encoded_packets();
+  }
 
   struct sigaction int_handler = {.sa_handler = stopSignalHandler};
   sigaction(SIGINT, &int_handler, NULL);
   sigaction(SIGTERM, &int_handler, NULL);
 
-  openmax_cam_loop();
-
-  if (disable_audio_capturing) {
-    pthread_create(&audio_nop_thread, NULL, audio_nop_loop, NULL);
-    pthread_join(audio_nop_thread, NULL);
+  if (query_and_exit) {
+    query_sensor_mode();
   } else {
-    log_debug("start capturing audio\n");
-    audio_loop_poll_mmap();
+    openmax_cam_loop();
+
+    if (disable_audio_capturing) {
+      pthread_create(&audio_nop_thread, NULL, audio_nop_loop, NULL);
+      pthread_join(audio_nop_thread, NULL);
+    } else {
+      log_debug("start capturing audio\n");
+      audio_loop_poll_mmap();
+    }
+
+    log_debug("shutdown sequence start\n");
+
+    if (is_recording) {
+      rec_thread_needs_write = 1;
+      pthread_cond_signal(&rec_cond);
+
+      stop_record();
+      pthread_join(rec_thread, NULL);
+    }
+
+    pthread_mutex_lock(&camera_finish_mutex);
+    // Wait for the camera to finish
+    while (!is_camera_finished) {
+      log_debug("waiting for the camera to finish\n");
+      pthread_cond_wait(&camera_finish_cond, &camera_finish_mutex);
+    }
+    pthread_mutex_unlock(&camera_finish_mutex);
   }
-
-  log_debug("shutdown sequence start\n");
-
-  if (is_recording) {
-    rec_thread_needs_write = 1;
-    pthread_cond_signal(&rec_cond);
-
-    stop_record();
-    pthread_join(rec_thread, NULL);
-  }
-
-  pthread_mutex_lock(&camera_finish_mutex);
-  // Wait for the camera to finish
-  while (!is_camera_finished) {
-    log_debug("waiting for the camera to finish\n");
-    pthread_cond_wait(&camera_finish_cond, &camera_finish_mutex);
-  }
-  pthread_mutex_unlock(&camera_finish_mutex);
 
   stop_openmax_capturing();
   shutdown_openmax();
   shutdown_video();
 
-  log_debug("teardown_audio_encode\n");
-  teardown_audio_encode();
+  if (!query_and_exit) {
+    log_debug("teardown_audio_encode\n");
+    teardown_audio_encode();
 
-  if (!disable_audio_capturing) {
-    log_debug("teardown_audio_capture_device\n");
-    teardown_audio_capture_device();
+    if (!disable_audio_capturing) {
+      log_debug("teardown_audio_capture_device\n");
+      teardown_audio_capture_device();
+    }
+
+    log_debug("hls_destroy\n");
+    hls_destroy(hls);
   }
-
-  log_debug("hls_destroy\n");
-  hls_destroy(hls);
 
   log_debug("pthread_mutex_destroy\n");
   pthread_mutex_destroy(&mutex_writing);
@@ -4086,25 +4144,27 @@ int main(int argc, char **argv) {
   pthread_cond_destroy(&rec_cond);
   pthread_cond_destroy(&camera_finish_cond);
 
-  if (is_tcpout_enabled) {
-    teardown_tcp_output();
+  if (!query_and_exit) {
+    if (is_tcpout_enabled) {
+      teardown_tcp_output();
+    }
+
+    log_debug("teardown_socks\n");
+    teardown_socks();
+
+    log_debug("free_encoded_packets\n");
+    free_encoded_packets();
+
+    log_debug("stop_watching_hooks\n");
+    stop_watching_hooks();
+    log_debug("pthread_join hooks_thread\n");
+    pthread_join(hooks_thread, NULL);
   }
 
-  log_debug("teardown_socks\n");
-  teardown_socks();
-
-  log_debug("free_encoded_packets\n");
-  free_encoded_packets();
   log_debug("free keyframe_pointers\n");
   free(keyframe_pointers);
 
-  log_debug("stop_watching_hooks\n");
-  stop_watching_hooks();
-  log_debug("pthread_join hooks_thread\n");
-  pthread_join(hooks_thread, NULL);
-
-  log_debug("shutdown successful");
-  log_info("\n");
+  log_debug("shutdown successful\n");
   return 0;
 }
 
