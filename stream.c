@@ -3279,8 +3279,8 @@ static void print_usage() {
   log_info("  --autoexthreshold <num>  When average value of Y (brightness) for\n");
   log_info("                      10 milliseconds of captured image falls below <num>,\n");
   log_info("                      camera exposure will change to night mode. Otherwise\n");
-  log_info("                      camera exposure is in daylight mode. Effective only if\n");
-  log_info("                      --autoex option is enabled. (default: %.1f)\n", auto_exposure_threshold_default);
+  log_info("                      camera exposure is in daylight mode. Implies --autoex.\n");
+  log_info("                      (default: %.1f)\n", auto_exposure_threshold_default);
   log_info("                      If --verbose option is enabled as well, average value of\n");
   log_info("                      Y is printed like y=28.0.\n");
   log_info("  -p, --preview       Display fullscreen preview\n");
@@ -3507,6 +3507,8 @@ int main(int argc, char **argv) {
             return EXIT_FAILURE;
           }
           auto_exposure_threshold = value;
+          is_auto_exposure_enabled = 1;
+          is_vfr_enabled = 1;
         } else if (strcmp(long_options[option_index].name, "minfps") == 0) {
           char *end;
           double value = strtod(optarg, &end);
