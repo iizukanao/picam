@@ -367,6 +367,8 @@ static int is_camera_finished = 0;
 // Variables for variable frame rate
 static int64_t last_keyframe_pts = 0;
 static int frames_since_last_keyframe = 0;
+static float min_fps = -1.0f;
+static float max_fps = -1.0f;
 #endif
 
 static pthread_mutex_t camera_finish_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -1755,6 +1757,41 @@ static void set_gop_size(int gop_size) {
 }
 #endif
 
+static void set_framerate_range(float min_fps, float max_fps) {
+  OMX_PARAM_BRCMFRAMERATERANGETYPE framerate_range;
+  OMX_ERRORTYPE error;
+
+  if (min_fps == -1.0f && max_fps == -1.0f) {
+    return;
+  }
+
+  memset(&framerate_range, 0, sizeof(OMX_PARAM_BRCMFRAMERATERANGETYPE));
+  framerate_range.nSize = sizeof(OMX_PARAM_BRCMFRAMERATERANGETYPE);
+  framerate_range.nVersion.nVersion = OMX_VERSION;
+  framerate_range.nPortIndex = CAMERA_CAPTURE_PORT;
+
+  error = OMX_GetParameter(ILC_GET_HANDLE(camera_component),
+      OMX_IndexParamBrcmFpsRange, &framerate_range);
+  if (error != OMX_ErrorNone) {
+    log_error("error: failed to get framerate range: 0x%x\n", error);
+    return;
+  }
+
+  if (min_fps != -1.0f) {
+    framerate_range.xFramerateLow = min_fps * 65536; // in Q16 format
+  }
+  if (max_fps != -1.0f) {
+    framerate_range.xFramerateHigh = max_fps * 65536; // in Q16 format
+  }
+
+  error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
+      OMX_IndexParamBrcmFpsRange, &framerate_range);
+  if (error != OMX_ErrorNone) {
+    log_error("error: failed to set framerate range: 0x%x\n", error);
+    return;
+  }
+}
+
 static void set_exposure_to_auto() {
   OMX_CONFIG_EXPOSURECONTROLTYPE exposure_type;
   OMX_ERRORTYPE error;
@@ -2930,6 +2967,11 @@ static void start_openmax_capturing() {
   if (is_clock_enabled) {
     start_openmax_clock();
   }
+
+  // set_framerate_range() is effective only after this point
+  if (is_vfr_enabled) {
+    set_framerate_range(min_fps, max_fps);
+  }
 }
 
 static void stop_openmax_capturing() {
@@ -3178,9 +3220,14 @@ static void print_usage() {
   log_info("  --tcpout <url>      Enable TCP output to <url>\n");
   log_info("                      (e.g. --tcpout tcp://127.0.0.1:8181)\n");
   log_info(" [camera]\n");
+  log_info("  --vfr               Enable variable frame rate. Also, GOP size will be\n");
+  log_info("                      controlled automatically.\n");
+  log_info("  --minfps <num>      Minimum frame rate per second. Implies --vfr.\n");
+  log_info("                      It might not work if width / height >= 1.45\n");
+  log_info("  --maxfps <num>      Maximum frame rate per second. Implies --vfr.\n");
+  log_info("                      It might not work if width / height >= 1.45\n");
   log_info("  --autoex            Enable automatic control of camera exposure between\n");
-  log_info("                      daylight and night modes. This forces variable\n");
-  log_info("                      frame rate and automatic control of GOP size.\n");
+  log_info("                      daylight and night modes. This forces --vfr enabled.\n");
   log_info("  --autoexthreshold <num>  When average value of Y (brightness) for\n");
   log_info("                      10 milliseconds of captured image falls below <num>,\n");
   log_info("                      camera exposure will change to night mode. Otherwise\n");
@@ -3230,6 +3277,9 @@ int main(int argc, char **argv) {
     { "rtspaudiocontrol", required_argument, NULL, 0 },
     { "rtspaudiodata", required_argument, NULL, 0 },
     { "tcpout", required_argument, NULL, 0 },
+    { "vfr", no_argument, NULL, 0 },
+    { "minfps", required_argument, NULL, 0 },
+    { "maxfps", required_argument, NULL, 0 },
     { "autoex", no_argument, NULL, 0 },
     { "autoexthreshold", required_argument, NULL, 0 },
     { "statedir", required_argument, NULL, 0 },
@@ -3393,6 +3443,8 @@ int main(int argc, char **argv) {
         } else if (strcmp(long_options[option_index].name, "tcpout") == 0) {
           is_tcpout_enabled = 1;
           strncpy(tcp_output_dest, optarg, sizeof(tcp_output_dest));
+        } else if (strcmp(long_options[option_index].name, "vfr") == 0) {
+          is_vfr_enabled = 1;
         } else if (strcmp(long_options[option_index].name, "autoex") == 0) {
           is_auto_exposure_enabled = 1;
           is_vfr_enabled = 1;
@@ -3405,6 +3457,34 @@ int main(int argc, char **argv) {
             return EXIT_FAILURE;
           }
           auto_exposure_threshold = value;
+        } else if (strcmp(long_options[option_index].name, "minfps") == 0) {
+          char *end;
+          double value = strtod(optarg, &end);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid minfps: %s\n", optarg);
+            print_usage();
+            return EXIT_FAILURE;
+          }
+          if (value < 0) {
+            log_fatal("error: invalid minfps: %d (must be >= 0)\n", value);
+            return EXIT_FAILURE;
+          }
+          min_fps = value;
+          is_vfr_enabled = 1;
+        } else if (strcmp(long_options[option_index].name, "maxfps") == 0) {
+          char *end;
+          double value = strtod(optarg, &end);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid maxfps: %s\n", optarg);
+            print_usage();
+            return EXIT_FAILURE;
+          }
+          if (value < 0) {
+            log_fatal("error: invalid maxfps: %d (must be >= 0)\n", value);
+            return EXIT_FAILURE;
+          }
+          max_fps = value;
+          is_vfr_enabled = 1;
         } else if (strcmp(long_options[option_index].name, "statedir") == 0) {
           strncpy(state_dir, optarg, sizeof(state_dir));
         } else if (strcmp(long_options[option_index].name, "hooksdir") == 0) {
@@ -3665,6 +3745,12 @@ int main(int argc, char **argv) {
     log_warn("warning: video size larger than 1280x720 may not work (program might hang)\n");
   }
 
+  if (is_vfr_enabled &&
+      (min_fps != -1.0f || max_fps != -1.0f) &&
+      (float) video_width / (float) video_height >= 1.45) {
+    log_warn("warning: --minfps and --maxfps might not work because width (%d) / height (%d) >= approx 1.45\n", video_width, video_height);
+  }
+
   fr_q16 = video_fps * 65536;
   if (video_pts_step == video_pts_step_default) {
     if (video_fps == 30.0f) {
@@ -3785,6 +3871,8 @@ int main(int argc, char **argv) {
   log_debug("auto_exposure_enabled=%d\n", is_auto_exposure_enabled);
   log_debug("auto_exposure_threshold=%f\n", auto_exposure_threshold);
   log_debug("is_vfr_enabled=%d\n", is_vfr_enabled);
+  log_debug("min_fps=%f\n", min_fps);
+  log_debug("max_fps=%f\n", max_fps);
   log_debug("is_preview_enabled=%d\n", is_preview_enabled);
   log_debug("is_previewrect_enabled=%d\n", is_previewrect_enabled);
   log_debug("preview_x=%d\n", preview_x);
