@@ -3888,7 +3888,7 @@ int main(int argc, char **argv) {
 
   log_debug("video_width=%d\n", video_width);
   log_debug("video_height=%d\n", video_height);
-  log_debug("video_fps=%.1f\n", video_fps);
+  log_debug("video_fps=%f\n", video_fps);
   log_debug("fr_q16=%d\n", fr_q16);
   log_debug("video_pts_step=%d\n", video_pts_step);
   log_debug("video_gop_size=%d\n", video_gop_size);
