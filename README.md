@@ -45,9 +45,11 @@ Tested with:
 
 ### Installation
 
-See [INSTALL.md](INSTALL.md).
+picam binary is available at https://github.com/iizukanao/picam/releases/tag/v1.2.8
 
-Alternatively, you can use [picam preinstalled Raspbian image](http://s.kyu-mu.net/raspbian-picam/). If you use a SD card larger than 4GB, run `raspi-config` and expand the filesystem after you boot Raspbian.
+[picam preinstalled Raspbian image](http://s.kyu-mu.net/raspbian-picam/) is also available. If you use an SD card larger than 4GB, run `raspi-config` and expand the filesystem after you boot Raspbian.
+
+If you want to build picam yourself, see [INSTALL.md](INSTALL.md).
 
 
 ### Usage
