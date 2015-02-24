@@ -2473,8 +2473,8 @@ static int video_encode_startup() {
     portdef.format.video.xFramerate = fr_q16; // specify the frame rate in Q.16 (framerate * 2^16)
   }
   portdef.format.video.nBitrate = 0x0;
-  portdef.format.video.nSliceHeight = portdef.format.video.nFrameHeight;
-  portdef.format.video.nStride = portdef.format.video.nFrameWidth;
+  portdef.format.video.nSliceHeight = (video_height+15)&~15;
+  portdef.format.video.nStride = (video_width+31)&~31;
   portdef.nBufferCountActual = N_BUFFER_COUNT_ACTUAL;
 
   // This specifies the input pixel format.
