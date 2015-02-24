@@ -127,7 +127,7 @@ To unmute microphone, create a file named `hooks/unmute`.
                           (width*height should be <= 1280*720)
       -v, --videobitrate <num>  Video bit rate (default: 2000000)
                           Set 0 to disable rate control
-      -f, --fps <num>     Frame rate (default: 0)
+      -f, --fps <num>     Frame rate (default: 30.0)
       --ptsstep <num>     PTS increment for each video frame
                           Default value is calculated based on fps
       -g, --gopsize <num>  GOP size (default: same value as fps)
