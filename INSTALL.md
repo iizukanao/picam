@@ -2,7 +2,7 @@
 
 ## picam standalone binary
 
-Pre-built binary is available at https://github.com/iizukanao/picam/releases/tag/v1.2.8
+Pre-built binary is available at https://github.com/iizukanao/picam/releases
 
 
 ## picam preinstalled Raspbian image
