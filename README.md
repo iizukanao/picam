@@ -117,7 +117,7 @@ To unmute microphone, create a file named `hooks/unmute`.
 #### Command options
 
     $ ./picam --help
-    picam version 1.2.8
+    picam version 1.2.9
     Usage: picam [options]
     
     Options:
@@ -128,8 +128,6 @@ To unmute microphone, create a file named `hooks/unmute`.
       -v, --videobitrate <num>  Video bit rate (default: 2000000)
                           Set 0 to disable rate control
       -f, --fps <num>     Frame rate (default: 30.0)
-      --ptsstep <num>     PTS increment for each video frame
-                          Default value is calculated based on fps
       -g, --gopsize <num>  GOP size (default: same value as fps)
       --vfr               Enable variable frame rate. GOP size will be
                           dynamically controlled.
