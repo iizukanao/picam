@@ -3808,71 +3808,11 @@ int main(int argc, char **argv) {
 
   fr_q16 = video_fps * 65536;
   if (video_pts_step == video_pts_step_default) {
-    if (video_fps == 30.0f) {
-      video_pts_step = 2955;
-    } else if (video_fps == 29.97f) {
-      video_pts_step = 2959;
-    } else if (video_fps == 29.0f) {
-      video_pts_step = 3058;
-    } else if (video_fps == 28.0f) {
-      video_pts_step = 3168;
-    } else if (video_fps == 27.0f) {
-      video_pts_step = 3285;
-    } else if (video_fps == 26.0f) {
-      video_pts_step = 3411;
-    } else if (video_fps == 25.0f) {
-      video_pts_step = 3547;
-    } else if (video_fps == 24.0f) {
-      video_pts_step = 3695;
-    } else if (video_fps == 23.0f) {
-      video_pts_step = 3856;
-    } else if (video_fps == 22.0f) {
-      video_pts_step = 4031;
-    } else if (video_fps == 21.0f) {
-      video_pts_step = 4224;
-    } else if (video_fps == 20.0f) {
-      video_pts_step = 4435;
-    } else if (video_fps == 19.0f) {
-      video_pts_step = 4669;
-    } else if (video_fps == 18.0f) {
-      video_pts_step = 4928;
-    } else if (video_fps == 17.0f) {
-      video_pts_step = 5216;
-    } else if (video_fps == 16.0f) {
-      video_pts_step = 5544;
-    } else if (video_fps == 15.0f) {
-      video_pts_step = 5912;
-    } else if (video_fps == 14.0f) {
-      video_pts_step = 6336;
-    } else if (video_fps == 13.0f) {
-      video_pts_step = 6823;
-    } else if (video_fps == 12.0f) {
-      video_pts_step = 7392;
-    } else if (video_fps == 11.0f) {
-      video_pts_step = 8062;
-    } else if (video_fps == 10.0f) {
-      video_pts_step = 8869;
-    } else if (video_fps == 9.0f) {
-      video_pts_step = 9855;
-    } else if (video_fps == 8.0f) {
-      video_pts_step = 11088;
-    } else if (video_fps == 7.0f) {
-      video_pts_step = 12672;
-    } else if (video_fps == 6.0f) {
-      video_pts_step = 14783;
-    } else if (video_fps == 5.0f) {
-      video_pts_step = 17739;
-    } else if (video_fps == 4.0f) {
-      video_pts_step = 22176;
-    } else if (video_fps == 3.0f) {
-      video_pts_step = 29567;
-    } else if (video_fps == 2.0f) {
-      video_pts_step = 44351;
-    } else if (video_fps == 1.0f) { // XXX: won't work?
+    video_pts_step = round(90000 / video_fps);
+
+    // It appears that the minimum fps is 1.31
+    if (video_pts_step > 68480) {
       video_pts_step = 68480;
-    } else {
-      float pts_delta = (88698.86675f - 88645.21441) / (30 - 2);
-      video_pts_step = ceil(88698.86675f - pts_delta * (video_fps - 2.0f));
     }
   }
   if (video_gop_size == video_gop_size_default) {
