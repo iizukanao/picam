@@ -3223,8 +3223,6 @@ static void print_usage() {
   log_info("  -v, --videobitrate <num>  Video bit rate (default: %ld)\n", video_bitrate_default);
   log_info("                      Set 0 to disable rate control\n");
   log_info("  -f, --fps <num>     Frame rate (default: %.1f)\n", video_fps_default);
-  log_info("  --ptsstep <num>     PTS increment for each video frame\n");
-  log_info("                      Default value is calculated based on fps\n");
   log_info("  -g, --gopsize <num>  GOP size (default: same value as fps)\n");
   log_info("  --vfr               Enable variable frame rate. GOP size will be\n");
   log_info("                      dynamically controlled.\n");
