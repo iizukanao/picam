@@ -115,7 +115,7 @@ void mpegts_destroy_context(AVFormatContext *format_ctx) {
   for (i = 0; i < format_ctx->nb_streams; i++) {
     avcodec_close(format_ctx->streams[i]->codec);
   }
-  av_free(format_ctx);
+  avformat_free_context(format_ctx);
 }
 
 void mpegts_close_stream(AVFormatContext *format_ctx) {
