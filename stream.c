@@ -3166,6 +3166,7 @@ static void setup_tcp_output() {
 }
 
 static void teardown_tcp_output() {
+  log_debug("teardown_tcp_output\n");
   mpegts_close_stream(tcp_ctx);
   mpegts_destroy_context(tcp_ctx);
   avformat_network_deinit();
