@@ -481,7 +481,7 @@ static void add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_
       log_warn("warning: Record buffer is starving. Recorded file may not start from keyframe. Try reducing the value of --gopsize.\n");
     }
 
-    av_free(packet->data);
+    av_freep(&packet->data);
   } else {
     packet = malloc(sizeof(EncodedPacket));
     if (packet == NULL) {
@@ -504,7 +504,7 @@ static void free_encoded_packets() {
   for (i = 0; i < encoded_packets_size; i++) {
     packet = encoded_packets[i];
     if (packet != NULL) {
-      av_free(packet->data);
+      av_freep(&packet->data);
     }
     free(packet);
   }
