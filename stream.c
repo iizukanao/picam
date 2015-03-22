@@ -187,6 +187,26 @@ static int is_vfr_enabled; // whether variable frame rate is enabled
 static const int is_vfr_enabled_default = 0;
 static float auto_exposure_threshold;
 static const float auto_exposure_threshold_default = 5.0f;
+
+static char white_balance[13];
+static const char *white_balance_default = "auto";
+typedef struct white_balance_option {
+  char *name;
+  OMX_WHITEBALCONTROLTYPE control;
+} white_balance_option;
+static const white_balance_option white_balance_options[] = {
+  { .name = "off",          .control = OMX_WhiteBalControlOff },
+  { .name = "auto",         .control = OMX_WhiteBalControlAuto },
+  { .name = "sun",          .control = OMX_WhiteBalControlSunLight },
+  { .name = "cloudy",       .control = OMX_WhiteBalControlCloudy },
+  { .name = "shade",        .control = OMX_WhiteBalControlShade },
+  { .name = "tungsten",     .control = OMX_WhiteBalControlTungsten },
+  { .name = "fluorescent",  .control = OMX_WhiteBalControlFluorescent },
+  { .name = "incandescent", .control = OMX_WhiteBalControlIncandescent },
+  { .name = "flash",        .control = OMX_WhiteBalControlFlash },
+  { .name = "horizon",      .control = OMX_WhiteBalControlHorizon },
+};
+
 static char state_dir[256];
 static const char *state_dir_default = "state";
 static char hooks_dir[256];
@@ -1991,6 +2011,39 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
   }
 }
 
+static int camera_set_white_balance(char *wb) {
+  OMX_CONFIG_WHITEBALCONTROLTYPE whitebal;
+  OMX_ERRORTYPE error;
+  int i;
+
+  memset(&whitebal, 0, sizeof(OMX_CONFIG_WHITEBALCONTROLTYPE));
+  whitebal.nSize = sizeof(OMX_CONFIG_WHITEBALCONTROLTYPE);
+  whitebal.nVersion.nVersion = OMX_VERSION;
+  whitebal.nPortIndex = OMX_ALL;
+
+  OMX_WHITEBALCONTROLTYPE control = OMX_WhiteBalControlMax;
+  for (i = 0; i < sizeof(white_balance_options) / sizeof(white_balance_option); i++) {
+    if (strcmp(white_balance_options[i].name, wb) == 0) {
+      control = white_balance_options[i].control;
+      break;
+    }
+  }
+  if (control == OMX_WhiteBalControlMax) {
+    log_error("error: invalid white balance value: %s\n", wb);
+    return -1;
+  }
+  whitebal.eWhiteBalControl = control;
+
+  error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
+      OMX_IndexConfigCommonWhiteBalance, &whitebal);
+  if (error != OMX_ErrorNone) {
+    log_fatal("error: failed to set camera white balance: 0x%x\n", error);
+    return -1;
+  }
+
+  return 0;
+}
+
 static int openmax_cam_open() {
   OMX_PARAM_PORTDEFINITIONTYPE cam_def;
   OMX_ERRORTYPE error;
@@ -2109,6 +2162,10 @@ static int openmax_cam_open() {
   }
 
   set_exposure_to_auto();
+
+  if (camera_set_white_balance(white_balance) != 0) {
+    exit(EXIT_FAILURE);
+  }
 
   // Set camera component to idle state
   if (ilclient_change_component_state(camera_component, OMX_StateIdle) == -1) {
@@ -3283,6 +3340,18 @@ static void print_usage() {
   log_info("                      (default: %.1f)\n", auto_exposure_threshold_default);
   log_info("                      If --verbose option is enabled as well, average value of\n");
   log_info("                      Y is printed like y=28.0.\n");
+  log_info("  --wb <value>        Set white balance. <value> is one of:\n");
+  log_info("                        off: Disable exposure control\n");
+  log_info("                        auto: Automatic white balance control\n");
+  log_info("                        sun: The sun provides the light source\n");
+  log_info("                        cloudy: The sun provides the light source through clouds\n");
+  log_info("                        shade: Light source is the sun and scene is in the shade\n");
+  log_info("                        tungsten: Light source is tungsten\n");
+  log_info("                        fluorescent: Light source is fluorescent\n");
+  log_info("                        incandescent: Light source is incandescent\n");
+  log_info("                        flash: Light source is a flash\n");
+  log_info("                        horizon: Light source is the sun on the horizon\n");
+  log_info("                      Default value: %s\n", white_balance_default);
   log_info("  -p, --preview       Display fullscreen preview\n");
   log_info("  --previewrect <x,y,width,height>\n");
   log_info("                      Display preview window at specified position\n");
@@ -3331,6 +3400,7 @@ int main(int argc, char **argv) {
     { "maxfps", required_argument, NULL, 0 },
     { "autoex", no_argument, NULL, 0 },
     { "autoexthreshold", required_argument, NULL, 0 },
+    { "wb", required_argument, NULL, 0 },
     { "query", no_argument, NULL, 0 },
     { "statedir", required_argument, NULL, 0 },
     { "hooksdir", required_argument, NULL, 0 },
@@ -3388,6 +3458,7 @@ int main(int argc, char **argv) {
   is_auto_exposure_enabled = is_auto_exposure_enabled_default;
   is_vfr_enabled = is_vfr_enabled_default;
   auto_exposure_threshold = auto_exposure_threshold_default;
+  strncpy(white_balance, white_balance_default, sizeof(white_balance));
   strncpy(state_dir, state_dir_default, sizeof(state_dir));
   strncpy(hooks_dir, hooks_dir_default, sizeof(hooks_dir));
   audio_volume_multiply = audio_volume_multiply_default;
@@ -3509,6 +3580,20 @@ int main(int argc, char **argv) {
           auto_exposure_threshold = value;
           is_auto_exposure_enabled = 1;
           is_vfr_enabled = 1;
+        } else if (strcmp(long_options[option_index].name, "wb") == 0) {
+          strncpy(white_balance, optarg, sizeof(white_balance));
+          int matched = 0;
+          int i;
+          for (i = 0; i < sizeof(white_balance_options) / sizeof(white_balance_option); i++) {
+            if (strcmp(white_balance_options[i].name, white_balance) == 0) {
+              matched = 1;
+              break;
+            }
+          }
+          if (!matched) {
+            log_fatal("error: invalid white balance: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
         } else if (strcmp(long_options[option_index].name, "minfps") == 0) {
           char *end;
           double value = strtod(optarg, &end);
@@ -3865,6 +3950,7 @@ int main(int argc, char **argv) {
   log_debug("auto_exposure_enabled=%d\n", is_auto_exposure_enabled);
   log_debug("auto_exposure_threshold=%f\n", auto_exposure_threshold);
   log_debug("is_vfr_enabled=%d\n", is_vfr_enabled);
+  log_debug("white_balance=%s\n", white_balance);
   log_debug("min_fps=%f\n", min_fps);
   log_debug("max_fps=%f\n", max_fps);
   log_debug("is_preview_enabled=%d\n", is_preview_enabled);
