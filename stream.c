@@ -207,6 +207,28 @@ static const white_balance_option white_balance_options[] = {
   { .name = "horizon",      .control = OMX_WhiteBalControlHorizon },
 };
 
+static char exposure_metering[8];
+static const char *exposure_metering_default = "average";
+typedef struct exposure_metering_option {
+  char *name;
+  OMX_METERINGTYPE metering;
+} exposure_metering_option;
+static const exposure_metering_option exposure_metering_options[] = {
+  { .name = "average", .metering = OMX_MeteringModeAverage },
+  { .name = "spot",    .metering = OMX_MeteringModeSpot },
+  { .name = "matrix",  .metering = OMX_MeteringModeMatrix },
+  { .name = "backlit", .metering = OMX_MeteringModeBacklit },
+};
+
+static int manual_exposure_compensation = 0; // EV compensation
+static float exposure_compensation;
+static int manual_exposure_aperture = 0; // f-number
+static float exposure_aperture;
+static int manual_exposure_shutter_speed = 0; // in microseconds
+static unsigned int exposure_shutter_speed;
+static int manual_exposure_sensitivity = 0; // ISO
+static unsigned int exposure_sensitivity;
+
 static char state_dir[256];
 static const char *state_dir_default = "state";
 static char hooks_dir[256];
@@ -2005,6 +2027,85 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
   }
 }
 
+static int camera_set_exposure_value() {
+  OMX_CONFIG_EXPOSUREVALUETYPE exposure_value;
+  OMX_ERRORTYPE error;
+  int i;
+
+  memset(&exposure_value, 0, sizeof(OMX_CONFIG_EXPOSUREVALUETYPE));
+  exposure_value.nSize = sizeof(OMX_CONFIG_EXPOSUREVALUETYPE);
+  exposure_value.nVersion.nVersion = OMX_VERSION;
+  exposure_value.nPortIndex = OMX_ALL;
+
+  error = OMX_GetParameter(ILC_GET_HANDLE(camera_component),
+      OMX_IndexConfigCommonExposureValue, &exposure_value);
+  if (error != OMX_ErrorNone) {
+    log_fatal("error: failed to get camera exposure value: 0x%x\n", error);
+    exit(EXIT_FAILURE);
+  }
+
+  OMX_METERINGTYPE metering = OMX_EVModeMax;
+  for (i = 0; i < sizeof(exposure_metering_options) / sizeof(exposure_metering_option); i++) {
+    if (strcmp(exposure_metering_options[i].name, exposure_metering) == 0) {
+      metering = exposure_metering_options[i].metering;
+      break;
+    }
+  }
+  if (metering == OMX_EVModeMax) {
+    log_error("error: invalid exposure metering value: %s\n", exposure_metering);
+    return -1;
+  }
+  // default: OMX_MeteringModeAverage
+  exposure_value.eMetering = metering;
+
+  if (manual_exposure_compensation) {
+    // OMX_S32 Q16; default: 0
+    exposure_value.xEVCompensation = round(exposure_compensation * 65536);
+  }
+
+  if (manual_exposure_aperture) {
+    // Apparently this has no practical effect
+
+    // OMX_U32 Q16; default: 0
+    exposure_value.nApertureFNumber = round(exposure_aperture * 65536);
+    // default: OMX_FALSE
+    exposure_value.bAutoAperture = OMX_FALSE;
+  }
+
+  if (manual_exposure_shutter_speed) {
+    // OMX_U32; default: 0
+    exposure_value.nShutterSpeedMsec = exposure_shutter_speed;
+    // default: OMX_TRUE
+    exposure_value.bAutoShutterSpeed = OMX_FALSE;
+  }
+
+  if (manual_exposure_sensitivity) {
+    // OMX_U32; default: 0
+    exposure_value.nSensitivity = exposure_sensitivity;
+    // default: OMX_TRUE
+    exposure_value.bAutoSensitivity = OMX_FALSE;
+  }
+
+  log_debug("setting exposure:\n");
+  log_debug("  eMetering: %d\n", exposure_value.eMetering);
+  log_debug("  xEVCompensation: %d\n", exposure_value.xEVCompensation);
+  log_debug("  nApertureFNumber: %u\n", exposure_value.nApertureFNumber);
+  log_debug("  bAutoAperture: %u\n", exposure_value.bAutoAperture);
+  log_debug("  nShutterSpeedMsec: %u\n", exposure_value.nShutterSpeedMsec);
+  log_debug("  bAutoShutterSpeed: %u\n", exposure_value.bAutoShutterSpeed);
+  log_debug("  nSensitivity: %u\n", exposure_value.nSensitivity);
+  log_debug("  bAutoSensitivity: %u\n", exposure_value.bAutoSensitivity);
+
+  error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
+      OMX_IndexConfigCommonExposureValue, &exposure_value);
+  if (error != OMX_ErrorNone) {
+    log_fatal("error: failed to set camera exposure value: 0x%x\n", error);
+    return -1;
+  }
+
+  return 0;
+}
+
 static int camera_set_white_balance(char *wb) {
   OMX_CONFIG_WHITEBALCONTROLTYPE whitebal;
   OMX_ERRORTYPE error;
@@ -2158,6 +2259,10 @@ static int openmax_cam_open() {
   set_exposure_to_auto();
 
   if (camera_set_white_balance(white_balance) != 0) {
+    exit(EXIT_FAILURE);
+  }
+
+  if (camera_set_exposure_value() != 0) {
     exit(EXIT_FAILURE);
   }
 
@@ -3346,6 +3451,17 @@ static void print_usage() {
   log_info("                        flash: Light source is a flash\n");
   log_info("                        horizon: Light source is the sun on the horizon\n");
   log_info("                      Default value: %s\n", white_balance_default);
+  log_info("  --metering <value>  Set metering type. <value> is one of:\n");
+  log_info("                        average: Center weight average metering (default)\n");
+  log_info("                        spot: Spot (partial) metering\n");
+  log_info("                        matrix: Matrix or evaluative metering\n");
+  log_info("                        backlit: Assume a backlit image\n");
+  log_info("  --evcomp <num>      Set Exposure Value compensation (-10..10) (default: 0)\n");
+//  log_info("  --aperture <num>    Set aperture f-stop. Use 2 for f/2. (default: not set)\n");
+//  log_info("                      * Not sure if this has practical effect.\n");
+  log_info("  --shutter <num>     Set shutter speed in microseconds (default: auto).\n");
+  log_info("                      Implies --vfr.\n");
+  log_info("  --iso <num>         Set ISO sensitivity (100..800) (default: auto)\n");
   log_info("  -p, --preview       Display fullscreen preview\n");
   log_info("  --previewrect <x,y,width,height>\n");
   log_info("                      Display preview window at specified position\n");
@@ -3395,6 +3511,11 @@ int main(int argc, char **argv) {
     { "autoex", no_argument, NULL, 0 },
     { "autoexthreshold", required_argument, NULL, 0 },
     { "wb", required_argument, NULL, 0 },
+    { "metering", required_argument, NULL, 0 },
+    { "evcomp", required_argument, NULL, 0 },
+    { "aperture", required_argument, NULL, 0 },
+    { "shutter", required_argument, NULL, 0 },
+    { "iso", required_argument, NULL, 0 },
     { "query", no_argument, NULL, 0 },
     { "statedir", required_argument, NULL, 0 },
     { "hooksdir", required_argument, NULL, 0 },
@@ -3453,6 +3574,7 @@ int main(int argc, char **argv) {
   is_vfr_enabled = is_vfr_enabled_default;
   auto_exposure_threshold = auto_exposure_threshold_default;
   strncpy(white_balance, white_balance_default, sizeof(white_balance));
+  strncpy(exposure_metering, exposure_metering_default, sizeof(exposure_metering));
   strncpy(state_dir, state_dir_default, sizeof(state_dir));
   strncpy(hooks_dir, hooks_dir_default, sizeof(hooks_dir));
   audio_volume_multiply = audio_volume_multiply_default;
@@ -3588,6 +3710,69 @@ int main(int argc, char **argv) {
             log_fatal("error: invalid white balance: %s\n", optarg);
             return EXIT_FAILURE;
           }
+        } else if (strcmp(long_options[option_index].name, "metering") == 0) {
+          strncpy(exposure_metering, optarg, sizeof(exposure_metering));
+          int matched = 0;
+          int i;
+          for (i = 0; i < sizeof(exposure_metering_options) / sizeof(exposure_metering_option); i++) {
+            if (strcmp(exposure_metering_options[i].name, exposure_metering) == 0) {
+              matched = 1;
+              break;
+            }
+          }
+          if (!matched) {
+            log_fatal("error: invalid metering: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+        } else if (strcmp(long_options[option_index].name, "evcomp") == 0) {
+          char *end;
+          double value = strtod(optarg, &end);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid evcomp: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          manual_exposure_compensation = 1;
+          exposure_compensation = value;
+        } else if (strcmp(long_options[option_index].name, "aperture") == 0) {
+          char *end;
+          double value = strtod(optarg, &end);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid aperture: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          if (value < 0) {
+            log_fatal("error: invalid aperture: %d (must be >= 0)\n", value);
+            return EXIT_FAILURE;
+          }
+          manual_exposure_aperture = 1;
+          exposure_aperture = value;
+        } else if (strcmp(long_options[option_index].name, "shutter") == 0) {
+          char *end;
+          long value = strtol(optarg, &end, 10);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid shutter speed: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          if (value < 0) {
+            log_fatal("error: invalid shutter speed: %d (must be >= 0)\n", value);
+            return EXIT_FAILURE;
+          }
+          manual_exposure_shutter_speed = 1;
+          exposure_shutter_speed = value;
+          is_vfr_enabled = 1;
+        } else if (strcmp(long_options[option_index].name, "iso") == 0) {
+          char *end;
+          long value = strtol(optarg, &end, 10);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid ISO sensitivity: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          if (value < 0) {
+            log_fatal("error: invalid ISO sensitivity: %d (must be >= 0)\n", value);
+            return EXIT_FAILURE;
+          }
+          manual_exposure_sensitivity = 1;
+          exposure_sensitivity = value;
         } else if (strcmp(long_options[option_index].name, "minfps") == 0) {
           char *end;
           double value = strtod(optarg, &end);
@@ -3945,6 +4130,15 @@ int main(int argc, char **argv) {
   log_debug("auto_exposure_threshold=%f\n", auto_exposure_threshold);
   log_debug("is_vfr_enabled=%d\n", is_vfr_enabled);
   log_debug("white_balance=%s\n", white_balance);
+  log_debug("metering=%s\n", exposure_metering);
+  log_debug("manual_exposure_compensation=%d\n", manual_exposure_compensation);
+  log_debug("exposure_compensation=%f\n", exposure_compensation);
+  log_debug("manual_exposure_aperture=%d\n", manual_exposure_aperture);
+  log_debug("exposure_aperture=%u\n", exposure_aperture);
+  log_debug("manual_exposure_shutter_speed=%d\n", manual_exposure_shutter_speed);
+  log_debug("exposure_shutter_speed=%u\n", exposure_shutter_speed);
+  log_debug("manual_exposure_sensitivity=%d\n", manual_exposure_sensitivity);
+  log_debug("exposure_sensitivity=%u\n", exposure_sensitivity);
   log_debug("min_fps=%f\n", min_fps);
   log_debug("max_fps=%f\n", max_fps);
   log_debug("is_preview_enabled=%d\n", is_preview_enabled);
