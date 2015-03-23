@@ -139,8 +139,8 @@ To unmute microphone, create a file named `hooks/unmute`.
                           (0, 90, 180, 270)
       --hflip             Flip image horizontally
       --vflip             Flip image vertically
-      --qpmin <num>       Minimum quantization level (0-51)
-      --qpmax <num>       Maximum quantization level (0-51)
+      --qpmin <num>       Minimum quantization level (0..51)
+      --qpmax <num>       Maximum quantization level (0..51)
       --qpinit <num>      Initial quantization level
       --dquant <num>      Slice DQuant level
      [audio]
@@ -183,6 +183,26 @@ To unmute microphone, create a file named `hooks/unmute`.
                           (default: 5.0)
                           If --verbose option is enabled as well, average value of
                           Y is printed like y=28.0.
+      --wb <value>        Set white balance. <value> is one of:
+                            off: Disable exposure control
+                            auto: Automatic white balance control (default)
+                            sun: The sun provides the light source
+                            cloudy: The sun provides the light source through clouds
+                            shade: Light source is the sun and scene is in the shade
+                            tungsten: Light source is tungsten
+                            fluorescent: Light source is fluorescent
+                            incandescent: Light source is incandescent
+                            flash: Light source is a flash
+                            horizon: Light source is the sun on the horizon
+      --metering <value>  Set metering type. <value> is one of:
+                            average: Center weight average metering (default)
+                            spot: Spot (partial) metering
+                            matrix: Matrix or evaluative metering
+                            backlit: Assume a backlit image
+      --evcomp <num>      Set Exposure Value compensation (-10..10) (default: 0)
+      --shutter <num>     Set shutter speed in microseconds (default: auto).
+                          Implies --vfr.
+      --iso <num>         Set ISO sensitivity (100..800) (default: auto)
       -p, --preview       Display fullscreen preview
       --previewrect <x,y,width,height>
                           Display preview window at specified position
