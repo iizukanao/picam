@@ -3391,8 +3391,8 @@ static void print_usage() {
   log_info("                      (0, 90, 180, 270)\n");
   log_info("  --hflip             Flip image horizontally\n");
   log_info("  --vflip             Flip image vertically\n");
-  log_info("  --qpmin <num>       Minimum quantization level (0-51)\n");
-  log_info("  --qpmax <num>       Maximum quantization level (0-51)\n");
+  log_info("  --qpmin <num>       Minimum quantization level (0..51)\n");
+  log_info("  --qpmax <num>       Maximum quantization level (0..51)\n");
   log_info("  --qpinit <num>      Initial quantization level\n");
   log_info("  --dquant <num>      Slice DQuant level\n");
   log_info(" [audio]\n");
@@ -3441,7 +3441,7 @@ static void print_usage() {
   log_info("                      Y is printed like y=28.0.\n");
   log_info("  --wb <value>        Set white balance. <value> is one of:\n");
   log_info("                        off: Disable exposure control\n");
-  log_info("                        auto: Automatic white balance control\n");
+  log_info("                        auto: Automatic white balance control (default)\n");
   log_info("                        sun: The sun provides the light source\n");
   log_info("                        cloudy: The sun provides the light source through clouds\n");
   log_info("                        shade: Light source is the sun and scene is in the shade\n");
@@ -3450,7 +3450,6 @@ static void print_usage() {
   log_info("                        incandescent: Light source is incandescent\n");
   log_info("                        flash: Light source is a flash\n");
   log_info("                        horizon: Light source is the sun on the horizon\n");
-  log_info("                      Default value: %s\n", white_balance_default);
   log_info("  --metering <value>  Set metering type. <value> is one of:\n");
   log_info("                        average: Center weight average metering (default)\n");
   log_info("                        spot: Spot (partial) metering\n");
