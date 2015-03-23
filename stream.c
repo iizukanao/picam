@@ -900,26 +900,20 @@ static void send_audio_start_time() {
 // Send video packet to node-rtsp-rtmp-server
 static void send_video_start_time() {
   if (is_rtspout_enabled) {
-    int payload_size = 9;
-    int64_t logical_start_time = video_start_time;
-    uint8_t sendbuf[12] = {
+    int payload_size = 6;
+    uint8_t sendbuf[9] = {
       // payload size
       (payload_size >> 16) & 0xff,
       (payload_size >> 8) & 0xff,
       payload_size & 0xff,
-      // packet type (0x00 == video start time)
-      0x00,
+
       // payload
-      logical_start_time >> 56,
-      (logical_start_time >> 48) & 0xff,
-      (logical_start_time >> 40) & 0xff,
-      (logical_start_time >> 32) & 0xff,
-      (logical_start_time >> 24) & 0xff,
-      (logical_start_time >> 16) & 0xff,
-      (logical_start_time >> 8) & 0xff,
-      logical_start_time & 0xff,
+      // packet type
+      0x00,
+      // stream name
+      'p', 'i', 'c', 'a', 'm'
     };
-    if (send(sockfd_video_control, sendbuf, 12, 0) == -1) {
+    if (send(sockfd_video_control, sendbuf, sizeof(sendbuf), 0) == -1) {
       perror("send video start time");
       exit(EXIT_FAILURE);
     }
@@ -1954,8 +1948,8 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
             struct timespec ts;
             clock_gettime(CLOCK_MONOTONIC, &ts);
             video_start_time = audio_start_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
-            send_audio_start_time();
             send_video_start_time();
+            send_audio_start_time();
             log_info("capturing started\n");
           }
         }
@@ -3195,8 +3189,8 @@ static void audio_loop_poll_mmap() {
             struct timespec ts;
             clock_gettime(CLOCK_MONOTONIC, &ts);
             video_start_time = audio_start_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
-            send_audio_start_time();
             send_video_start_time();
+            send_audio_start_time();
             log_info("capturing started\n");
           }
         }
