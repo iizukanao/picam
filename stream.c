@@ -436,7 +436,7 @@ static void mute_audio() {
 static int is_disk_almost_full() {
   struct statvfs stat;
   statvfs("/", &stat);
-  int used_percent = ceil( (stat.f_blocks - stat.f_bfree) * 100.0 / stat.f_blocks);
+  int used_percent = ceil( (stat.f_blocks - stat.f_bfree) * 100.0f / stat.f_blocks);
   log_info("disk_usage=%d%% ", used_percent);
   if (used_percent >= 95) {
     return 1;
@@ -602,7 +602,7 @@ void setup_av_frame(AVFormatContext *format_ctx) {
 #endif
 
   period_size = buffer_size / audio_channels / sizeof(short);
-  audio_pts_step_base = 90000.0 * period_size / audio_sample_rate;
+  audio_pts_step_base = 90000.0f * period_size / audio_sample_rate;
   log_debug("audio_pts_step_base: %d\n", audio_pts_step_base);
 
   ret = avcodec_fill_audio_frame(av_frame, audio_codec_ctx->channels, audio_codec_ctx->sample_fmt,
@@ -1118,7 +1118,7 @@ static int64_t get_next_audio_write_time() {
   if (audio_frame_count == 0) {
     return LLONG_MIN;
   }
-  return audio_start_time + audio_frame_count * 1000000000.0 / ((float)audio_sample_rate / (float)period_size);
+  return audio_start_time + audio_frame_count * 1000000000.0f / ((float)audio_sample_rate / (float)period_size);
 }
 
 static void print_audio_timing() {
@@ -1131,7 +1131,7 @@ static void print_audio_timing() {
 
   // The following equation causes int64 overflow:
   // (cur_time - audio_start_time) * INT64_C(90000) / INT64_C(1000000000);
-  int64_t clock_pts = (cur_time - audio_start_time) * 90000.0 / 1000000000.0;
+  int64_t clock_pts = (cur_time - audio_start_time) * .00009f;
 
   log_debug(" a-v=%lld c-a=%lld u=%d d=%d pts=%" PRId64,
       avdiff, clock_pts - audio_pts, speed_up_count, speed_down_count, last_pts);
@@ -2562,10 +2562,10 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
           unsigned long long wait_nsec = tsDiff.tv_sec * INT64_C(1000000000) + tsDiff.tv_nsec;
           float divisor = (float)wait_nsec / (float)frame_count / 1000000000;
           float fps;
-          if (divisor == 0.0) { // This won't cause SIGFPE because of float, but just to be safe.
-            fps = 99999.0;
+          if (divisor == 0.0f) { // This won't cause SIGFPE because of float, but just to be safe.
+            fps = 99999.0f;
           } else {
-            fps = 1 / divisor;
+            fps = 1.0f / divisor;
           }
           log_debug(" %5.2f fps k=%d", fps, keyframes_count);
           if (log_get_level() <= LOG_LEVEL_DEBUG) {
