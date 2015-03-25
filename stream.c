@@ -271,6 +271,7 @@ static const int record_buffer_keyframes_default = 5;
 static int64_t video_current_pts = 0;
 static int64_t audio_current_pts = 0;
 static int64_t last_pts = 0;
+static int64_t time_for_last_pts = 0; // Used in VFR mode
 
 pts_mode_t pts_mode = PTS_SPEED_NORMAL;
 
@@ -1040,7 +1041,17 @@ static int64_t get_next_audio_pts() {
 // Return next video PTS for variable frame rate
 static int64_t get_next_video_pts_vfr() {
   video_frame_count++;
-  video_current_pts = audio_current_pts;
+
+  if (time_for_last_pts == 0) {
+    video_current_pts = 0;
+  } else {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    video_current_pts = last_pts
+      + (ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec - time_for_last_pts) // diff_time
+      * .00009f; // nanoseconds to PTS
+  }
+
   return video_current_pts;
 }
 
@@ -1256,6 +1267,12 @@ static int send_keyframe(uint8_t *data, size_t data_len, int consume_time) {
 #endif
   last_pts = pts;
 
+  if (is_vfr_enabled) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    time_for_last_pts = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
+  }
+
   // PTS (presentation time stamp): Timestamp when a decoder should play this frame
   // DTS (decoding time stamp): Timestamp when a decoder should decode this frame
   // DTS should be smaller than or equal to PTS.
@@ -1363,6 +1380,12 @@ static int send_pframe(uint8_t *data, size_t data_len, int consume_time) {
   pts = pts % PTS_MODULO;
 #endif
   last_pts = pts;
+
+  if (is_vfr_enabled) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    time_for_last_pts = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
+  }
 
   pkt.pts = pkt.dts = pts;
 
@@ -2952,6 +2975,12 @@ static void encode_and_send_audio() {
 #endif
     last_pts = pts;
     pkt.pts = pkt.dts = pts;
+
+    if (is_vfr_enabled) {
+      struct timespec ts;
+      clock_gettime(CLOCK_MONOTONIC, &ts);
+      time_for_last_pts = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
+    }
 
     // We have to copy AVPacket before av_write_frame()
     // because it changes internal data of the AVPacket.
