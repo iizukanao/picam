@@ -273,6 +273,19 @@ Start nginx server, then run:
 You can access your live stream at `rtmp://YOUR_RASPBERRYPI_IP/webcam/mystream`.
 
 
+### Publishing to Ustream
+
+To upload streams from picam to Ustream, run ffmpeg with the following options. `RTMP_URL` and `STREAM_KEY` can be obtained from Ustream's Channel settings &rarr; Broadcast settings &rarr; Encoder settings.
+
+    $ ffmpeg -i tcp://127.0.0.1:8181?listen -c:v copy -c:a aac -strict -2 -ar 44100 -ab 40000 -f flv RTMP_URL/STREAM_KEY
+
+![Encoder settings on Ustream](images/ustream.png)
+
+Then, run picam to start streaming.
+
+    $ picam --tcpout tcp://127.0.0.1:8181
+
+
 ### Recommended hardware
 
 #### USB microphone
