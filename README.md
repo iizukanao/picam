@@ -86,7 +86,7 @@ Run picam with your ALSA device name.
     configuring devices
     capturing started
 
-#### Make symbolic links (optional, but strongly recommended)
+#### Create symbolic links (optional, but strongly recommended)
 
 You can take advantage of RAM drive (/run/shm/) and reduce access to SD card. It also provides better quality of recording.
 
