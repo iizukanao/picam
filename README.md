@@ -86,6 +86,30 @@ Run picam with your ALSA device name.
     configuring devices
     capturing started
 
+#### Make symbolic links (optional, but strongly recommended)
+
+You can take advantage of RAM drive (/run/shm/) and reduce access to SD card. It also provides better quality of recording.
+
+First, stop picam if it is running. Create **rec**, **hooks**, and **state** directories in /run/shm/, then change directories with the same name in picam to symbolic links. Create another symbolic link from /run/shm/rec/archive to somewhere on SD card.
+
+Result:
+
+    picam
+    | ...
+    |-- archive
+    |-- hooks -> /run/shm/hooks
+    |-- rec -> /run/shm/rec
+    `-- state -> /run/shm/state
+
+    /run/shm/
+    |-- hooks
+    |-- rec
+    |   |-- archive -> /home/pi/picam/archive
+    |   `-- tmp (automatically created by picam)
+    `-- state
+
+
+
 #### Recording
 
 To start recording, create a file named `hooks/start_record` while picam command is running.
