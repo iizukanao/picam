@@ -191,6 +191,7 @@ Transfer the contents of $PIBUILD directory to Raspberry Pi, then put them in /u
 
 If you have transferred the files to ~/build/, you can install them like this:
 
+    (on Raspberry Pi)
     $ cd ~/build
     $ ls
     bin  include  lib  share
