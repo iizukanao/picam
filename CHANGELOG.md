@@ -1,6 +1,12 @@
 Change Log
 ==========
 
+Version 1.3.0 *(2015-04-04)*
+-----------------------------
+
+- Add support for various AVC profiles and levels (--avcprofile, --avclevel).
+- Add support for 1080p (1920x1080) resolution.
+
 Version 1.2.10 *(2015-03-25)*
 -----------------------------
 
