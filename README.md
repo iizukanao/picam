@@ -2,7 +2,7 @@
 
 ### Features
 
-- Capture video from Raspberry Pi Camera (up to 720p) and encode it to H.264 using hardware encoder
+- Capture video from Raspberry Pi Camera and encode it to H.264 using hardware encoder
 - Capture audio from USB microphone or Wolfson Audio Card via ALSA and encode it to AAC-LC using libavcodec (FFmpeg)
 - Record audio/video to MPEG-TS files
 - Generate files for HTTP Live Streaming with optional encryption
