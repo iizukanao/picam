@@ -141,14 +141,13 @@ To unmute microphone, create a file named `hooks/unmute`.
 #### Command options
 
     $ ./picam --help
-    picam version 1.2.10
+    picam version 1.3.0
     Usage: picam [options]
     
     Options:
      [video]
       -w, --width <num>   Width in pixels (default: 1280)
       -h, --height <num>  Height in pixels (default: 720)
-                          (width*height should be <= 1280*720)
       -v, --videobitrate <num>  Video bit rate (default: 2000000)
                           Set 0 to disable rate control
       -f, --fps <num>     Frame rate (default: 30.0)
@@ -163,6 +162,10 @@ To unmute microphone, create a file named `hooks/unmute`.
                           (0, 90, 180, 270)
       --hflip             Flip image horizontally
       --vflip             Flip image vertically
+      --avcprofile <str>  Set AVC/H.264 profile to one of:
+                          constrained_baseline/baseline/main/high
+                          (default: constrained_baseline)
+      --avclevel <value>  Set AVC/H.264 level (default: 3.1)
       --qpmin <num>       Minimum quantization level (0..51)
       --qpmax <num>       Maximum quantization level (0..51)
       --qpinit <num>      Initial quantization level
