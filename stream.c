@@ -147,6 +147,45 @@ static int video_vflip;
 static const int video_vflip_default = 0;
 static long video_bitrate;
 static const long video_bitrate_default = 2000 * 1000; // 2 Mbps
+
+static char video_avc_profile[21];
+static const char *video_avc_profile_default = "constrained_baseline";
+typedef struct video_avc_profile_option {
+  char *name;
+  OMX_VIDEO_AVCPROFILETYPE profile;
+} video_avc_profile_option;
+static const video_avc_profile_option video_avc_profile_options[] = {
+  { .name = "constrained_baseline", .profile = OMX_VIDEO_AVCProfileConstrainedBaseline },
+  { .name = "baseline",             .profile = OMX_VIDEO_AVCProfileBaseline },
+  { .name = "main",                 .profile = OMX_VIDEO_AVCProfileMain },
+  { .name = "high",                 .profile = OMX_VIDEO_AVCProfileHigh },
+};
+
+static char video_avc_level[4];
+static const char *video_avc_level_default = "3.1";
+typedef struct video_avc_level_option {
+  char *name;
+  OMX_VIDEO_AVCLEVELTYPE level;
+} video_avc_level_option;
+static const video_avc_level_option video_avc_level_options[] = {
+  { .name = "1",   .level = OMX_VIDEO_AVCLevel1 },
+  { .name = "1b",  .level = OMX_VIDEO_AVCLevel1b },
+  { .name = "1.1", .level = OMX_VIDEO_AVCLevel11 },
+  { .name = "1.2", .level = OMX_VIDEO_AVCLevel12 },
+  { .name = "1.3", .level = OMX_VIDEO_AVCLevel13 },
+  { .name = "2",   .level = OMX_VIDEO_AVCLevel2 },
+  { .name = "2.1", .level = OMX_VIDEO_AVCLevel21 },
+  { .name = "2.2", .level = OMX_VIDEO_AVCLevel22 },
+  { .name = "3",   .level = OMX_VIDEO_AVCLevel3 },
+  { .name = "3.1", .level = OMX_VIDEO_AVCLevel31 },
+  { .name = "3.2", .level = OMX_VIDEO_AVCLevel32 },
+  { .name = "4",   .level = OMX_VIDEO_AVCLevel4 },
+  { .name = "4.1", .level = OMX_VIDEO_AVCLevel41 },
+  { .name = "4.2", .level = OMX_VIDEO_AVCLevel42 },
+  { .name = "5",   .level = OMX_VIDEO_AVCLevel5 },
+  { .name = "5.1", .level = OMX_VIDEO_AVCLevel51 },
+};
+
 static int video_qp_min;
 static const int video_qp_min_default = -1;
 static int video_qp_max;
@@ -2614,6 +2653,7 @@ static int video_encode_startup() {
   OMX_PARAM_U32TYPE u32;
   OMX_ERRORTYPE error;
   int r;
+  int i;
 
   ilclient = ilclient_init();
   if (ilclient == NULL) {
@@ -2720,33 +2760,38 @@ static int video_encode_startup() {
   // Number of P frames between I frames
   avctype.nPFrames = video_gop_size - 1;
 
-  // Number of B frames between I frames
-  avctype.nBFrames = 0;
+  OMX_VIDEO_AVCPROFILETYPE profile = OMX_VIDEO_AVCProfileMax;
+  for (i = 0; i < sizeof(video_avc_profile_options) / sizeof(video_avc_profile_option); i++) {
+    if (strcmp(video_avc_profile_options[i].name, video_avc_profile) == 0) {
+      profile = video_avc_profile_options[i].profile;
+      break;
+    }
+  }
+  if (profile == OMX_VIDEO_AVCProfileMax) {
+    log_error("error: invalid AVC profile value: %s\n", video_avc_profile);
+    return -1;
+  }
+  avctype.eProfile = profile;
 
-  // Set the profile to Constrained Baseline Profile, Level 3.1
-  avctype.eProfile = OMX_VIDEO_AVCProfileConstrainedBaseline; // Main profile is not playable on Android
-  avctype.eLevel = OMX_VIDEO_AVCLevel31; // Level 4.1 is not supported on Raspberry Pi
-  // Level 3.1 allows up to 1280x720 @ 30.0 FPS (720p)
-
-  avctype.nAllowedPictureTypes = OMX_VIDEO_PictureTypeI | OMX_VIDEO_PictureTypeP;
-  avctype.bUseHadamard = OMX_TRUE; // not sure
-//  avctype.nRefFrames = 1;          // not sure
-  avctype.bEnableFMO = OMX_FALSE;  // not allowed in CBP (Constrained Baseline profile)
-  avctype.bEnableASO = OMX_FALSE;  // not allowed in CBP
-  avctype.bEnableRS = OMX_FALSE;   // not allowed in CBP
-  // See A.2.1 in H.264 Annex A
-  // See also https://en.wikipedia.org/wiki/H.264/MPEG-4_AVC
-  avctype.bWeightedPPrediction = OMX_FALSE; // FALSE is required by BP
-  avctype.bconstIpred = OMX_FALSE;          // not sure
-  avctype.bFrameMBsOnly = OMX_TRUE;         // TRUE is required by BP
-  avctype.bEntropyCodingCABAC = OMX_FALSE;  // FALSE is required by BP
-//  avctype.nWeightedBipredicitonMode = 0;    // not sure
+  OMX_VIDEO_AVCLEVELTYPE level = OMX_VIDEO_AVCLevelMax;
+  for (i = 0; i < sizeof(video_avc_level_options) / sizeof(video_avc_level_option); i++) {
+    if (strcmp(video_avc_level_options[i].name, video_avc_level) == 0) {
+      level = video_avc_level_options[i].level;
+      break;
+    }
+  }
+  if (level == OMX_VIDEO_AVCLevelMax) {
+    log_error("error: invalid AVC level value: %s\n", video_avc_level);
+    return -1;
+  }
+  avctype.eLevel = level;
 
   // Set AVC parameter
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamVideoAvc, &avctype);
   if (error != OMX_ErrorNone) {
     log_fatal("error: failed to set video_encode %d AVC: 0x%x\n", VIDEO_ENCODE_OUTPUT_PORT, error);
+    log_fatal("Probably the combination of --avcprofile and --avclevel is not supported on Raspberry Pi\n");
     exit(EXIT_FAILURE);
   }
 
@@ -3405,7 +3450,6 @@ static void print_usage() {
   log_info(" [video]\n");
   log_info("  -w, --width <num>   Width in pixels (default: %d)\n", video_width_default);
   log_info("  -h, --height <num>  Height in pixels (default: %d)\n", video_height_default);
-  log_info("                      (width*height should be <= 1280*720)\n");
   log_info("  -v, --videobitrate <num>  Video bit rate (default: %ld)\n", video_bitrate_default);
   log_info("                      Set 0 to disable rate control\n");
   log_info("  -f, --fps <num>     Frame rate (default: %.1f)\n", video_fps_default);
@@ -3420,6 +3464,10 @@ static void print_usage() {
   log_info("                      (0, 90, 180, 270)\n");
   log_info("  --hflip             Flip image horizontally\n");
   log_info("  --vflip             Flip image vertically\n");
+  log_info("  --avcprofile <str>  Set AVC/H.264 profile to one of:\n");
+  log_info("                      constrained_baseline/baseline/main/high\n");
+  log_info("                      (default: %s)\n", video_avc_profile_default);
+  log_info("  --avclevel <value>  Set AVC/H.264 level (default: %s)\n", video_avc_level_default);
   log_info("  --qpmin <num>       Minimum quantization level (0..51)\n");
   log_info("  --qpmax <num>       Maximum quantization level (0..51)\n");
   log_info("  --qpinit <num>      Initial quantization level\n");
@@ -3518,6 +3566,8 @@ int main(int argc, char **argv) {
     { "rotation", required_argument, NULL, 0 },
     { "hflip", no_argument, NULL, 0 },
     { "vflip", no_argument, NULL, 0 },
+    { "avcprofile", required_argument, NULL, 0 },
+    { "avclevel", required_argument, NULL, 0 },
     { "qpmin", required_argument, NULL, 0 },
     { "qpmax", required_argument, NULL, 0 },
     { "qpinit", required_argument, NULL, 0 },
@@ -3578,6 +3628,8 @@ int main(int argc, char **argv) {
   video_pts_step = video_pts_step_default;
   video_gop_size = video_gop_size_default;
   video_bitrate = video_bitrate_default;
+  strncpy(video_avc_profile, video_avc_profile_default, sizeof(video_avc_profile));
+  strncpy(video_avc_level, video_avc_level_default, sizeof(video_avc_level));
   video_qp_min = video_qp_min_default;
   video_qp_max = video_qp_max_default;
   video_qp_initial = video_qp_initial_default;
@@ -3649,6 +3701,34 @@ int main(int argc, char **argv) {
         } else if (strcmp(long_options[option_index].name, "vflip") == 0) {
           video_vflip = 1;
           break;
+        } else if (strcmp(long_options[option_index].name, "avcprofile") == 0) {
+          strncpy(video_avc_profile, optarg, sizeof(video_avc_profile));
+          int matched = 0;
+          int i;
+          for (i = 0; i < sizeof(video_avc_profile_options) / sizeof(video_avc_profile_option); i++) {
+            if (strcmp(video_avc_profile_options[i].name, video_avc_profile) == 0) {
+              matched = 1;
+              break;
+            }
+          }
+          if (!matched) {
+            log_fatal("error: invalid avcprofile: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+        } else if (strcmp(long_options[option_index].name, "avclevel") == 0) {
+          strncpy(video_avc_level, optarg, sizeof(video_avc_level));
+          int matched = 0;
+          int i;
+          for (i = 0; i < sizeof(video_avc_level_options) / sizeof(video_avc_level_option); i++) {
+            if (strcmp(video_avc_level_options[i].name, video_avc_level) == 0) {
+              matched = 1;
+              break;
+            }
+          }
+          if (!matched) {
+            log_fatal("error: invalid avclevel: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
         } else if (strcmp(long_options[option_index].name, "qpmin") == 0) {
           char *end;
           long value = strtol(optarg, &end, 10);
@@ -4088,7 +4168,16 @@ int main(int argc, char **argv) {
 
   // Print a warning if the video size is larger than 1280x720
   if (video_width * video_height > 1280 * 720) {
-    log_warn("warning: video size larger than 1280x720 may not work (program might hang)\n");
+    if (strcmp(video_avc_profile, "high") != 0 || strcmp(video_avc_level, "4") != 0) {
+      log_info("using AVC High Profile Level 4\n");
+      strncpy(video_avc_profile, "high", sizeof(video_avc_profile));
+      strncpy(video_avc_level, "4", sizeof(video_avc_level));
+    }
+    if (!is_vfr_enabled && video_fps > 20.0f) {
+      log_warn("warn: fps > 20 might not work properly when width and height is large.\n");
+      log_warn("      Use lower --fps or use --vfr. If you still want to use this\n");
+      log_warn("      configuration, see if picam keeps up with %.1f fps using --verbose.\n", video_fps);
+    }
   }
 
   if (is_vfr_enabled &&
@@ -4128,6 +4217,8 @@ int main(int argc, char **argv) {
   log_debug("video_hflip=%d\n", video_hflip);
   log_debug("video_vflip=%d\n", video_vflip);
   log_debug("video_bitrate=%ld\n", video_bitrate);
+  log_debug("video_avc_profile=%s\n", video_avc_profile);
+  log_debug("video_avc_level=%s\n", video_avc_level);
   log_debug("video_qp_min=%d\n", video_qp_min);
   log_debug("video_qp_max=%d\n", video_qp_max);
   log_debug("video_qp_initial=%d\n", video_qp_initial);
