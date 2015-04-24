@@ -199,7 +199,7 @@ Then, put those files into /usr/local/ so that you have /usr/local/bin/ffmpeg.
     bin  include  lib  share
     $ sudo rsync -rav ./ /usr/local/
 
-We have done with the powerful machine which was used for cross compiling.
+We have done with the powerful machine which we used for cross compiling.
 
 If you don't have /etc/ld.so.conf.d/libc.conf on Raspberry Pi, create that file with the following contents. On Raspbian, /etc/ld.so.conf.d/libc.conf is installed by default.
 
