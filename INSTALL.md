@@ -187,9 +187,11 @@ If all goes well, build ffmpeg.
 
 ## Transfer the files to Raspberry Pi
 
-Transfer the contents of $PIBUILD directory to Raspberry Pi, then put them in /usr/local/ so that you have /usr/local/bin/ffmpeg.
+Transfer the contents of $PIBUILD directory to Raspberry Pi.
 
-If you have transferred the files to ~/build/, you can install them like this:
+    $ rsync -rav $PIBUILD/ pi@raspberrypi:build/
+
+Then, put those files into /usr/local/ so that you have /usr/local/bin/ffmpeg.
 
     (on Raspberry Pi)
     $ cd ~/build
