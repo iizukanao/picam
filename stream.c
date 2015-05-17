@@ -96,6 +96,21 @@ static OMX_U8 *video_encode_input_buf_pBuffer_orig = NULL;
 
 #define ENABLE_AUTO_GOP_SIZE_CONTROL_FOR_VFR 1
 
+// Enable motion vector (1) or not (0)
+#define ENABLE_MVEC 1
+
+#if ENABLE_MVEC
+
+// To output all of motion vector data to files, set this to 1.
+// Otherwise, motion vector files will be written only at keyframes.
+#define WRITE_ALL_MVEC_FRAMES 0
+
+static const char mvec_dir[] = "mvec";
+static int mvec_index = 0;
+static uint8_t *mvec_data = NULL;
+static size_t mvec_data_size = 0;
+#endif // ENABLE_MVEC
+
 // OpenMAX IL ports
 static const int CAMERA_PREVIEW_PORT      = 70;
 static const int CAMERA_CAPTURE_PORT      = 71;
@@ -461,6 +476,66 @@ static pthread_cond_t camera_finish_cond = PTHREAD_COND_INITIALIZER;
 
 static char errbuf[1024];
 
+#if ENABLE_MVEC
+static void shutdown_mvec() {
+  if (mvec_data != NULL) {
+    free(mvec_data);
+  }
+}
+
+static void write_mvec_data() {
+  char mvec_filename[32];
+  FILE *fp;
+
+  if (mvec_data != NULL) {
+    mvec_index++;
+    snprintf(mvec_filename, sizeof(mvec_filename), "%s/%d.mvec", mvec_dir, mvec_index);
+    fp = fopen(mvec_filename, "w");
+    if (fp == NULL) {
+      perror("mvec fopen");
+      exit(EXIT_FAILURE);
+    }
+    fwrite(mvec_data, 1, mvec_data_size, fp);
+    fclose(fp);
+    printf("wrote %s\n", mvec_filename);
+  }
+}
+
+// Create mvec dir if it does not exist
+static void create_mvec_dir() {
+  struct stat st;
+  int err;
+
+  err = stat(mvec_dir, &st);
+  if (err == -1) {
+    if (errno == ENOENT) {
+      // create directory
+      if (mkdir(mvec_dir, 0755) == 0) { // success
+        log_info("created dir: %s\n", mvec_dir);
+      } else { // error
+        log_error("error creating dir (%s): %s\n",
+            mvec_dir, strerror(errno));
+        exit(EXIT_FAILURE);
+      }
+    } else {
+      perror("stat mvec_dir");
+      exit(EXIT_FAILURE);
+    }
+  } else {
+    if (!S_ISDIR(st.st_mode)) {
+      log_error("error: mvec is not a directory\n");
+      exit(EXIT_FAILURE);
+    }
+  }
+
+  if (access(mvec_dir, R_OK) != 0) {
+    log_error("error: cannot access mvec directory (%s): %s\n",
+        mvec_dir, strerror(errno));
+    exit(EXIT_FAILURE);
+  }
+}
+#endif // ENABLE_MVEC
+
 static void unmute_audio() {
   log_info("unmute");
   is_audio_muted = 0;
@@ -560,7 +635,7 @@ static void add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_
       next_keyframe_pointer = 0;
     }
     if (current_encoded_packet == keyframe_pointers[next_keyframe_pointer]) {
-      log_warn("warning: Record buffer is starving. Recorded file may not start from keyframe. Try reducing the value of --gopsize.\n");
+      log_warn("warning: Ran out of record buffer. Recorded file may not start from keyframe. Try reducing the value of --gopsize.\n");
     }
 
     av_freep(&packet->data);
@@ -2488,11 +2563,10 @@ static int openmax_cam_open() {
 }
 
 // This function is called after the video encoder produces each frame
-static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
+static void video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
   int nal_unit_type;
   uint8_t *buf;
   int buf_len;
-  int is_endofnal = 1;
   uint8_t *concat_buf = NULL;
   struct timespec tsEnd, tsDiff;
 
@@ -2500,7 +2574,7 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
 
   if (out == NULL) {
     log_error("error: cannot get output buffer from video_encode\n");
-    return 0;
+    return;
   }
   if (encbuf != NULL) {
     // merge the previous buffer
@@ -2533,95 +2607,95 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
       }
       memcpy(encbuf, buf, buf_len);
     }
-    is_endofnal = 0;
   } else {
     encbuf = NULL;
     encbuf_size = -1;
 
-    nal_unit_type = buf[4] & 0x1f;
-    if (nal_unit_type != 1 && nal_unit_type != 5) {
-      log_debug("%d", nal_unit_type);
-    }
-    if (out->nFlags != 0x480 && out->nFlags != 0x490 &&
-        out->nFlags != 0x430 && out->nFlags != 0x410 &&
-        out->nFlags != 0x400 && out->nFlags != 0x510 &&
-        out->nFlags != 0x530) {
-      log_warn("\nnew flag (%d,nal=%d)\n", out->nFlags, nal_unit_type);
-    }
-    if (out->nFlags & OMX_BUFFERFLAG_DATACORRUPT) {
-      log_warn("\n=== OMX_BUFFERFLAG_DATACORRUPT ===\n");
-    }
-    if (out->nFlags & OMX_BUFFERFLAG_EXTRADATA) {
-      log_warn("\n=== OMX_BUFFERFLAG_EXTRADATA ===\n");
-    }
-    if (out->nFlags & OMX_BUFFERFLAG_FRAGMENTLIST) {
-      log_warn("\n=== OMX_BUFFERFLAG_FRAGMENTLIST ===\n");
-    }
-    if (out->nFlags & OMX_BUFFERFLAG_DISCONTINUITY) {
-      log_warn("\n=== OMX_BUFFERFLAG_DISCONTINUITY ===\n");
-    }
-    if (out->nFlags & OMX_BUFFERFLAG_CODECCONFIG) {
-      // Insert timing info to nal_unit_type 7
-      codec_configs[n_codec_configs] = malloc(buf_len);
-      if (codec_configs[n_codec_configs] == NULL) {
-        log_fatal("error: cannot allocate memory for codec config (%d bytes)\n", buf_len);
-        exit(EXIT_FAILURE);
+    if (out->nFlags & OMX_BUFFERFLAG_CODECSIDEINFO) { // codec side info
+      // possibly motion vector data
+#if ENABLE_MVEC
+      if (out->nFilledLen > mvec_data_size) {
+        // increase buffer size
+        uint8_t *newbuf = realloc(mvec_data, out->nFilledLen);
+        if (newbuf == NULL) {
+          if (mvec_data != NULL) {
+            free(mvec_data);
+          }
+          perror("mvec realloc failed");
+          exit(EXIT_FAILURE);
+        }
+        mvec_data = newbuf;
       }
-      codec_config_sizes[n_codec_configs] = buf_len;
-      memcpy(codec_configs[n_codec_configs], buf, buf_len);
+      memcpy(mvec_data, out->pBuffer, out->nFilledLen);
+      mvec_data_size = out->nFilledLen;
 
-      codec_config_total_size += codec_config_sizes[n_codec_configs];
-      n_codec_configs++;
-
-      send_video_frame(buf, buf_len, 0);
-    } else { // video frame
-      frame_count++; // will be used for printing stats about FPS, etc.
-
-      if (out->nFlags & OMX_BUFFERFLAG_SYNCFRAME) { // keyframe
-        if (nal_unit_type != 5) {
-          log_debug("SYNCFRAME nal_unit_type=%d len=%d\n", nal_unit_type, buf_len);
-        }
-        int consume_time = 0;
-        if (nal_unit_type == 1 || nal_unit_type == 2 ||
-            nal_unit_type == 3 || nal_unit_type == 4 ||
-            nal_unit_type == 5) {
-          consume_time = 1;
-        } else {
-          log_debug("(nosl)");
-        }
-#if !(AUDIO_ONLY)
-        send_keyframe(buf, buf_len, consume_time);
+#if WRITE_ALL_MVEC_FRAMES
+      write_mvec_data();
 #endif
 
-        // calculate FPS and display it
-        if (tsBegin.tv_sec != 0 && tsBegin.tv_nsec != 0) {
-          keyframes_count++;
-          clock_gettime(CLOCK_MONOTONIC, &tsEnd);
-          timespec_subtract(&tsDiff, &tsEnd, &tsBegin);
-          unsigned long long wait_nsec = tsDiff.tv_sec * INT64_C(1000000000) + tsDiff.tv_nsec;
-          float divisor = (float)wait_nsec / (float)frame_count / 1000000000;
-          float fps;
-          if (divisor == 0.0f) { // This won't cause SIGFPE because of float, but just to be safe.
-            fps = 99999.0f;
-          } else {
-            fps = 1.0f / divisor;
-          }
-          log_debug(" %5.2f fps k=%d", fps, keyframes_count);
-          if (log_get_level() <= LOG_LEVEL_DEBUG) {
-            print_audio_timing();
-          }
-          current_audio_frames = 0;
-          frame_count = 0;
-
-          if (is_auto_exposure_enabled) {
-            auto_select_exposure(video_width, video_height, last_video_buffer, fps);
-          }
-
-          log_debug("\n");
+#endif // ENABLE_MVEC
+      out->nFilledLen = 0;
+      out->nOffset = 0;
+    } else {
+      nal_unit_type = buf[4] & 0x1f;
+      if (nal_unit_type != 1 && nal_unit_type != 5 &&
+          nal_unit_type != 7 && nal_unit_type != 8) {
+        log_debug("nut=%d", nal_unit_type);
+      }
+      /**
+       * 0x400: OMX_BUFFERFLAG_ENDOFNAL
+       * 0x410: OMX_BUFFERFLAG_ENDOFNAL | OMX_BUFFERFLAG_ENDOFFRAME
+       *   -> P frame
+       * 0x430: OMX_BUFFERFLAG_ENDOFNAL | OMX_BUFFERFLAG_SYNCFRAME | OMX_BUFFERFLAG_ENDOFFRAME
+       *   -> I frame
+       * 0x480: OMX_BUFFERFLAG_ENDOFNAL | OMX_BUFFERFLAG_CODECCONFIG
+       *   -> SPS (only occurs at the beginning of stream)
+       * 0x490: OMX_BUFFERFLAG_ENDOFNAL | OMX_BUFFERFLAG_CODECCONFIG | OMX_BUFFERFLAG_ENDOFFRAME
+       *   -> PPS (only occurs at the beginning of stream)
+       * 0x510: OMX_BUFFERFLAG_ENDOFNAL | OMX_BUFFERFLAG_TIME_UNKNOWN | OMX_BUFFERFLAG_ENDOFFRAME
+       * 0x530: OMX_BUFFERFLAG_ENDOFNAL | OMX_BUFFERFLAG_TIME_UNKNOWN | OMX_BUFFERFLAG_SYNCFRAME | OMX_BUFFERFLAG_ENDOFFRAME
+       * 0x2010: OMX_BUFFERFLAG_CODECSIDEINFO | OMX_BUFFERFLAG_ENDOFFRAME
+       *   -> motion vector data
+       */
+      if (out->nFlags != 0x480 && out->nFlags != 0x490 &&
+          out->nFlags != 0x430 && out->nFlags != 0x410 &&
+          out->nFlags != 0x400 && out->nFlags != 0x510 &&
+          out->nFlags != 0x530 && out->nFlags != 0x2010) {
+        log_warn("\nnew flag (%d,nal=%d)\n", out->nFlags, nal_unit_type);
+      }
+      if (out->nFlags & OMX_BUFFERFLAG_DATACORRUPT) {
+        log_warn("\n=== OMX_BUFFERFLAG_DATACORRUPT ===\n");
+      }
+      if (out->nFlags & OMX_BUFFERFLAG_EXTRADATA) {
+        log_warn("\n=== OMX_BUFFERFLAG_EXTRADATA ===\n");
+      }
+      if (out->nFlags & OMX_BUFFERFLAG_FRAGMENTLIST) {
+        log_warn("\n=== OMX_BUFFERFLAG_FRAGMENTLIST ===\n");
+      }
+      if (out->nFlags & OMX_BUFFERFLAG_DISCONTINUITY) {
+        log_warn("\n=== OMX_BUFFERFLAG_DISCONTINUITY ===\n");
+      }
+      if (out->nFlags & OMX_BUFFERFLAG_CODECCONFIG) {
+        // Insert timing info to nal_unit_type 7
+        codec_configs[n_codec_configs] = malloc(buf_len);
+        if (codec_configs[n_codec_configs] == NULL) {
+          log_fatal("error: cannot allocate memory for codec config (%d bytes)\n", buf_len);
+          exit(EXIT_FAILURE);
         }
-        clock_gettime(CLOCK_MONOTONIC, &tsBegin);
-      } else { // inter frame
-        if (nal_unit_type != 9) { // Exclude nal_unit_type 9 (Access unit delimiter)
+        codec_config_sizes[n_codec_configs] = buf_len;
+        memcpy(codec_configs[n_codec_configs], buf, buf_len);
+
+        codec_config_total_size += codec_config_sizes[n_codec_configs];
+        n_codec_configs++;
+
+        send_video_frame(buf, buf_len, 0);
+      } else { // video frame
+        frame_count++; // will be used for printing stats about FPS, etc.
+
+        if (out->nFlags & OMX_BUFFERFLAG_SYNCFRAME) { // keyframe
+          if (nal_unit_type != 5) {
+            log_debug("SYNCFRAME nal_unit_type=%d len=%d\n", nal_unit_type, buf_len);
+          }
           int consume_time = 0;
           if (nal_unit_type == 1 || nal_unit_type == 2 ||
               nal_unit_type == 3 || nal_unit_type == 4 ||
@@ -2631,8 +2705,54 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
             log_debug("(nosl)");
           }
 #if !(AUDIO_ONLY)
-          send_pframe(buf, buf_len, consume_time);
+          send_keyframe(buf, buf_len, consume_time);
 #endif
+
+          // calculate FPS and display it
+          if (tsBegin.tv_sec != 0 && tsBegin.tv_nsec != 0) {
+            keyframes_count++;
+            clock_gettime(CLOCK_MONOTONIC, &tsEnd);
+            timespec_subtract(&tsDiff, &tsEnd, &tsBegin);
+            unsigned long long wait_nsec = tsDiff.tv_sec * INT64_C(1000000000) + tsDiff.tv_nsec;
+            float divisor = (float)wait_nsec / (float)frame_count / 1000000000;
+            float fps;
+            if (divisor == 0.0f) { // This won't cause SIGFPE because of float, but just to be safe.
+              fps = 99999.0f;
+            } else {
+              fps = 1.0f / divisor;
+            }
+            log_debug(" %5.2f fps k=%d", fps, keyframes_count);
+            if (log_get_level() <= LOG_LEVEL_DEBUG) {
+              print_audio_timing();
+            }
+            current_audio_frames = 0;
+            frame_count = 0;
+
+            if (is_auto_exposure_enabled) {
+              auto_select_exposure(video_width, video_height, last_video_buffer, fps);
+            }
+
+            log_debug("\n");
+          }
+          clock_gettime(CLOCK_MONOTONIC, &tsBegin);
+
+#if ENABLE_MVEC && !(WRITE_ALL_MVEC_FRAMES)
+          write_mvec_data();
+#endif
+        } else { // inter frame
+          if (nal_unit_type != 9) { // Exclude nal_unit_type 9 (Access unit delimiter)
+            int consume_time = 0;
+            if (nal_unit_type == 1 || nal_unit_type == 2 ||
+                nal_unit_type == 3 || nal_unit_type == 4 ||
+                nal_unit_type == 5) {
+              consume_time = 1;
+            } else {
+              log_debug("(nosl)");
+            }
+#if !(AUDIO_ONLY)
+            send_pframe(buf, buf_len, consume_time);
+#endif
+          }
         }
       }
     }
@@ -2640,8 +2760,6 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
   if (concat_buf != NULL) {
     free(concat_buf);
   }
-
-  return is_endofnal;
 }
 
 static int video_encode_startup() {
@@ -2889,6 +3007,23 @@ static int video_encode_startup() {
     exit(EXIT_FAILURE);
   }
 
+#if ENABLE_MVEC
+  OMX_CONFIG_PORTBOOLEANTYPE port_boolean_type;
+
+  memset(&port_boolean_type, 0, sizeof(OMX_CONFIG_BOOLEANTYPE));
+  port_boolean_type.nSize = sizeof(OMX_CONFIG_BOOLEANTYPE);
+  port_boolean_type.nVersion.nVersion = OMX_VERSION;
+  port_boolean_type.nPortIndex = VIDEO_ENCODE_OUTPUT_PORT;
+  port_boolean_type.bEnabled = OMX_TRUE;
+
+  error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
+      OMX_IndexParamBrcmVideoAVCInlineVectorsEnable, &port_boolean_type);
+  if (error != OMX_ErrorNone) {
+    log_fatal("error: failed to set video_encode AVC inline vectors enable: 0x%x\n", error);
+    exit(EXIT_FAILURE);
+  }
+#endif // ENABLE_MVEC
+
   // Set video_encode component to idle state
   log_debug("Set video_encode state to idle\n");
   if (ilclient_change_component_state(video_encode, OMX_StateIdle) == -1) {
@@ -2975,11 +3110,22 @@ static void encode_and_send_image() {
       break;
     }
 
+#if ENABLE_MVEC
+    if (out->nFlags & OMX_BUFFERFLAG_CODECSIDEINFO) {
+      // There is one more video frame to consume, and
+      // we have to consume it before return. Otherwise
+      // ilclient_get_input_buffer() will eventually hang.
+      continue;
+    }
+#endif // ENABLE_MVEC
+
     if (out->nFlags & OMX_BUFFERFLAG_ENDOFFRAME) {
       break;
       // If out->nFlags doesn't have ENDOFFRAME,
       // there is remaining buffer for this frame.
     }
+
+    // There is more data to consume
   }
 }
 
@@ -4282,6 +4428,10 @@ int main(int argc, char **argv) {
     create_dir(rec_tmp_dir);
     create_dir(rec_archive_dir);
 
+#if ENABLE_MVEC
+    create_mvec_dir();
+#endif
+
     if (is_hlsout_enabled) {
       ensure_hls_dir_exists();
     }
@@ -4498,6 +4648,10 @@ int main(int argc, char **argv) {
 
   log_debug("free keyframe_pointers\n");
   free(keyframe_pointers);
+
+#if ENABLE_MVEC
+  shutdown_mvec();
+#endif
 
   log_debug("shutdown successful\n");
   return 0;
