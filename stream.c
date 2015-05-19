@@ -3111,7 +3111,9 @@ static void encode_and_send_image() {
     }
 
 #if ENABLE_MVEC
-    if (out->nFlags & OMX_BUFFERFLAG_CODECSIDEINFO) {
+    if (out->nFlags & OMX_BUFFERFLAG_ENDOFNAL &&
+        !(out->nFlags & OMX_BUFFERFLAG_CODECCONFIG) &&
+        !(out->nFlags & OMX_BUFFERFLAG_CODECSIDEINFO)) {
       // There is one more video frame to consume, and
       // we have to consume it before return. Otherwise
       // ilclient_get_input_buffer() will eventually hang.
