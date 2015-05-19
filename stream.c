@@ -2612,6 +2612,7 @@ static void video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
     encbuf_size = -1;
 
     if (out->nFlags & OMX_BUFFERFLAG_CODECSIDEINFO) { // codec side info
+      log_debug("#");
       // possibly motion vector data
 #if ENABLE_MVEC
       if (out->nFilledLen > mvec_data_size) {
