@@ -2638,9 +2638,8 @@ static void video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
       out->nOffset = 0;
     } else {
       nal_unit_type = buf[4] & 0x1f;
-      if (nal_unit_type != 1 && nal_unit_type != 5 &&
-          nal_unit_type != 7 && nal_unit_type != 8) {
-        log_debug("nut=%d", nal_unit_type);
+      if (nal_unit_type != 1 && nal_unit_type != 5) {
+        log_debug("<%d>", nal_unit_type);
       }
       /**
        * 0x400: OMX_BUFFERFLAG_ENDOFNAL
