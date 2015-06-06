@@ -21,6 +21,8 @@ Time from real motion to playback on Strobe Media Player over RTMP:
 |   2 Mbps      |         1.0 sec |
 |   3 Mbps      |         1.3 sec |
 
+In HTTP Live Streaming (HLS), the latency will never go below 3-4 seconds. This limitation stems from the design of HLS.
+
 Tested with:
 
 - Video: 1280x720, 30 fps, GOP size 30
