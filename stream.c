@@ -927,6 +927,8 @@ void on_file_create(char *filename, char *content) {
     mute_audio();
   } else if (strcmp(filename, "unmute") == 0) {
     unmute_audio();
+  } else {
+    log_error("error: invalid hook: %s\n", filename);
   }
 }
 
