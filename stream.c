@@ -334,6 +334,7 @@ static pthread_t audio_nop_thread;
 static int fr_q16;
 
 // Function prototypes
+static int camera_set_white_balance(char *wb);
 static void encode_and_send_image();
 static void encode_and_send_audio();
 void start_record();
@@ -927,6 +928,36 @@ void on_file_create(char *filename, char *content) {
     mute_audio();
   } else if (strcmp(filename, "unmute") == 0) {
     unmute_audio();
+  } else if (strncmp(filename, "wb_", 3) == 0) { // e.g. wb_sun
+    char *wb_mode = filename + 3;
+    int matched = 0;
+    int i;
+    for (i = 0; i < sizeof(white_balance_options) / sizeof(white_balance_option); i++) {
+      if (strcmp(white_balance_options[i].name, wb_mode) == 0) {
+        strncpy(white_balance, wb_mode, sizeof(white_balance));
+        matched = 1;
+        break;
+      }
+    }
+    if (matched) {
+      if (camera_set_white_balance(white_balance) == 0) {
+        log_info("changed the white balance to %s\n", white_balance);
+      } else {
+        log_error("error: failed to set the white balance to %s\n", white_balance);
+      }
+    } else {
+      log_error("hook error: invalid white balance: %s\n", wb_mode);
+      log_error("(valid values: ");
+      int size = sizeof(white_balance_options) / sizeof(white_balance_option);
+      for (i = 0; i < size; i++) {
+        log_error("%s", white_balance_options[i].name);
+        if (i + 1 == size) { // the last item
+          log_error(")\n");
+        } else {
+          log_error("/");
+        }
+      }
+    }
   } else {
     log_error("error: invalid hook: %s\n", filename);
   }
