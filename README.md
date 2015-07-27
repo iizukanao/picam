@@ -246,6 +246,14 @@ To unmute microphone, create a file named `hooks/unmute`.
       --version           Print program version
       --help              Print this help
 
+#### Changing the white balance
+
+The white balance can be set either via command line option or hooks. To change the white balance while picam is running, create `hooks/wb_<wbname>`, where `<wbname>` is the white balance name.
+
+For example, the following command changes the white balance to "sun":
+
+    $ touch hooks/wb_sun
+
 
 ### HTTP Live Streaming
 
