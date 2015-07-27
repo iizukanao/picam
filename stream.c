@@ -2322,10 +2322,6 @@ static int openmax_cam_open() {
 
   set_exposure_to_auto();
 
-  if (camera_set_white_balance(white_balance) != 0) {
-    exit(EXIT_FAILURE);
-  }
-
   if (camera_set_exposure_value() != 0) {
     exit(EXIT_FAILURE);
   }
@@ -3290,6 +3286,11 @@ static void openmax_cam_loop() {
   error = OMX_FillThisBuffer(ILC_GET_HANDLE(camera_component), out);
   if (error != OMX_ErrorNone) {
     log_error("error filling camera buffer (1): 0x%x\n", error);
+  }
+
+  // Changing the white balance only take effect after this point.
+  if (camera_set_white_balance(white_balance) != 0) {
+    exit(EXIT_FAILURE);
   }
 }
 
