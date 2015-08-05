@@ -1,6 +1,13 @@
 Change Log
 ==========
 
+Version 1.3.1 *(2015-08-05)*
+-----------------------------
+
+- Show error when picam receives an invalid hook
+- Fix white balance control for the latest firmware
+- Add hooks for white balance control
+
 Version 1.3.0 *(2015-04-04)*
 -----------------------------
 
