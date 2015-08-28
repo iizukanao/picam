@@ -304,6 +304,8 @@ static int preview_x;
 static int preview_y;
 static int preview_width;
 static int preview_height;
+static int preview_opacity;
+static const int preview_opacity_default = 255;
 static int record_buffer_keyframes;
 static const int record_buffer_keyframes_default = 5;
 
@@ -2494,6 +2496,16 @@ static int openmax_cam_open() {
       exit(EXIT_FAILURE);
     }
 
+    // Set the opacity of the preview window
+    display_region.set = OMX_DISPLAY_SET_ALPHA;
+    display_region.alpha = (OMX_U32) preview_opacity;
+    error = OMX_SetParameter(ILC_GET_HANDLE(render_component),
+        OMX_IndexConfigDisplayRegion, &display_region);
+    if (error != OMX_ErrorNone) {
+      log_fatal("error: failed to set render input %d alpha: 0x%x\n", VIDEO_RENDER_INPUT_PORT, error);
+      exit(EXIT_FAILURE);
+    }
+
     // Set up tunnel from camera to video_render
     set_tunnel(tunnel+n_tunnel,
         camera_component, CAMERA_PREVIEW_PORT,
@@ -3575,6 +3587,8 @@ static void print_usage() {
   log_info("  -p, --preview       Display fullscreen preview\n");
   log_info("  --previewrect <x,y,width,height>\n");
   log_info("                      Display preview window at specified position\n");
+  log_info("  --opacity           Preview window opacity\n");
+  log_info("                      (0=transparent .. 255=opaque)\n");
   log_info("  --query             Query camera capabilities then exit\n");
   log_info(" [misc]\n");
   log_info("  --recordbuf <num>   Start recording from <num> keyframes ago\n");
@@ -3639,6 +3653,7 @@ int main(int argc, char **argv) {
     { "hlsenciv", required_argument, NULL, 0 },
     { "preview", no_argument, NULL, 'p' },
     { "previewrect", required_argument, NULL, 0 },
+    { "opacity", required_argument, NULL, 0 },
     { "quiet", no_argument, NULL, 'q' },
     { "recordbuf", required_argument, NULL, 0 },
     { "verbose", no_argument, NULL, 0 },
@@ -4032,6 +4047,16 @@ int main(int argc, char **argv) {
           }
           is_preview_enabled = 1;
           is_previewrect_enabled = 1;
+        } else if (strcmp(long_options[option_index].name, "opacity") == 0) {
+          char *end;
+          int value = strtol(optarg, &end, 10);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid opacity: %s\n", optarg);
+            print_usage();
+            return EXIT_FAILURE;
+          }
+          preview_opacity = value;
+          break;
         } else if (strcmp(long_options[option_index].name, "recordbuf") == 0) {
           char *end;
           long value = strtol(optarg, &end, 10);
@@ -4300,6 +4325,7 @@ int main(int argc, char **argv) {
   log_debug("preview_y=%d\n", preview_y);
   log_debug("preview_width=%d\n", preview_width);
   log_debug("preview_height=%d\n", preview_height);
+  log_debug("preview_opacity=%d\n", preview_opacity);
   log_debug("record_buffer_keyframes=%d\n", record_buffer_keyframes);
   log_debug("state_dir=%s\n", state_dir);
   log_debug("hooks_dir=%s\n", hooks_dir);
