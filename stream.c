@@ -2724,7 +2724,7 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
 
     nal_unit_type = buf[4] & 0x1f;
     if (nal_unit_type != 1 && nal_unit_type != 5) {
-      log_debug("%d", nal_unit_type);
+      log_debug("[NAL%d]", nal_unit_type);
     }
     if (out->nFlags != 0x480 && out->nFlags != 0x490 &&
         out->nFlags != 0x430 && out->nFlags != 0x410 &&
@@ -3296,7 +3296,7 @@ static int read_audio_poll_mmap() {
         // if the capture from PCM is started (is_first_audio=1) and one period is ready to process,
         // the stream must start 
         is_first_audio = 0;
-        log_debug("S");
+        log_debug("[microphone started]");
         if ( (error = snd_pcm_start(capture_handle)) < 0) {
           log_fatal("error: cannot start microphone: %s\n", snd_strerror(error));
           exit(EXIT_FAILURE);
