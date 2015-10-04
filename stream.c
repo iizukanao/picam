@@ -3762,7 +3762,7 @@ static void print_usage() {
   log_info("  --previewrect <x,y,width,height>\n");
   log_info("                      Display preview window at specified position\n");
   log_info("  --opacity           Preview window opacity\n");
-  log_info("                      (0=transparent .. 255=opaque)\n");
+  log_info("                      (0=transparent..255=opaque; default=%d)\n", preview_opacity_default);
   log_info("  --query             Query camera capabilities then exit\n");
   log_info(" [misc]\n");
   log_info("  --recordbuf <num>   Start recording from <num> keyframes ago\n");
@@ -3890,6 +3890,7 @@ int main(int argc, char **argv) {
       sizeof(hls_encryption_key_uri));
   is_preview_enabled = is_preview_enabled_default;
   is_previewrect_enabled = is_previewrect_enabled_default;
+  preview_opacity = preview_opacity_default;
   record_buffer_keyframes = record_buffer_keyframes_default;
 
   while ((opt = getopt_long(argc, argv, "w:h:v:f:g:c:r:a:o:pq", long_options, &option_index)) != -1) {
