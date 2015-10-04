@@ -50,8 +50,11 @@ extern "C" {
 // Audio-only stream is created if this is 1 (for debugging)
 #define AUDIO_ONLY 0
 
-// ALSA buffer size (frames) is multiplied by this number by default
+// ALSA buffer size for capture will be multiplied by this number
 #define ALSA_BUFFER_MULTIPLY 100
+
+// ALSA buffer size for playback will be multiplied by this number (max: 16)
+#define ALSA_PLAYBACK_BUFFER_MULTIPLY 10
 
 // If this is 1, PTS will be reset to zero when it exceeds PTS_MODULO
 #define ENABLE_PTS_WRAP_AROUND 0
@@ -196,10 +199,13 @@ static int video_slice_dquant;
 static const int video_slice_dquant_default = -1;
 static char alsa_dev[256];
 static const char *alsa_dev_default = "hw:0,0";
+static char audio_preview_dev[256];
+static const char *audio_preview_dev_default = "plughw:0,0";
 static long audio_bitrate;
 static const long audio_bitrate_default = 40000; // 40 Kbps
 static int is_audio_channels_specified = 0;
 static int audio_channels;
+static int audio_preview_channels;
 static const int audio_channels_default = 1; // mono
 static int audio_sample_rate;
 static const int audio_sample_rate_default = 48000;
@@ -398,6 +404,7 @@ static int access_unit_delimiter_length = 6;
 
 // sound
 static snd_pcm_t *capture_handle;
+static snd_pcm_t *audio_preview_handle;
 static snd_pcm_hw_params_t *alsa_hw_params;
 static uint16_t *samples;
 static AVFrame *av_frame;
@@ -405,6 +412,10 @@ static int audio_fd_count;
 static struct pollfd *poll_fds; // file descriptors for polling audio
 static int is_first_audio;
 static int period_size;
+static int audio_buffer_size;
+static int is_audio_preview_enabled;
+static const int is_audio_preview_enabled_default = 0;
+static int is_audio_preview_device_opened = 0;
 
 // threads
 static pthread_mutex_t mutex_writing = PTHREAD_MUTEX_INITIALIZER;
@@ -1568,12 +1579,126 @@ static int wait_for_poll(snd_pcm_t *device, struct pollfd *target_fds, unsigned 
 static int open_audio_capture_device() {
   int err;
 
-  log_debug("opening ALSA device: %s\n", alsa_dev);
+  log_debug("opening ALSA device for capture: %s\n", alsa_dev);
   err = snd_pcm_open(&capture_handle, alsa_dev, SND_PCM_STREAM_CAPTURE, 0);
   if (err < 0) {
     log_error("error: cannot open audio device '%s' (%s)\n",
         alsa_dev, snd_strerror(err));
     return -1;
+  }
+
+  return 0;
+}
+
+static int open_audio_preview_device() {
+  int err;
+  snd_pcm_hw_params_t *audio_preview_params;
+
+  log_debug("opening ALSA device for playback: %s\n", audio_preview_dev);
+  err = snd_pcm_open(&audio_preview_handle, audio_preview_dev, SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK);
+  if (err < 0) {
+    log_error("error: audio preview device '%s' open error: %s\n",
+        audio_preview_dev, snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  err = snd_pcm_hw_params_malloc(&audio_preview_params);
+  if (err < 0) {
+    log_fatal("error: cannot allocate hardware parameter structure for audio preview: %s\n",
+        snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  // fill hw_params with a full configuration space for a PCM.
+  err = snd_pcm_hw_params_any(audio_preview_handle, audio_preview_params);
+  if (err < 0) {
+    log_fatal("error: cannot initialize hardware parameter structure for audio preview: %s\n",
+        snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  // enable rate resampling
+  unsigned int enable_resampling = 1;
+  err = snd_pcm_hw_params_set_rate_resample(audio_preview_handle, audio_preview_params, enable_resampling);
+  if (err < 0) {
+    log_fatal("error: cannot enable rate resampling for audio preview: %s\n",
+        snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  err = snd_pcm_hw_params_set_access(audio_preview_handle, audio_preview_params,
+      SND_PCM_ACCESS_MMAP_INTERLEAVED);
+  if (err < 0) {
+    log_fatal("error: cannot set access type for audio preview: %s\n",
+        snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  // SND_PCM_FORMAT_S16_LE => PCM 16 bit signed little endian
+  err = snd_pcm_hw_params_set_format(audio_preview_handle, audio_preview_params, SND_PCM_FORMAT_S16_LE);
+  if (err < 0) {
+    log_fatal("error: cannot set sample format for audio preview: %s\n",
+        snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  audio_preview_channels = audio_channels;
+  err = snd_pcm_hw_params_set_channels(audio_preview_handle, audio_preview_params, audio_preview_channels);
+  if (err < 0) {
+    log_fatal("error: cannot set channel count for audio preview: %s\n",
+        snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  // set the sample rate
+  unsigned int rate = audio_sample_rate;
+  err = snd_pcm_hw_params_set_rate_near(audio_preview_handle, audio_preview_params, &rate, 0);
+  if (err < 0) {
+    log_fatal("error: cannot set sample rate for audio preview: %s\n",
+        snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  // set the buffer size
+  err = snd_pcm_hw_params_set_buffer_size(audio_preview_handle, audio_preview_params,
+      audio_buffer_size * ALSA_PLAYBACK_BUFFER_MULTIPLY);
+  if (err < 0) {
+    log_fatal("error: failed to set buffer size for audio preview: audio_buffer_size=%d error=%s\n",
+        audio_buffer_size, snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  int dir;
+  // set the period size
+  err = snd_pcm_hw_params_set_period_size_near(audio_preview_handle, audio_preview_params,
+      (snd_pcm_uframes_t *)&period_size, &dir);
+  if (err < 0) {
+    log_fatal("error: failed to set period size for audio preview: %s\n",
+        snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  // apply the hardware configuration
+  err = snd_pcm_hw_params (audio_preview_handle, audio_preview_params);
+  if (err < 0) {
+    log_fatal("error: cannot set PCM hardware parameters for audio preview: %s\n",
+        snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  // end of configuration
+  snd_pcm_hw_params_free(audio_preview_params);
+
+  // dump the configuration of capture_handle
+  if (log_get_level() <= LOG_LEVEL_DEBUG) {
+    snd_output_t *output;
+    err = snd_output_stdio_attach(&output, stdout, 0);
+    if (err < 0) {
+      log_error("snd_output_stdio_attach failed: %s\n", snd_strerror(err));
+      return 0;
+    }
+    log_debug("audio preview device:\n");
+    snd_pcm_dump(audio_preview_handle, output);
   }
 
   return 0;
@@ -1709,6 +1834,8 @@ static int configure_audio_capture_device() {
   }
   log_debug("microphone: buffer size: %d frames (channels=%d buffer_size=%d multiply=%d)\n", (int)real_buffer_size, audio_channels, buffer_size, alsa_buffer_multiply);
 
+  audio_buffer_size = buffer_size;
+
   log_debug("microphone: setting period size to %d\n", period_size);
   dir = 0;
   // set the period size
@@ -1761,6 +1888,18 @@ static int configure_audio_capture_device() {
   }
   is_first_audio = 1; 
 
+  // dump the configuration of capture_handle
+  if (log_get_level() <= LOG_LEVEL_DEBUG) {
+    snd_output_t *output;
+    err = snd_output_stdio_attach(&output, stdout, 0);
+    if (err < 0) {
+      log_error("snd_output_stdio_attach failed: %s\n", snd_strerror(err));
+      return 0;
+    }
+    log_debug("audio capture device:\n");
+    snd_pcm_dump(capture_handle, output);
+  }
+
   return 0;
 }
 
@@ -1801,6 +1940,10 @@ static void teardown_audio_capture_device() {
   snd_pcm_close (capture_handle);
 
   free(poll_fds);
+}
+
+static void teardown_audio_preview_device() {
+  snd_pcm_close(audio_preview_handle);
 }
 
 /* Return 1 if the difference is negative, otherwise 0.  */
@@ -3201,6 +3344,35 @@ static int read_audio_poll_mmap() {
     size -= frames; // needed in the condition of the while loop to check if period is filled
   }
 
+  if (is_audio_preview_enabled) {
+    uint16_t *ptr;
+    int cptr;
+    int err;
+
+    if (!is_audio_preview_device_opened) {
+      open_audio_preview_device();
+      is_audio_preview_device_opened = 1;
+    }
+
+    ptr = this_samples;
+    cptr = period_size;
+    while (cptr > 0) {
+      err = snd_pcm_mmap_writei(audio_preview_handle, ptr, cptr);
+      if (err == -EAGAIN) {
+        continue;
+      }
+      if (err < 0) {
+        if (xrun_recovery(audio_preview_handle, err) < 0) {
+          printf("audio preview error: %s\n", snd_strerror(err));
+          exit(EXIT_FAILURE);
+        }
+        break; // skip one period
+      }
+      ptr += err * audio_preview_channels;
+      cptr -= err;
+    }
+  }
+
   if (audio_volume_multiply != 1.0f) {
     int total_samples = period_size * audio_channels;
     int i;
@@ -3527,6 +3699,8 @@ static void print_usage() {
   log_info("  --volume <num>      Amplify audio by multiplying the volume by <num>\n");
   log_info("                      (default: %.1f)\n", audio_volume_multiply_default);
   log_info("  --noaudio           Disable audio capturing\n");
+  log_info("  --audiopreview      Enable audio preview\n");
+  log_info("  --audiopreviewdev <dev>  Audio preview output device (default: %s)\n", audio_preview_dev_default);
   log_info(" [HTTP Live Streaming (HLS)]\n");
   log_info("  -o, --hlsdir <dir>  Generate HTTP Live Streaming files in <dir>\n");
   log_info("  --hlsenc            Enable HLS encryption\n");
@@ -3647,6 +3821,8 @@ int main(int argc, char **argv) {
     { "hooksdir", required_argument, NULL, 0 },
     { "volume", required_argument, NULL, 0 },
     { "noaudio", no_argument, NULL, 0 },
+    { "audiopreview", no_argument, NULL, 0 },
+    { "audiopreviewdev", required_argument, NULL, 0 },
     { "hlsenc", no_argument, NULL, 0 },
     { "hlsenckeyuri", required_argument, NULL, 0 },
     { "hlsenckey", required_argument, NULL, 0 },
@@ -3687,6 +3863,8 @@ int main(int argc, char **argv) {
   audio_bitrate = audio_bitrate_default;
   audio_channels = audio_channels_default;
   audio_sample_rate = audio_sample_rate_default;
+  is_audio_preview_enabled = is_audio_preview_enabled_default;
+  strncpy(audio_preview_dev, audio_preview_dev_default, sizeof(audio_preview_dev));
   is_hlsout_enabled = is_hlsout_enabled_default;
   strncpy(hls_output_dir, hls_output_dir_default, sizeof(hls_output_dir));
   is_rtspout_enabled = is_rtspout_enabled_default;
@@ -3979,6 +4157,12 @@ int main(int argc, char **argv) {
           audio_volume_multiply = value;
         } else if (strcmp(long_options[option_index].name, "noaudio") == 0) {
           disable_audio_capturing = 1;
+        } else if (strcmp(long_options[option_index].name, "audiopreview") == 0) {
+          is_audio_preview_enabled = 1;
+          break;
+        } else if (strcmp(long_options[option_index].name, "audiopreviewdev") == 0) {
+          strncpy(audio_preview_dev, optarg, sizeof(audio_preview_dev));
+          break;
         } else if (strcmp(long_options[option_index].name, "hlsenc") == 0) {
           is_hls_encryption_enabled = 1;
         } else if (strcmp(long_options[option_index].name, "hlsenckeyuri") == 0) {
@@ -4326,6 +4510,8 @@ int main(int argc, char **argv) {
   log_debug("preview_width=%d\n", preview_width);
   log_debug("preview_height=%d\n", preview_height);
   log_debug("preview_opacity=%d\n", preview_opacity);
+  log_debug("is_audio_preview_enabled=%d\n", is_audio_preview_enabled);
+  log_debug("audio_preview_dev=%s\n", audio_preview_dev);
   log_debug("record_buffer_keyframes=%d\n", record_buffer_keyframes);
   log_debug("state_dir=%s\n", state_dir);
   log_debug("hooks_dir=%s\n", hooks_dir);
@@ -4524,6 +4710,10 @@ int main(int argc, char **argv) {
     if (!disable_audio_capturing) {
       log_debug("teardown_audio_capture_device\n");
       teardown_audio_capture_device();
+      if (is_audio_preview_device_opened) {
+        log_debug("teardown_audio_preview_device\n");
+        teardown_audio_preview_device();
+      }
     }
 
     log_debug("hls_destroy\n");
