@@ -3363,7 +3363,7 @@ static int read_audio_poll_mmap() {
       }
       if (err < 0) {
         if (xrun_recovery(audio_preview_handle, err) < 0) {
-          printf("audio preview error: %s\n", snd_strerror(err));
+          log_fatal("audio preview error: %s\n", snd_strerror(err));
           exit(EXIT_FAILURE);
         }
         break; // skip one period
