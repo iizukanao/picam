@@ -1,6 +1,12 @@
 Change Log
 ==========
 
+Version 1.3.3 *(2015-10-06)*
+-----------------------------
+
+- Add audio preview feature (`--audiopreview` and `--audiopreviewdev` options).
+- Change default value of `--opacity` to 0.
+
 Version 1.3.2 *(2015-09-01)*
 -----------------------------
 
