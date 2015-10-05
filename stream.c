@@ -1582,8 +1582,9 @@ static int open_audio_capture_device() {
   log_debug("opening ALSA device for capture: %s\n", alsa_dev);
   err = snd_pcm_open(&capture_handle, alsa_dev, SND_PCM_STREAM_CAPTURE, 0);
   if (err < 0) {
-    log_error("error: cannot open audio device '%s' (%s)\n",
+    log_error("error: cannot open audio capture device '%s': %s\n",
         alsa_dev, snd_strerror(err));
+    log_error("hint: specify correct ALSA device with '--alsadev <dev>'\n");
     return -1;
   }
 
@@ -1594,11 +1595,12 @@ static int open_audio_preview_device() {
   int err;
   snd_pcm_hw_params_t *audio_preview_params;
 
-  log_debug("opening ALSA device for playback: %s\n", audio_preview_dev);
+  log_debug("opening ALSA device for playback (preview): %s\n", audio_preview_dev);
   err = snd_pcm_open(&audio_preview_handle, audio_preview_dev, SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK);
   if (err < 0) {
-    log_error("error: audio preview device '%s' open error: %s\n",
+    log_error("error: cannot open audio playback (preview) device '%s': %s\n",
         audio_preview_dev, snd_strerror(err));
+    log_error("hint: specify correct ALSA device with '--audiopreviewdev <dev>'\n");
     exit(EXIT_FAILURE);
   }
 
