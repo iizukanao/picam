@@ -143,7 +143,7 @@ To unmute microphone, create a file named `hooks/unmute`.
 #### Command options
 
     $ ./picam --help
-    picam version 1.3.2
+    picam version 1.3.3
     Usage: picam [options]
     
     Options:
@@ -181,6 +181,8 @@ To unmute microphone, create a file named `hooks/unmute`.
       --volume <num>      Amplify audio by multiplying the volume by <num>
                           (default: 1.0)
       --noaudio           Disable audio capturing
+      --audiopreview      Enable audio preview
+      --audiopreviewdev <dev>  Audio preview output device (default: plughw:0,0)
      [HTTP Live Streaming (HLS)]
       -o, --hlsdir <dir>  Generate HTTP Live Streaming files in <dir>
       --hlsenc            Enable HLS encryption
@@ -236,7 +238,7 @@ To unmute microphone, create a file named `hooks/unmute`.
       --previewrect <x,y,width,height>
                           Display preview window at specified position
       --opacity           Preview window opacity
-                          (0=transparent .. 255=opaque)
+                          (0=transparent..255=opaque; default=255)
       --query             Query camera capabilities then exit
      [misc]
       --recordbuf <num>   Start recording from <num> keyframes ago
