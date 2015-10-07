@@ -932,8 +932,48 @@ void start_record() {
   pthread_create(&rec_thread, NULL, rec_thread_start, NULL);
 }
 
+// parse the contents of hooks/start_record
+static void parse_start_record_file(char *full_filename) {
+  char buf[1024];
+
+  FILE *fp = fopen(full_filename, "r");
+  if (fp != NULL) {
+    while (fgets(buf, sizeof(buf), fp)) {
+      char *sep_p = strchr(buf, '='); // separator (name=value)
+      if (sep_p == NULL) { // we couldn't find '='
+        log_error("error parsing line in %s: %s\n",
+            full_filename, buf);
+        continue;
+      }
+      if (strncmp(buf, "recordbuf", sep_p - buf) == 0) {
+        // read a number
+        char *end;
+        int value = strtol(sep_p + 1, &end, 10);
+        if (end == sep_p + 1 || errno == ERANGE) { // parse error
+          log_error("error parsing line in %s: %s\n",
+              full_filename, buf);
+          continue;
+        }
+
+        record_buffer_keyframes = value;
+        log_info("recordbuf set to %d\n", record_buffer_keyframes);
+      } else {
+        log_error("can't recognize line in %s: %s\n",
+            full_filename, buf);
+      }
+    }
+    fclose(fp);
+  }
+}
+
 void on_file_create(char *filename, char *content) {
   if (strcmp(filename, "start_record") == 0) {
+    char buf[256];
+
+    // parse the contents of hooks/start_record
+    snprintf(buf, sizeof(buf), "%s/%s", hooks_dir, filename);
+    parse_start_record_file(buf);
+
     start_record();
   } else if (strcmp(filename, "stop_record") == 0) {
     stop_record();
