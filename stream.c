@@ -811,7 +811,7 @@ void *rec_thread_start() {
   int is_caught_up = 0;
   int unique_number = 1;
   int64_t rec_start_pts, rec_end_pts;
-  char diff_pts[11];
+  char state_buf[256];
   EncodedPacket *enc_pkt;
   int filename_decided = 0;
   uint8_t *copy_buf;
@@ -955,8 +955,10 @@ void *rec_thread_start() {
   }
   enc_pkt = encoded_packets[prev_frame];
   rec_end_pts = enc_pkt->pts;
-  snprintf(diff_pts, 11, "%" PRId64, rec_end_pts - rec_start_pts);
-  state_set(state_dir, recording_filepath + 4, diff_pts);
+  snprintf(state_buf, sizeof(state_buf), "duration_pts=%" PRId64 "\nduration_sec=%f\n",
+      rec_end_pts - rec_start_pts,
+      (rec_end_pts - rec_start_pts) / 90000.0f);
+  state_set(state_dir, recording_basename, state_buf);
 
   return rec_thread_stop();
 }
