@@ -447,9 +447,11 @@ static int encoded_packets_size;
 
 // hooks
 static pthread_t hooks_thread;
-char recording_filepath[50];
-char recording_tmp_filepath[50];
-char recording_archive_filepath[50];
+char recording_filepath[256];
+char recording_tmp_filepath[256];
+char recording_archive_filepath[1024];
+char recording_basename[256];
+char recording_dest_dir[1024];
 int is_recording = 0;
 
 static MpegTSCodecSettings codec_settings;
@@ -724,11 +726,13 @@ void *rec_thread_stop() {
   log_debug("copy ");
   fsrc = fopen(recording_tmp_filepath, "r");
   if (fsrc == NULL) {
-    perror("fopen recording_tmp_filepath");
+    log_error("error: failed to open %s: %s\n",
+        recording_tmp_filepath, strerror(errno));
   }
   fdest = fopen(recording_archive_filepath, "a");
   if (fdest == NULL) {
-    perror("fopen recording_archive_filepath");
+    log_error("error: failed to open %s: %s\n",
+        recording_archive_filepath, strerror(errno));
   }
   while (1) {
     read_len = fread(copy_buf, 1, BUFSIZ, fsrc);
@@ -747,9 +751,25 @@ void *rec_thread_stop() {
   }
 
   // link
-  log_debug("symlink");
-  if (symlink(recording_archive_filepath + 4, recording_filepath) != 0) { // +4 is for trimming "rec/"
-    perror("symlink recording_archive_filepath");
+  char *dest_path = recording_archive_filepath;
+  size_t rec_dir_len = strlen(rec_dir);
+  struct stat file_stat;
+
+  // If dest_path starts with "rec/", then remove it
+  if (strncmp(dest_path, rec_dir, rec_dir_len) == 0 &&
+      dest_path[rec_dir_len] == '/') {
+    dest_path += rec_dir_len + 1;
+  }
+
+  log_debug("symlink(%s, %s)\n", dest_path, recording_filepath);
+  if (lstat(recording_filepath, &file_stat) == 0) { // file (symlink) exists
+    log_info("replacing existing symlink: %s\n", recording_filepath);
+    unlink(recording_filepath);
+  }
+
+  if (symlink(dest_path, recording_filepath) != 0) {
+    log_error("error: cannot create symlink from %s to %s: %s\n",
+        dest_path, recording_filepath, strerror(errno));
   }
 
   // unlink tmp file
@@ -793,11 +813,11 @@ void *rec_thread_start() {
   int64_t rec_start_pts, rec_end_pts;
   char diff_pts[11];
   EncodedPacket *enc_pkt;
-  char filename_base[20];
   int filename_decided = 0;
   uint8_t *copy_buf;
   FILE *fsrc, *fdest;
   int read_len;
+  char *dest_dir;
 
   copy_buf = malloc(BUFSIZ);
   if (copy_buf == NULL) {
@@ -811,20 +831,44 @@ void *rec_thread_start() {
   rec_start_time = time(NULL);
   rec_start_pts = -1;
 
-  strftime(filename_base, 80, "%Y-%m-%d_%H-%M-%S", timeinfo);
-  snprintf(recording_filepath, 50, "rec/%s.ts", filename_base);
-  if (access(recording_filepath, F_OK) != 0) {
-    snprintf(recording_archive_filepath, 50, "rec/archive/%s.ts", filename_base);
-    snprintf(recording_tmp_filepath, 50, "rec/tmp/%s.ts", filename_base);
-    filename_decided = 1;
+  if (recording_dest_dir[0] != 0) {
+    dest_dir = recording_dest_dir;
+  } else {
+    dest_dir = rec_archive_dir;
   }
-  while (!filename_decided) {
-    unique_number++;
-    snprintf(recording_filepath, 50, "rec/%s-%d.ts", filename_base, unique_number);
-    if (access(recording_filepath, F_OK) != 0) {
-      snprintf(recording_archive_filepath, 50, "rec/archive/%s.ts", filename_base);
-      snprintf(recording_tmp_filepath, 50, "rec/tmp/%s-%d.ts", filename_base, unique_number);
+
+  if (recording_basename[0] != 0) { // basename is already decided
+    snprintf(recording_filepath, sizeof(recording_filepath),
+        "%s/%s", rec_dir, recording_basename);
+    snprintf(recording_archive_filepath, sizeof(recording_archive_filepath),
+        "%s/%s", dest_dir, recording_basename);
+    snprintf(recording_tmp_filepath, sizeof(recording_tmp_filepath),
+        "%s/%s", rec_tmp_dir, recording_basename);
+    filename_decided = 1;
+  } else {
+    strftime(recording_basename, sizeof(recording_basename), "%Y-%m-%d_%H-%M-%S", timeinfo);
+    snprintf(recording_filepath, sizeof(recording_filepath),
+        "%s/%s.ts", rec_dir, recording_basename);
+    if (access(recording_filepath, F_OK) != 0) { // filename is decided
+      sprintf(recording_basename + strlen(recording_basename), ".ts"); // add ".ts"
+      snprintf(recording_archive_filepath, sizeof(recording_archive_filepath),
+          "%s/%s", dest_dir, recording_basename);
+      snprintf(recording_tmp_filepath, sizeof(recording_tmp_filepath),
+          "%s/%s", rec_tmp_dir, recording_basename);
       filename_decided = 1;
+    }
+    while (!filename_decided) {
+      unique_number++;
+      snprintf(recording_filepath, sizeof(recording_filepath),
+          "%s/%s-%d.ts", rec_dir, recording_basename, unique_number);
+      if (access(recording_filepath, F_OK) != 0) { // filename is decided
+        sprintf(recording_basename + strlen(recording_basename), "-%d.ts", unique_number);
+        snprintf(recording_archive_filepath, sizeof(recording_archive_filepath),
+            "%s/%s", dest_dir, recording_basename);
+        snprintf(recording_tmp_filepath, sizeof(recording_tmp_filepath),
+            "%s/%s", rec_tmp_dir, recording_basename);
+        filename_decided = 1;
+      }
     }
   }
 
@@ -936,6 +980,9 @@ void start_record() {
 static void parse_start_record_file(char *full_filename) {
   char buf[1024];
 
+  recording_basename[0] = 0; // empties the basename used for this recording
+  recording_dest_dir[0] = 0; // empties the directory the result file will be put in
+
   FILE *fp = fopen(full_filename, "r");
   if (fp != NULL) {
     while (fgets(buf, sizeof(buf), fp)) {
@@ -957,6 +1004,16 @@ static void parse_start_record_file(char *full_filename) {
 
         record_buffer_keyframes = value;
         log_info("recordbuf set to %d\n", record_buffer_keyframes);
+      } else if (strncmp(buf, "dir", sep_p - buf) == 0) {
+        size_t len = strcspn(sep_p + 1, "\r\n");
+        strncpy(recording_dest_dir, sep_p + 1, len);
+        recording_dest_dir[len] = 0;
+        log_info("dir set to %s\n", recording_dest_dir);
+      } else if (strncmp(buf, "filename", sep_p - buf) == 0) {
+        size_t len = strcspn(sep_p + 1, "\r\n");
+        strncpy(recording_basename, sep_p + 1, len);
+        recording_basename[len] = 0;
+        log_info("filename set to %s\n", recording_basename);
       } else {
         log_error("can't recognize line in %s: %s\n",
             full_filename, buf);
