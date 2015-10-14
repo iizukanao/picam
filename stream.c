@@ -109,9 +109,9 @@ static const int VIDEO_ENCODE_INPUT_PORT  = 200;
 static const int VIDEO_ENCODE_OUTPUT_PORT = 201;
 
 // Directory to put recorded MPEG-TS files
-static const char *rec_dir = "rec";
-static const char *rec_tmp_dir = "rec/tmp";
-static const char *rec_archive_dir = "rec/archive";
+static char *rec_dir = "rec";
+static char *rec_tmp_dir = "rec/tmp";
+static char *rec_archive_dir = "rec/archive";
 
 // Whether or not to enable clock OMX component
 static const int is_clock_enabled = 1;
@@ -314,6 +314,9 @@ static int preview_opacity;
 static const int preview_opacity_default = 255;
 static int record_buffer_keyframes;
 static const int record_buffer_keyframes_default = 5;
+
+// how many keyframes should we look back for the next recording
+static int recording_look_back_keyframes;
 
 static int64_t video_current_pts = 0;
 static int64_t audio_current_pts = 0;
@@ -603,8 +606,8 @@ static void free_encoded_packets() {
     packet = encoded_packets[i];
     if (packet != NULL) {
       av_freep(&packet->data);
+      free(packet);
     }
-    free(packet);
   }
 }
 
@@ -880,15 +883,29 @@ void *rec_thread_start() {
   state_set(state_dir, "record", "true");
   pthread_mutex_unlock(&rec_write_mutex);
 
-  int start_keyframe_pointer;
-  if (!is_keyframe_pointers_filled) {
-    start_keyframe_pointer = 0;
+  int look_back_keyframes;
+  if (recording_look_back_keyframes != -1) {
+    look_back_keyframes = recording_look_back_keyframes;
   } else {
-    start_keyframe_pointer = current_keyframe_pointer - record_buffer_keyframes + 1;
+    look_back_keyframes = record_buffer_keyframes;
   }
+
+  int start_keyframe_pointer;
+  if (!is_keyframe_pointers_filled) { // first cycle has not been finished
+    if (look_back_keyframes - 1 > current_keyframe_pointer) { // not enough pre-start buffer
+      start_keyframe_pointer = 0;
+    } else {
+      start_keyframe_pointer = current_keyframe_pointer - look_back_keyframes + 1;
+    }
+  } else { // at least one cycle has been passed
+    start_keyframe_pointer = current_keyframe_pointer - look_back_keyframes + 1;
+  }
+
+  // turn negative into positive
   while (start_keyframe_pointer < 0) {
     start_keyframe_pointer += record_buffer_keyframes;
   }
+
   rec_thread_frame = keyframe_pointers[start_keyframe_pointer];
   enc_pkt = encoded_packets[rec_thread_frame];
   rec_start_pts = enc_pkt->pts;
@@ -978,12 +995,87 @@ void start_record() {
   pthread_create(&rec_thread, NULL, rec_thread_start, NULL);
 }
 
+// set record_buffer_keyframes to newsize
+static int set_record_buffer_keyframes(int newsize) {
+  int i;
+  void *result;
+  int malloc_size;
+
+  if (is_recording) {
+    log_error("error: recordbuf cannot be changed while recording\n");
+    return -1;
+  }
+
+  if (newsize < 1) {
+    log_error("error changing recordbuf to %d (must be >= 1)\n", newsize);
+    return -1;
+  }
+
+  if (newsize == record_buffer_keyframes) { // no change
+    log_debug("recordbuf does not change: current=%d new=%d\n",
+        record_buffer_keyframes, newsize);
+    return -1;
+  }
+
+  for (i = 0; i < encoded_packets_size; i++) {
+    EncodedPacket *packet = encoded_packets[i];
+    if (packet != NULL) {
+      av_freep(&packet->data);
+      free(packet);
+    }
+  }
+
+  // reset encoded_packets
+  int audio_fps = audio_sample_rate / 1 / period_size;
+  int new_encoded_packets_size = (video_fps + 1) * newsize * 2 +
+    (audio_fps + 1) * newsize * 2 + 100;
+  malloc_size = sizeof(EncodedPacket *) * new_encoded_packets_size;
+  result = realloc(encoded_packets, malloc_size);
+  int success = 0;
+  if (result == NULL) {
+    log_error("error: failed to set encoded_packets to %d while trying to allocate "
+        "%d bytes of memory\n", newsize, malloc_size);
+    // fallback to old size
+    malloc_size = sizeof(EncodedPacket *) * encoded_packets_size;
+  } else {
+    encoded_packets = result;
+    encoded_packets_size = new_encoded_packets_size;
+    success = 1;
+  }
+  memset(encoded_packets, 0, malloc_size);
+
+  if (success) {
+    // reset keyframe_pointers
+    malloc_size = sizeof(int) * newsize;
+    result = realloc(keyframe_pointers, malloc_size);
+    if (result == NULL) {
+      log_error("error: failed to set keyframe_pointers to %d while trying to allocate "
+          "%d bytes of memory\n", newsize, malloc_size);
+      // fallback to old size
+      malloc_size = sizeof(int) * record_buffer_keyframes;
+    } else {
+      keyframe_pointers = result;
+      record_buffer_keyframes = newsize;
+    }
+  } else {
+    malloc_size = sizeof(int) * record_buffer_keyframes;
+  }
+  memset(keyframe_pointers, 0, malloc_size);
+
+  current_encoded_packet = -1;
+  current_keyframe_pointer = -1;
+  is_keyframe_pointers_filled = 0;
+
+  return 0;
+}
+
 // parse the contents of hooks/start_record
 static void parse_start_record_file(char *full_filename) {
   char buf[1024];
 
   recording_basename[0] = 0; // empties the basename used for this recording
   recording_dest_dir[0] = 0; // empties the directory the result file will be put in
+  recording_look_back_keyframes = -1;
 
   FILE *fp = fopen(full_filename, "r");
   if (fp != NULL) {
@@ -1003,9 +1095,17 @@ static void parse_start_record_file(char *full_filename) {
               full_filename, buf);
           continue;
         }
-
-        record_buffer_keyframes = value;
-        log_info("recordbuf set to %d\n", record_buffer_keyframes);
+        if (value > record_buffer_keyframes) {
+          log_error("error: per-recording recordbuf (%d) cannot be greater than "
+              "global recordbuf (%d); using %d\n"
+              "hint: try increasing global recordbuf with \"--recordbuf %d\" or "
+              "\"echo %d > hooks/set_recordbuf\"\n",
+              value, record_buffer_keyframes, record_buffer_keyframes,
+              value, value);
+          continue;
+        }
+        recording_look_back_keyframes = value;
+        log_info("using recordbuf=%d for this recording\n", recording_look_back_keyframes);
       } else if (strncmp(buf, "dir", sep_p - buf) == 0) {
         size_t len = strcspn(sep_p + 1, "\r\n");
         strncpy(recording_dest_dir, sep_p + 1, len);
@@ -1023,6 +1123,45 @@ static void parse_start_record_file(char *full_filename) {
     }
     fclose(fp);
   }
+}
+
+/**
+ * Reads a file and returns the contents.
+ * Returned pointer must be freed by caller after use.
+ */
+static char *read_file(const char *filepath) {
+  FILE *fp;
+  long filesize;
+  char *buf;
+  size_t result;
+
+  fp = fopen(filepath, "rb");
+  if (fp == NULL) {
+    return NULL;
+  }
+
+  // obtain file size
+  fseek(fp, 0L, SEEK_END);
+  filesize = ftell(fp);
+  fseek(fp, 0L, SEEK_SET);
+
+  buf = malloc(filesize);
+  if (buf == NULL) {
+    log_error("read_file: error reading %s: failed to allocate memory (%d bytes)", filepath, filesize);
+    fclose(fp);
+    return NULL;
+  }
+
+  result = fread(buf, 1, filesize, fp);
+  if (result != filesize) {
+    log_error("read_file: error reading %s", filepath);
+    fclose(fp);
+    free(buf);
+    return NULL;
+  }
+
+  fclose(fp);
+  return buf;
 }
 
 void on_file_create(char *filename, char *content) {
@@ -1069,6 +1208,23 @@ void on_file_create(char *filename, char *content) {
           log_error("/");
         }
       }
+    }
+  } else if (strcmp(filename, "set_recordbuf") == 0) { // set global recordbuf
+    char buf[256];
+    snprintf(buf, sizeof(buf), "%s/%s", hooks_dir, filename);
+    char *file_buf = read_file(buf);
+    if (file_buf != NULL) {
+      // read a number
+      char *end;
+      int value = strtol(file_buf, &end, 10);
+      if (end == file_buf || errno == ERANGE) { // parse error
+        log_error("error parsing file %s\n", buf);
+      } else { // parse ok
+        if (set_record_buffer_keyframes(value) == 0) {
+          log_info("recordbuf set to %d; existing record buffer cleared\n", value);
+        }
+      }
+      free(file_buf);
     }
   } else {
     log_error("error: invalid hook: %s\n", filename);
@@ -3867,7 +4023,7 @@ static void print_usage() {
   log_info("  --query             Query camera capabilities then exit\n");
   log_info(" [misc]\n");
   log_info("  --recordbuf <num>   Start recording from <num> keyframes ago\n");
-  log_info("                      (default: %d)\n", record_buffer_keyframes_default);
+  log_info("                      (must be >= 1; default: %d)\n", record_buffer_keyframes_default);
   log_info("  --statedir <dir>    Set state dir (default: %s)\n", state_dir_default);
   log_info("  --hooksdir <dir>    Set hooks dir (default: %s)\n", hooks_dir_default);
   log_info("  -q, --quiet         Suppress all output except errors\n");
@@ -4351,8 +4507,8 @@ int main(int argc, char **argv) {
             print_usage();
             return EXIT_FAILURE;
           }
-          if (value < 0) {
-            log_fatal("error: invalid recordbuf: %ld (must be >= 0)\n", value);
+          if (value < 1) {
+            log_fatal("error: invalid recordbuf: %ld (must be >= 1)\n", value);
             return EXIT_FAILURE;
           }
           record_buffer_keyframes = value;
