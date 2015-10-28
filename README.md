@@ -276,7 +276,7 @@ There are two types of recordbuf; global and per-recording. Global recordbuf is 
 Per-recording recordbuf has a default value which is the same value as global recordbuf. Per-recording recordbuf can be specified via hooks/start_record.
 
     # Set per-recording recordbuf to 2
-    $ echo "recordbuf=2" > hooks/start_record
+    $ echo recordbuf=2 > hooks/start_record
 
 
 ### HTTP Live Streaming
