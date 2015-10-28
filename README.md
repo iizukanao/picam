@@ -258,6 +258,26 @@ For example, the following command changes the white balance to **sun**.
 
     $ touch hooks/wb_sun
 
+#### Recordbuf
+
+Recordbuf is a parameter which controls how many past keyframes should be included at the start of a recording. For example, recordbuf=1 means that a recording will start from the last keyframe, and recordbuf=2 means that a recording will start from the second last keyframe relative to when hooks/start_record is created. The minimum value of recordbuf is 1.
+
+##### Global and per-recording recordbuf
+
+There are two types of recordbuf; global and per-recording. Global recordbuf is the default value for all recordings. Per-recording recordbuf only applies to the current recording. Per-recording recordbuf must be less than or equal to global recordbuf.
+
+##### Setting global recordbuf
+
+    # Set global recordbuf to 30
+    $ echo 30 > hooks/set_recordbuf
+
+##### Setting per-recording recordbuf
+
+Per-recording recordbuf has a default value which is the same value as global recordbuf. Per-recording recordbuf can be specified via hooks/start_record.
+
+    # Set per-recording recordbuf to 2
+    $ echo "recordbuf=2" > hooks/start_record
+
 
 ### HTTP Live Streaming
 
