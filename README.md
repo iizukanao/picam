@@ -268,6 +268,8 @@ There are two types of recordbuf; global and per-recording. Global recordbuf is 
 
 ##### Setting global recordbuf
 
+Global recordbuf can be specified by either `--recordbuf` option or hooks/set_recordbuf.
+
     # Set global recordbuf to 30
     $ echo 30 > hooks/set_recordbuf
 
