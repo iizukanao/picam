@@ -43,6 +43,9 @@ extern "C" {
 #include "httplivestreaming.h"
 #include "state.h"
 #include "log.h"
+#include "text.h"
+#include "timestamp.h"
+#include "subtitle.h"
 
 #define PROGRAM_NAME     "picam"
 #define PROGRAM_VERSION  "1.3.3"
@@ -134,8 +137,10 @@ typedef struct EncodedPacket {
 static const int log_level_default = LOG_LEVEL_INFO;
 static int video_width;
 static const int video_width_default = 1280;
+static int video_width_32;
 static int video_height;
 static const int video_height_default = 720;
+static int video_height_16;
 static float video_fps;
 static const float video_fps_default = 30.0f;
 static int video_pts_step;
@@ -314,6 +319,38 @@ static int preview_opacity;
 static const int preview_opacity_default = 255;
 static int record_buffer_keyframes;
 static const int record_buffer_keyframes_default = 5;
+
+static int is_timestamp_enabled = 0;
+static char timestamp_format[128];
+static const char *timestamp_format_default = "%a %b %d %l:%M:%S %p";
+static LAYOUT_ALIGN timestamp_layout;
+static const LAYOUT_ALIGN timestamp_layout_default = LAYOUT_ALIGN_BOTTOM | LAYOUT_ALIGN_RIGHT;
+static int timestamp_horizontal_margin;
+static const int timestamp_horizontal_margin_default = 10;
+static int timestamp_vertical_margin;
+static const int timestamp_vertical_margin_default = 10;
+static int timestamp_pos_x;
+static int timestamp_pos_y;
+static int is_timestamp_abs_pos_enabled = 0;
+static TEXT_ALIGN timestamp_text_align;
+static const TEXT_ALIGN timestamp_text_align_default = TEXT_ALIGN_LEFT;
+static char timestamp_font_name[128];
+static const char *timestamp_font_name_default = "Droid Sans Mono";
+static char timestamp_font_file[1024];
+static int timestamp_font_face_index;
+static const int timestamp_font_face_index_default = 0;
+static float timestamp_font_points;
+static const float timestamp_font_points_default = 14.0f;
+static int timestamp_font_dpi;
+static const int timestamp_font_dpi_default = 96;
+static int timestamp_color;
+static const int timestamp_color_default = 0xffffff;
+static int timestamp_stroke_color;
+static const int timestamp_stroke_color_default = 0x000000;
+static float timestamp_stroke_width;
+static const float timestamp_stroke_width_default = 1.3f;
+static int timestamp_letter_spacing;
+static const int timestamp_letter_spacing_default = 0;
 
 // how many keyframes should we look back for the next recording
 static int recording_look_back_keyframes;
@@ -1242,6 +1279,312 @@ void on_file_create(char *filename, char *content) {
         }
         free(file_buf);
       }
+    }
+  } else if (strcmp(filename, "subtitle") == 0) {
+    // The followings are default values for the subtitle
+    char line[1024];
+    char text[1024];
+    size_t text_len = 0;
+    char font_name[128] = { 0x00 };
+    long face_index = 0;
+    char font_file[256] = { 0x00 };
+    int color = 0xffffff;
+    int stroke_color = 0x000000;
+    float font_points = 28.0f;
+    int font_dpi = 96;
+    float stroke_width = 1.0f;
+    int letter_spacing = 0;
+    float line_height_multiply = 1.0f;
+    int abspos_x = 0;
+    int abspos_y = 0;
+    float duration = 7.0f;
+    int is_abspos_specified = 0;
+    LAYOUT_ALIGN layout_align = LAYOUT_ALIGN_BOTTOM | LAYOUT_ALIGN_CENTER;
+    TEXT_ALIGN text_align = TEXT_ALIGN_CENTER;
+    int horizontal_margin = 0;
+    int vertical_margin = 35;
+
+    char filepath[256];
+    snprintf(filepath, sizeof(filepath), "%s/%s", hooks_dir, filename);
+    FILE *fp;
+    fp = fopen(filepath, "r");
+    if (fp == NULL) {
+      log_error("subtitle error: cannot open file: %s\n", filepath);
+    } else {
+      // read key=value lines
+      while (fgets(line, sizeof(line), fp)) {
+        // remove newline at the end of the line
+        size_t line_len = strlen(line);
+        if (line[line_len-1] == '\n') {
+          line[line_len-1] = '\0';
+          line_len--;
+        }
+        if (line_len == 0) { // blank line
+          continue;
+        }
+        if (line[0] == '#') { // comment line
+          continue;
+        }
+
+        char *delimiter_p = strchr(line, '=');
+        if (delimiter_p != NULL) {
+          int key_len = delimiter_p - line;
+          if (strncmp(line, "text=", key_len+1) == 0) {
+            text_len = line_len - 5; // 5 == strlen("text") + 1
+            if (text_len >= sizeof(text) - 1) {
+              text_len = sizeof(text) - 1;
+            }
+            strncpy(text, delimiter_p + 1, text_len);
+            text[text_len] = '\0';
+          } else if (strncmp(line, "font_name=", key_len+1) == 0) {
+            strncpy(font_name, delimiter_p + 1, sizeof(font_name) - 1);
+            font_name[sizeof(font_name) - 1] = '\0';
+          } else if (strncmp(line, "font_file=", key_len+1) == 0) {
+            strncpy(font_file, delimiter_p + 1, sizeof(font_file) - 1);
+            font_file[sizeof(font_file) - 1] = '\0';
+          } else if (strncmp(line, "face_index=", key_len+1) == 0) {
+            char *end;
+            long value = strtol(delimiter_p+1, &end, 10);
+            if (end == delimiter_p+1 || *end != '\0' || errno == ERANGE) { // parse error
+              log_error("subtitle error: invalid face_index: %s\n", delimiter_p+1);
+              return;
+            }
+            face_index = value;
+          } else if (strncmp(line, "pt=", key_len+1) == 0) {
+            char *end;
+            double value = strtod(delimiter_p+1, &end);
+            if (end == delimiter_p+1 || *end != '\0' || errno == ERANGE) { // parse error
+              log_error("subtitle error: invalid pt: %s\n", delimiter_p+1);
+              return;
+            }
+            font_points = value;
+          } else if (strncmp(line, "dpi=", key_len+1) == 0) {
+            char *end;
+            long value = strtol(delimiter_p+1, &end, 10);
+            if (end == delimiter_p+1 || *end != '\0' || errno == ERANGE) { // parse error
+              log_error("subtitle error: invalid dpi: %s\n", delimiter_p+1);
+              return;
+            }
+            font_dpi = value;
+          } else if (strncmp(line, "horizontal_margin=", key_len+1) == 0) {
+            char *end;
+            long value = strtol(delimiter_p+1, &end, 10);
+            if (end == delimiter_p+1 || *end != '\0' || errno == ERANGE) { // parse error
+              log_error("subtitle error: invalid horizontal_margin: %s\n", delimiter_p+1);
+              return;
+            }
+            horizontal_margin = value;
+          } else if (strncmp(line, "vertical_margin=", key_len+1) == 0) {
+            char *end;
+            long value = strtol(delimiter_p+1, &end, 10);
+            if (end == delimiter_p+1 || *end != '\0' || errno == ERANGE) { // parse error
+              log_error("subtitle error: invalid vertical_margin: %s\n", delimiter_p+1);
+              return;
+            }
+            vertical_margin = value;
+          } else if (strncmp(line, "duration=", key_len+1) == 0) {
+            char *end;
+            double value = strtod(delimiter_p+1, &end);
+            if (end == delimiter_p+1 || *end != '\0' || errno == ERANGE) { // parse error
+              log_error("subtitle error: invalid duration: %s\n", delimiter_p+1);
+              return;
+            }
+            duration = value;
+          } else if (strncmp(line, "color=", key_len+1) == 0) {
+            char *end;
+            long value = strtol(delimiter_p+1, &end, 16);
+            if (end == delimiter_p+1 || *end != '\0' || errno == ERANGE) { // parse error
+              log_error("subtitle error: invalid color: %s\n", delimiter_p+1);
+              return;
+            }
+            if (value < 0) {
+              log_error("subtitle error: invalid color: %d (must be >= 0)\n", value);
+              return;
+            }
+            color = value;
+          } else if (strncmp(line, "stroke_color=", key_len+1) == 0) {
+            char *end;
+            long value = strtol(delimiter_p+1, &end, 16);
+            if (end == delimiter_p+1 || *end != '\0' || errno == ERANGE) { // parse error
+              log_error("subtitle error: invalid stroke_color: %s\n", delimiter_p+1);
+              return;
+            }
+            if (value < 0) {
+              log_error("subtitle error: invalid stroke_color: %d (must be >= 0)\n", value);
+              return;
+            }
+            stroke_color = value;
+          } else if (strncmp(line, "stroke_width=", key_len+1) == 0) {
+            char *end;
+            double value = strtod(delimiter_p+1, &end);
+            if (end == delimiter_p+1 || *end != '\0' || errno == ERANGE) { // parse error
+              log_error("subtitle error: invalid stroke_width: %s\n", delimiter_p+1);
+              return;
+            }
+            stroke_width = value;
+          } else if (strncmp(line, "letter_spacing=", key_len+1) == 0) {
+            char *end;
+            long value = strtol(delimiter_p+1, &end, 10);
+            if (end == delimiter_p+1 || *end != '\0' || errno == ERANGE) { // parse error
+              log_error("subtitle error: invalid letter_spacing: %s\n", delimiter_p+1);
+              return;
+            }
+            letter_spacing = value;
+          } else if (strncmp(line, "line_height=", key_len+1) == 0) {
+            char *end;
+            double value = strtod(delimiter_p+1, &end);
+            if (end == delimiter_p+1 || *end != '\0' || errno == ERANGE) { // parse error
+              log_error("subtitle error: invalid line_height: %s\n", delimiter_p+1);
+              return;
+            }
+            line_height_multiply = value;
+          } else if (strncmp(line, "pos=", key_len+1) == 0) { // absolute position
+            char *comma_p = strchr(delimiter_p+1, ',');
+            if (comma_p == NULL) {
+              log_error("subtitle error: invalid pos format: %s (should be <x>,<y>)\n", delimiter_p+1);
+              return;
+            }
+
+            char *end;
+            long value = strtol(delimiter_p+1, &end, 10);
+            if (end == delimiter_p+1 || end != comma_p || errno == ERANGE) { // parse error
+              log_error("subtitle error: invalid pos x: %s\n", delimiter_p+1);
+              return;
+            }
+            abspos_x = value;
+
+            value = strtol(comma_p+1, &end, 10);
+            if (end == comma_p+1 || *end != '\0' || errno == ERANGE) { // parse error
+              log_error("subtitle error: invalid pos y: %s\n", comma_p+1);
+              return;
+            }
+            abspos_y = value;
+
+            is_abspos_specified = 1;
+          } else if (strncmp(line, "layout_align=", key_len+1) == 0) { // layout align
+            char *comma_p;
+            char *search_p = delimiter_p + 1;
+            int param_len;
+            layout_align = 0;
+            while (1) {
+              comma_p = strchr(search_p, ',');
+              if (comma_p == NULL) {
+                param_len = line + line_len - search_p;
+              } else {
+                param_len = comma_p - search_p;
+              }
+              if (strncmp(search_p, "top", param_len) == 0) {
+                layout_align |= LAYOUT_ALIGN_TOP;
+              } else if (strncmp(search_p, "middle", param_len) == 0) {
+                layout_align |= LAYOUT_ALIGN_MIDDLE;
+              } else if (strncmp(search_p, "bottom", param_len) == 0) {
+                layout_align |= LAYOUT_ALIGN_BOTTOM;
+              } else if (strncmp(search_p, "left", param_len) == 0) {
+                layout_align |= LAYOUT_ALIGN_LEFT;
+              } else if (strncmp(search_p, "center", param_len) == 0) {
+                layout_align |= LAYOUT_ALIGN_CENTER;
+              } else if (strncmp(search_p, "right", param_len) == 0) {
+                layout_align |= LAYOUT_ALIGN_RIGHT;
+              } else {
+                log_error("subtitle error: invalid layout_align found at: %s\n", search_p);
+                return;
+              }
+              if (comma_p == NULL || line + line_len - 1 - comma_p <= 0) { // no remaining chars
+                break;
+              }
+              search_p = comma_p + 1;
+            }
+          } else if (strncmp(line, "text_align=", key_len+1) == 0) { // text align
+            char *comma_p;
+            char *search_p = delimiter_p + 1;
+            int param_len;
+            text_align = 0;
+            while (1) {
+              comma_p = strchr(search_p, ',');
+              if (comma_p == NULL) {
+                param_len = line + line_len - search_p;
+              } else {
+                param_len = comma_p - search_p;
+              }
+              if (strncmp(search_p, "left", param_len) == 0) {
+                text_align |= TEXT_ALIGN_LEFT;
+              } else if (strncmp(search_p, "center", param_len) == 0) {
+                text_align |= TEXT_ALIGN_CENTER;
+              } else if (strncmp(search_p, "right", param_len) == 0) {
+                text_align |= TEXT_ALIGN_RIGHT;
+              } else {
+                log_error("subtitle error: invalid text_align found at: %s\n", search_p);
+                return;
+              }
+              if (comma_p == NULL || line + line_len - 1 - comma_p <= 0) { // no remaining chars
+                break;
+              }
+              search_p = comma_p + 1;
+            }
+          } else {
+            log_error("subtitle error: cannot parse line: %s\n", line);
+          }
+        } else {
+          log_error("subtitle error: cannot find delimiter: %s\n", line);
+        }
+      }
+      if (text_len > 0) {
+        // replace literal \n with newline
+        int i;
+        int is_escape_active = 0;
+        int omitted_bytes = 0;
+        char replaced_text[1024];
+        char *replaced_text_ptr = replaced_text;
+        for (i = 0; i < text_len; i++) {
+          if (text[i] == '\\') { // escape char
+            if (is_escape_active) { // double escape char
+              *replaced_text_ptr++ = '\\';
+            } else { // start of escape sequence
+              omitted_bytes++;
+            }
+            is_escape_active = !is_escape_active;
+          } else if (text[i] == 'n') {
+            if (is_escape_active) { // n after escape char
+              *replaced_text_ptr = '\n';
+              is_escape_active = 0;
+            } else { // n after non-escape char
+              *replaced_text_ptr = text[i];
+            }
+            replaced_text_ptr++;
+          } else {
+            if (is_escape_active) {
+              is_escape_active = 0;
+            }
+            *replaced_text_ptr++ = text[i];
+          }
+        }
+        text_len -= omitted_bytes;
+
+        replaced_text[text_len] = '\0';
+        if (font_file[0] != 0x00) {
+          subtitle_init(font_file, face_index, font_points, font_dpi);
+        } else {
+          subtitle_init_with_font_name(font_name, font_points, font_dpi);
+        }
+        subtitle_set_color(color);
+        subtitle_set_stroke_color(stroke_color);
+        subtitle_set_stroke_width(stroke_width);
+        subtitle_set_letter_spacing(letter_spacing);
+        subtitle_set_line_height_multiply(line_height_multiply);
+        if (is_abspos_specified) {
+          subtitle_set_position(abspos_x, abspos_y);
+        } else {
+          subtitle_set_layout(layout_align,
+              horizontal_margin, vertical_margin);
+        }
+        subtitle_set_align(text_align);
+
+        // show subtitle for 7 seconds
+        subtitle_show(replaced_text, text_len, duration);
+      } else {
+        subtitle_clear();
+      }
+      fclose(fp);
     }
   } else {
     log_error("error: invalid hook: %s\n", filename);
@@ -2241,6 +2584,10 @@ static void shutdown_video() {
   for (i = 0; i < n_codec_configs; i++) {
     free(codec_configs[i]);
   }
+
+  timestamp_shutdown();
+  subtitle_shutdown();
+  text_teardown();
 }
 
 static void shutdown_openmax() {
@@ -2496,6 +2843,9 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
             video_pending_drop_frames--;
           } else {
             log_debug(".");
+            timestamp_update();
+            subtitle_update();
+            text_draw_all(last_video_buffer, video_width_32, video_height_16);
             encode_and_send_image();
           }
         }
@@ -4038,6 +4388,33 @@ static void print_usage() {
   log_info("  --opacity           Preview window opacity\n");
   log_info("                      (0=transparent..255=opaque; default=%d)\n", preview_opacity_default);
   log_info("  --query             Query camera capabilities then exit\n");
+  log_info(" [timestamp]\n");
+  log_info("  --time              Enable timestamp\n");
+  log_info("  --timeformat <spec>  Timestamp format (see \"man strftime\" for spec)\n");
+  log_info("                       (default: %s)\n", timestamp_format_default);
+  log_info("  --timelayout <spec>  Timestamp position (relative mode)\n");
+  log_info("                       layout is comma-separated list of:\n");
+  log_info("                        top middle bottom  left center right\n");
+  log_info("                       (default: bottom,right)\n");
+  log_info("  --timehorizmargin <px>  Horizontal margin from edge (default: %d).\n", timestamp_horizontal_margin_default);
+  log_info("                          Effective only if --timelayout is used.\n");
+  log_info("  --timevertmargin <px>  Vertical margin from edge (default: %d).\n", timestamp_vertical_margin_default);
+  log_info("                         Effective only if --timelayout is used.\n");
+  log_info("  --timepos <x,y>     Timestamp position (absolute mode)\n");
+//  log_info("  --timealign <spec>  Text alignment (left, center, right) (default: left)\n");
+  log_info("  --timefontname <name>  Timestamp font name (default: %s)\n", timestamp_font_name_default);
+  log_info("  --timefontfile <file>  Timestamp font file. This invalidates --timefontname.\n");
+  log_info("  --timefontface <num>  Timestamp font face index (default: %d).\n", timestamp_font_face_index_default);
+  log_info("                        Effective only if --timefontfile is used.\n");
+  log_info("  --timept <pt>       Text size in points (default: %.1f)\n", timestamp_font_points_default);
+  log_info("  --timedpi <num>     DPI for calculating text size (default: %d)\n", timestamp_font_dpi_default);
+  log_info("  --timecolor <hex>   Text color (default: %06x)\n", timestamp_color_default);
+  log_info("  --timestrokecolor <hex>  Text stroke color (default: %06x)\n", timestamp_stroke_color_default);
+  log_info("                      Note that texts are rendered in grayscale.\n");
+  log_info("  --timestrokewidth <pt>  Text stroke border radius (default: %.1f).\n",
+      timestamp_stroke_width_default);
+  log_info("                          To disable stroking borders, set this value to 0.\n");
+  log_info("  --timespacing <px>  Additional letter spacing (default: %d)\n", timestamp_letter_spacing_default);
   log_info(" [misc]\n");
   log_info("  --recordbuf <num>   Start recording from <num> keyframes ago\n");
   log_info("                      (must be >= 1; default: %d)\n", record_buffer_keyframes_default);
@@ -4091,6 +4468,22 @@ int main(int argc, char **argv) {
     { "shutter", required_argument, NULL, 0 },
     { "iso", required_argument, NULL, 0 },
     { "query", no_argument, NULL, 0 },
+    { "time", no_argument, NULL, 0 },
+    { "timeformat", required_argument, NULL, 0 },
+    { "timelayout", required_argument, NULL, 0 },
+    { "timehorizmargin", required_argument, NULL, 0 },
+    { "timevertmargin", required_argument, NULL, 0 },
+    { "timepos", required_argument, NULL, 0 },
+    { "timealign", required_argument, NULL, 0 },
+    { "timefontname", required_argument, NULL, 0 },
+    { "timefontfile", required_argument, NULL, 0 },
+    { "timefontface", required_argument, NULL, 0 },
+    { "timept", required_argument, NULL, 0 },
+    { "timedpi", required_argument, NULL, 0 },
+    { "timecolor", required_argument, NULL, 0 },
+    { "timestrokecolor", required_argument, NULL, 0 },
+    { "timestrokewidth", required_argument, NULL, 0 },
+    { "timespacing", required_argument, NULL, 0 },
     { "statedir", required_argument, NULL, 0 },
     { "hooksdir", required_argument, NULL, 0 },
     { "volume", required_argument, NULL, 0 },
@@ -4180,6 +4573,21 @@ int main(int argc, char **argv) {
   is_previewrect_enabled = is_previewrect_enabled_default;
   preview_opacity = preview_opacity_default;
   record_buffer_keyframes = record_buffer_keyframes_default;
+  strncpy(timestamp_format, timestamp_format_default, sizeof(timestamp_format) - 1);
+  timestamp_format[sizeof(timestamp_format) - 1] = '\0';
+  timestamp_layout = timestamp_layout_default;
+  timestamp_horizontal_margin = timestamp_horizontal_margin_default;
+  timestamp_vertical_margin = timestamp_vertical_margin_default;
+  timestamp_text_align = timestamp_text_align_default;
+  strncpy(timestamp_font_name, timestamp_font_name_default, sizeof(timestamp_font_name) - 1);
+  timestamp_font_name[sizeof(timestamp_font_name) - 1] = '\0';
+  timestamp_font_face_index = timestamp_font_face_index_default;
+  timestamp_font_points = timestamp_font_points_default;
+  timestamp_font_dpi = timestamp_font_dpi_default;
+  timestamp_color = timestamp_color_default;
+  timestamp_stroke_color = timestamp_stroke_color_default;
+  timestamp_stroke_width = timestamp_stroke_width_default;
+  timestamp_letter_spacing = timestamp_letter_spacing_default;
 
   while ((opt = getopt_long(argc, argv, "w:h:v:f:g:c:r:a:o:pq", long_options, &option_index)) != -1) {
     switch (opt) {
@@ -4437,6 +4845,199 @@ int main(int argc, char **argv) {
           is_vfr_enabled = 1;
         } else if (strcmp(long_options[option_index].name, "query") == 0) {
           query_and_exit = 1;
+        } else if (strcmp(long_options[option_index].name, "time") == 0) {
+          is_timestamp_enabled = 1;
+        } else if (strcmp(long_options[option_index].name, "timeformat") == 0) {
+          strncpy(timestamp_format, optarg, sizeof(timestamp_format) - 1);
+          timestamp_format[sizeof(timestamp_format) - 1] = '\0';
+        } else if (strcmp(long_options[option_index].name, "timelayout") == 0) {
+          char *comma_p;
+          char *search_p = optarg;
+          size_t optarg_len = strlen(optarg);
+          int param_len;
+          LAYOUT_ALIGN layout_align = 0;
+          while (1) {
+            comma_p = strchr(search_p, ',');
+            if (comma_p == NULL) {
+              param_len = optarg + optarg_len - search_p;
+            } else {
+              param_len = comma_p - search_p;
+            }
+            if (strncmp(search_p, "top", param_len) == 0) {
+              layout_align |= LAYOUT_ALIGN_TOP;
+            } else if (strncmp(search_p, "middle", param_len) == 0) {
+              layout_align |= LAYOUT_ALIGN_MIDDLE;
+            } else if (strncmp(search_p, "bottom", param_len) == 0) {
+              layout_align |= LAYOUT_ALIGN_BOTTOM;
+            } else if (strncmp(search_p, "left", param_len) == 0) {
+              layout_align |= LAYOUT_ALIGN_LEFT;
+            } else if (strncmp(search_p, "center", param_len) == 0) {
+              layout_align |= LAYOUT_ALIGN_CENTER;
+            } else if (strncmp(search_p, "right", param_len) == 0) {
+              layout_align |= LAYOUT_ALIGN_RIGHT;
+            } else {
+              log_fatal("error: invalid timelayout found at: %s\n", search_p);
+              return EXIT_FAILURE;
+            }
+            if (comma_p == NULL || optarg + optarg_len - 1 - comma_p <= 0) { // no remaining chars
+              break;
+            }
+            search_p = comma_p + 1;
+          }
+          timestamp_layout = layout_align;
+        } else if (strcmp(long_options[option_index].name, "timehorizmargin") == 0) {
+          char *end;
+          long value = strtol(optarg, &end, 10);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid timehorizmargin: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          timestamp_horizontal_margin = value;
+        } else if (strcmp(long_options[option_index].name, "timevertmargin") == 0) {
+          char *end;
+          long value = strtol(optarg, &end, 10);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid timevertmargin: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          timestamp_vertical_margin = value;
+        } else if (strcmp(long_options[option_index].name, "timepos") == 0) {
+          char *comma_p = strchr(optarg, ',');
+          if (comma_p == NULL) {
+            log_fatal("error: invalid timepos format: %s (should be <x>,<y>)\n", optarg);
+            return EXIT_FAILURE;
+          }
+
+          char *end;
+          long value = strtol(optarg, &end, 10);
+          if (end == optarg || end != comma_p || errno == ERANGE) { // parse error
+            log_fatal("error: invalid timepos x: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          timestamp_pos_x = value;
+
+          value = strtol(comma_p+1, &end, 10);
+          if (end == comma_p+1 || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid timepos y: %s\n", comma_p+1);
+            return EXIT_FAILURE;
+          }
+          timestamp_pos_y = value;
+
+          is_timestamp_abs_pos_enabled = 1;
+        } else if (strcmp(long_options[option_index].name, "timealign") == 0) {
+          char *comma_p;
+          char *search_p = optarg;
+          size_t optarg_len = strlen(optarg);
+          int param_len;
+          TEXT_ALIGN text_align = 0;
+          while (1) {
+            comma_p = strchr(search_p, ',');
+            if (comma_p == NULL) {
+              param_len = optarg + optarg_len - search_p;
+            } else {
+              param_len = comma_p - search_p;
+            }
+            if (strncmp(search_p, "left", param_len) == 0) {
+              text_align |= TEXT_ALIGN_LEFT;
+            } else if (strncmp(search_p, "center", param_len) == 0) {
+              text_align |= TEXT_ALIGN_CENTER;
+            } else if (strncmp(search_p, "right", param_len) == 0) {
+              text_align |= TEXT_ALIGN_RIGHT;
+            } else {
+              log_fatal("error: invalid timealign found at: %s\n", search_p);
+              return EXIT_FAILURE;
+            }
+            if (comma_p == NULL || optarg + optarg_len - 1 - comma_p <= 0) { // no remaining chars
+              break;
+            }
+            search_p = comma_p + 1;
+          }
+        } else if (strcmp(long_options[option_index].name, "timefontname") == 0) {
+          strncpy(timestamp_font_name, optarg, sizeof(timestamp_font_name) - 1);
+          timestamp_font_name[sizeof(timestamp_font_name) - 1] = '\0';
+        } else if (strcmp(long_options[option_index].name, "timefontfile") == 0) {
+          strncpy(timestamp_font_file, optarg, sizeof(timestamp_font_file) - 1);
+          timestamp_font_file[sizeof(timestamp_font_file) - 1] = '\0';
+        } else if (strcmp(long_options[option_index].name, "timefontface") == 0) {
+          char *end;
+          long value = strtol(optarg, &end, 10);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid timefontface: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          if (value < 0) {
+            log_fatal("error: invalid timefontface: %d (must be >= 0)\n", value);
+            return EXIT_FAILURE;
+          }
+          timestamp_font_face_index = value;
+        } else if (strcmp(long_options[option_index].name, "timept") == 0) {
+          char *end;
+          double value = strtod(optarg, &end);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid timept: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          if (value <= 0.0f) {
+            log_fatal("error: invalid timept: %.1f (must be > 0)\n", value);
+            return EXIT_FAILURE;
+          }
+          timestamp_font_points = value;
+        } else if (strcmp(long_options[option_index].name, "timedpi") == 0) {
+          char *end;
+          long value = strtol(optarg, &end, 10);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid timedpi: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          if (value <= 0) {
+            log_fatal("error: invalid timedpi: %d (must be > 0)\n", value);
+            return EXIT_FAILURE;
+          }
+          timestamp_font_dpi = value;
+        } else if (strcmp(long_options[option_index].name, "timecolor") == 0) {
+          char *end;
+          long value = strtol(optarg, &end, 16);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid timecolor: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          if (value < 0) {
+            log_fatal("error: invalid timecolor: %d (must be >= 0)\n", value);
+            return EXIT_FAILURE;
+          }
+          timestamp_color = value;
+        } else if (strcmp(long_options[option_index].name, "timestrokecolor") == 0) {
+          char *end;
+          long value = strtol(optarg, &end, 16);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid timecolor: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          if (value < 0) {
+            log_fatal("error: invalid timecolor: %d (must be >= 0)\n", value);
+            return EXIT_FAILURE;
+          }
+          timestamp_stroke_color = value;
+        } else if (strcmp(long_options[option_index].name, "timestrokewidth") == 0) {
+          char *end;
+          double value = strtod(optarg, &end);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid timestrokewidth: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          if (value < 0.0f) {
+            log_fatal("error: invalid timestrokewidth: %.1f (must be >= 0)\n", value);
+            return EXIT_FAILURE;
+          }
+          timestamp_stroke_width = value;
+        } else if (strcmp(long_options[option_index].name, "timespacing") == 0) {
+          char *end;
+          long value = strtol(optarg, &end, 16);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid timespacing: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          timestamp_letter_spacing = value;
         } else if (strcmp(long_options[option_index].name, "statedir") == 0) {
           strncpy(state_dir, optarg, sizeof(state_dir) - 1);
           state_dir[sizeof(state_dir) - 1] = '\0';
@@ -4807,6 +5408,24 @@ int main(int argc, char **argv) {
   log_debug("exposure_sensitivity=%u\n", exposure_sensitivity);
   log_debug("min_fps=%f\n", min_fps);
   log_debug("max_fps=%f\n", max_fps);
+  log_debug("is_timestamp_enabled=%d\n", is_timestamp_enabled);
+  log_debug("timestamp_format=%s\n", timestamp_format);
+  log_debug("timestamp_layout=%d\n", timestamp_layout);
+  log_debug("timestamp_horizontal_margin=%d\n", timestamp_horizontal_margin);
+  log_debug("timestamp_vertical_margin=%d\n", timestamp_vertical_margin);
+  log_debug("is_timestamp_abs_pos_enabled=%d\n", is_timestamp_abs_pos_enabled);
+  log_debug("timestamp_pos_x=%d\n", timestamp_pos_x);
+  log_debug("timestamp_pos_y=%d\n", timestamp_pos_y);
+  log_debug("timestamp_text_align=%d\n", timestamp_text_align);
+  log_debug("timestamp_font_name=%s\n", timestamp_font_name);
+  log_debug("timestamp_font_file=%s\n", timestamp_font_file);
+  log_debug("timestamp_font_face_index=%s\n", timestamp_font_face_index);
+  log_debug("timestamp_font_points=%1f\n", timestamp_font_points);
+  log_debug("timestamp_font_dpi=%d\n", timestamp_font_dpi);
+  log_debug("timestamp_color=%06x\n", timestamp_color);
+  log_debug("timestamp_stroke_color=%06x\n", timestamp_stroke_color);
+  log_debug("timestamp_stroke_width=%.f\n", timestamp_stroke_width);
+  log_debug("timestamp_letter_spacing=%d\n", timestamp_letter_spacing);
   log_debug("is_preview_enabled=%d\n", is_preview_enabled);
   log_debug("is_previewrect_enabled=%d\n", is_previewrect_enabled);
   log_debug("preview_x=%d\n", preview_x);
@@ -4819,6 +5438,9 @@ int main(int argc, char **argv) {
   log_debug("record_buffer_keyframes=%d\n", record_buffer_keyframes);
   log_debug("state_dir=%s\n", state_dir);
   log_debug("hooks_dir=%s\n", hooks_dir);
+
+  video_width_32 = (video_width+31)&~31;
+  video_height_16 = (video_height+15)&~15;
 
   if (!query_and_exit) {
     if (state_create_dir(state_dir) != 0) {
@@ -4970,6 +5592,35 @@ int main(int argc, char **argv) {
   struct sigaction int_handler = {.sa_handler = stopSignalHandler};
   sigaction(SIGINT, &int_handler, NULL);
   sigaction(SIGTERM, &int_handler, NULL);
+
+  // initialize text library
+  text_init();
+  // setup timestamp
+  if (is_timestamp_enabled) {
+    if (timestamp_font_file[0] != 0) {
+      timestamp_init(timestamp_font_file, timestamp_font_face_index,
+          timestamp_font_points, timestamp_font_dpi);
+    } else if (timestamp_font_name[0] != 0) {
+      timestamp_init_with_font_name(timestamp_font_name,
+          timestamp_font_points, timestamp_font_dpi);
+    } else {
+      timestamp_init_with_font_name(NULL,
+          timestamp_font_points, timestamp_font_dpi);
+    }
+    timestamp_set_format(timestamp_format);
+    if (is_timestamp_abs_pos_enabled) {
+      timestamp_set_position(timestamp_pos_x, timestamp_pos_y);
+    } else {
+      timestamp_set_layout(timestamp_layout,
+          timestamp_horizontal_margin, timestamp_vertical_margin);
+    }
+    timestamp_set_align(timestamp_text_align);
+    timestamp_set_color(timestamp_color);
+    timestamp_set_stroke_color(timestamp_stroke_color);
+    timestamp_set_stroke_width(timestamp_stroke_width);
+    timestamp_set_letter_spacing(timestamp_letter_spacing);
+    timestamp_fix_position(video_width_32, video_height_16);
+  }
 
   if (query_and_exit) {
     query_sensor_mode();
