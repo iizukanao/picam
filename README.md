@@ -258,7 +258,7 @@ For example, the following command dynamically changes the white balance to **su
 
     $ touch hooks/wb_sun
 
-Available white balance modes are: off, auto, sun, cloudy, shade, tungsten, fluorescent, incandescent, flash, and horizon.
+Available white balance modes are: **off**, **auto**, **sun**, **cloudy**, **shade**, **tungsten**, **fluorescent**, **incandescent**, **flash**, and **horizon**.
 
 #### Recordbuf
 
