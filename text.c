@@ -629,7 +629,6 @@ void span_writer_callback(int y, int count, const FT_Span* spans, void *user) {
       * textdata->width + textdata->pen_x) * BYTES_PER_PIXEL;
   int remaining_pixels = textdata->width - textdata->pen_x;
   if (unlikely(remaining_pixels <= 0)) { // out of bounds
-    printf("out of bounds\n");
     return;
   }
   int i;
@@ -641,7 +640,6 @@ void span_writer_callback(int y, int count, const FT_Span* spans, void *user) {
     int x;
     for (x = 0; x < spans[i].len; x++) {
       if (unlikely(total_length + x >= remaining_pixels)) { // out of bounds
-        printf("out of bounds 2\n");
         return;
       }
       if (opacity == 0) {
