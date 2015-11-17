@@ -1108,13 +1108,19 @@ static void parse_start_record_file(char *full_filename) {
         log_info("using recordbuf=%d for this recording\n", recording_look_back_keyframes);
       } else if (strncmp(buf, "dir", sep_p - buf) == 0) {
         size_t len = strcspn(sep_p + 1, "\r\n");
+        if (len > sizeof(recording_dest_dir) - 1) {
+          len = sizeof(recording_dest_dir) - 1;
+        }
         strncpy(recording_dest_dir, sep_p + 1, len);
-        recording_dest_dir[len] = 0;
+        recording_dest_dir[len] = '\0';
         log_info("dir set to %s\n", recording_dest_dir);
       } else if (strncmp(buf, "filename", sep_p - buf) == 0) {
         size_t len = strcspn(sep_p + 1, "\r\n");
+        if (len > sizeof(recording_basename) - 1) {
+          len = sizeof(recording_basename) - 1;
+        }
         strncpy(recording_basename, sep_p + 1, len);
-        recording_basename[len] = 0;
+        recording_basename[len] = '\0';
         log_info("filename set to %s\n", recording_basename);
       } else {
         log_error("can't recognize line in %s: %s\n",
@@ -1191,7 +1197,8 @@ void on_file_create(char *filename, char *content) {
     int i;
     for (i = 0; i < sizeof(white_balance_options) / sizeof(white_balance_option); i++) {
       if (strcmp(white_balance_options[i].name, wb_mode) == 0) {
-        strncpy(white_balance, wb_mode, sizeof(white_balance));
+        strncpy(white_balance, wb_mode, sizeof(white_balance) - 1);
+        white_balance[sizeof(white_balance) - 1] = '\0';
         matched = 1;
         break;
       }
@@ -4120,41 +4127,55 @@ int main(int argc, char **argv) {
   video_pts_step = video_pts_step_default;
   video_gop_size = video_gop_size_default;
   video_bitrate = video_bitrate_default;
-  strncpy(video_avc_profile, video_avc_profile_default, sizeof(video_avc_profile));
-  strncpy(video_avc_level, video_avc_level_default, sizeof(video_avc_level));
+  strncpy(video_avc_profile, video_avc_profile_default, sizeof(video_avc_profile) - 1);
+  video_avc_profile[sizeof(video_avc_profile) - 1] = '\0';
+  strncpy(video_avc_level, video_avc_level_default, sizeof(video_avc_level) - 1);
+  video_avc_level[sizeof(video_avc_level) - 1] = '\0';
   video_qp_min = video_qp_min_default;
   video_qp_max = video_qp_max_default;
   video_qp_initial = video_qp_initial_default;
   video_slice_dquant = video_slice_dquant_default;
-  strncpy(alsa_dev, alsa_dev_default, sizeof(alsa_dev));
+  strncpy(alsa_dev, alsa_dev_default, sizeof(alsa_dev) - 1);
+  alsa_dev[sizeof(alsa_dev) - 1] = '\0';
   audio_bitrate = audio_bitrate_default;
   audio_channels = audio_channels_default;
   audio_sample_rate = audio_sample_rate_default;
   is_audio_preview_enabled = is_audio_preview_enabled_default;
-  strncpy(audio_preview_dev, audio_preview_dev_default, sizeof(audio_preview_dev));
+  strncpy(audio_preview_dev, audio_preview_dev_default, sizeof(audio_preview_dev) - 1);
+  audio_preview_dev[sizeof(audio_preview_dev) - 1] = '\0';
   is_hlsout_enabled = is_hlsout_enabled_default;
-  strncpy(hls_output_dir, hls_output_dir_default, sizeof(hls_output_dir));
+  strncpy(hls_output_dir, hls_output_dir_default, sizeof(hls_output_dir) - 1);
+  hls_output_dir[sizeof(hls_output_dir) - 1] = '\0';
   is_rtspout_enabled = is_rtspout_enabled_default;
   strncpy(rtsp_video_control_path, rtsp_video_control_path_default,
-      sizeof(rtsp_video_control_path));
+      sizeof(rtsp_video_control_path) - 1);
+  rtsp_video_control_path[sizeof(rtsp_video_control_path) - 1] = '\0';
   strncpy(rtsp_audio_control_path, rtsp_audio_control_path_default,
-      sizeof(rtsp_audio_control_path));
+      sizeof(rtsp_audio_control_path) - 1);
+  rtsp_audio_control_path[sizeof(rtsp_audio_control_path) - 1] = '\0';
   strncpy(rtsp_video_data_path, rtsp_video_data_path_default,
-      sizeof(rtsp_video_data_path));
+      sizeof(rtsp_video_data_path) - 1);
+  rtsp_video_data_path[sizeof(rtsp_video_data_path) - 1] = '\0';
   strncpy(rtsp_audio_data_path, rtsp_audio_data_path_default,
-      sizeof(rtsp_audio_data_path));
+      sizeof(rtsp_audio_data_path) - 1);
+  rtsp_audio_data_path[sizeof(rtsp_audio_data_path) - 1] = '\0';
   is_tcpout_enabled = is_tcpout_enabled_default;
   is_auto_exposure_enabled = is_auto_exposure_enabled_default;
   is_vfr_enabled = is_vfr_enabled_default;
   auto_exposure_threshold = auto_exposure_threshold_default;
-  strncpy(white_balance, white_balance_default, sizeof(white_balance));
-  strncpy(exposure_metering, exposure_metering_default, sizeof(exposure_metering));
-  strncpy(state_dir, state_dir_default, sizeof(state_dir));
-  strncpy(hooks_dir, hooks_dir_default, sizeof(hooks_dir));
+  strncpy(white_balance, white_balance_default, sizeof(white_balance) - 1);
+  white_balance[sizeof(white_balance) - 1] = '\0';
+  strncpy(exposure_metering, exposure_metering_default, sizeof(exposure_metering) - 1);
+  exposure_metering[sizeof(exposure_metering) - 1] = '\0';
+  strncpy(state_dir, state_dir_default, sizeof(state_dir) - 1);
+  state_dir[sizeof(state_dir) - 1] = '\0';
+  strncpy(hooks_dir, hooks_dir_default, sizeof(hooks_dir) - 1);
+  hooks_dir[sizeof(hooks_dir) - 1] = '\0';
   audio_volume_multiply = audio_volume_multiply_default;
   is_hls_encryption_enabled = is_hls_encryption_enabled_default;
   strncpy(hls_encryption_key_uri, hls_encryption_key_uri_default,
-      sizeof(hls_encryption_key_uri));
+      sizeof(hls_encryption_key_uri) - 1);
+  hls_encryption_key_uri[sizeof(hls_encryption_key_uri) - 1] = '\0';
   is_preview_enabled = is_preview_enabled_default;
   is_previewrect_enabled = is_previewrect_enabled_default;
   preview_opacity = preview_opacity_default;
@@ -4197,7 +4218,8 @@ int main(int argc, char **argv) {
           video_vflip = 1;
           break;
         } else if (strcmp(long_options[option_index].name, "avcprofile") == 0) {
-          strncpy(video_avc_profile, optarg, sizeof(video_avc_profile));
+          strncpy(video_avc_profile, optarg, sizeof(video_avc_profile) - 1);
+          video_avc_profile[sizeof(video_avc_profile) - 1] = '\0';
           int matched = 0;
           int i;
           for (i = 0; i < sizeof(video_avc_profile_options) / sizeof(video_avc_profile_option); i++) {
@@ -4211,7 +4233,8 @@ int main(int argc, char **argv) {
             return EXIT_FAILURE;
           }
         } else if (strcmp(long_options[option_index].name, "avclevel") == 0) {
-          strncpy(video_avc_level, optarg, sizeof(video_avc_level));
+          strncpy(video_avc_level, optarg, sizeof(video_avc_level) - 1);
+          video_avc_level[sizeof(video_avc_level) - 1] = '\0';
           int matched = 0;
           int i;
           for (i = 0; i < sizeof(video_avc_level_options) / sizeof(video_avc_level_option); i++) {
@@ -4269,20 +4292,26 @@ int main(int argc, char **argv) {
           }
           video_slice_dquant = value;
         } else if (strcmp(long_options[option_index].name, "alsadev") == 0) {
-          strncpy(alsa_dev, optarg, sizeof(alsa_dev));
+          strncpy(alsa_dev, optarg, sizeof(alsa_dev) - 1);
+          alsa_dev[sizeof(alsa_dev) - 1] = '\0';
         } else if (strcmp(long_options[option_index].name, "rtspout") == 0) {
           is_rtspout_enabled = 1;
         } else if (strcmp(long_options[option_index].name, "rtspvideocontrol") == 0) {
-          strncpy(rtsp_video_control_path, optarg, sizeof(rtsp_video_control_path));
+          strncpy(rtsp_video_control_path, optarg, sizeof(rtsp_video_control_path) - 1);
+          rtsp_video_control_path[sizeof(rtsp_video_control_path) - 1] = '\0';
         } else if (strcmp(long_options[option_index].name, "rtspaudiocontrol") == 0) {
-          strncpy(rtsp_audio_control_path, optarg, sizeof(rtsp_audio_control_path));
+          strncpy(rtsp_audio_control_path, optarg, sizeof(rtsp_audio_control_path) - 1);
+          rtsp_audio_control_path[sizeof(rtsp_audio_control_path) - 1] = '\0';
         } else if (strcmp(long_options[option_index].name, "rtspvideodata") == 0) {
-          strncpy(rtsp_video_data_path, optarg, sizeof(rtsp_video_data_path));
+          strncpy(rtsp_video_data_path, optarg, sizeof(rtsp_video_data_path) - 1);
+          rtsp_video_data_path[sizeof(rtsp_video_data_path) - 1] = '\0';
         } else if (strcmp(long_options[option_index].name, "rtspaudiodata") == 0) {
-          strncpy(rtsp_audio_data_path, optarg, sizeof(rtsp_audio_data_path));
+          strncpy(rtsp_audio_data_path, optarg, sizeof(rtsp_audio_data_path) - 1);
+          rtsp_audio_data_path[sizeof(rtsp_audio_data_path) - 1] = '\0';
         } else if (strcmp(long_options[option_index].name, "tcpout") == 0) {
           is_tcpout_enabled = 1;
-          strncpy(tcp_output_dest, optarg, sizeof(tcp_output_dest));
+          strncpy(tcp_output_dest, optarg, sizeof(tcp_output_dest) - 1);
+          tcp_output_dest[sizeof(tcp_output_dest) - 1] = '\0';
         } else if (strcmp(long_options[option_index].name, "vfr") == 0) {
           is_vfr_enabled = 1;
         } else if (strcmp(long_options[option_index].name, "autoex") == 0) {
@@ -4300,7 +4329,8 @@ int main(int argc, char **argv) {
           is_auto_exposure_enabled = 1;
           is_vfr_enabled = 1;
         } else if (strcmp(long_options[option_index].name, "wb") == 0) {
-          strncpy(white_balance, optarg, sizeof(white_balance));
+          strncpy(white_balance, optarg, sizeof(white_balance) - 1);
+          white_balance[sizeof(white_balance) - 1] = '\0';
           int matched = 0;
           int i;
           for (i = 0; i < sizeof(white_balance_options) / sizeof(white_balance_option); i++) {
@@ -4314,7 +4344,8 @@ int main(int argc, char **argv) {
             return EXIT_FAILURE;
           }
         } else if (strcmp(long_options[option_index].name, "metering") == 0) {
-          strncpy(exposure_metering, optarg, sizeof(exposure_metering));
+          strncpy(exposure_metering, optarg, sizeof(exposure_metering) - 1);
+          exposure_metering[sizeof(exposure_metering) - 1] = '\0';
           int matched = 0;
           int i;
           for (i = 0; i < sizeof(exposure_metering_options) / sizeof(exposure_metering_option); i++) {
@@ -4407,9 +4438,11 @@ int main(int argc, char **argv) {
         } else if (strcmp(long_options[option_index].name, "query") == 0) {
           query_and_exit = 1;
         } else if (strcmp(long_options[option_index].name, "statedir") == 0) {
-          strncpy(state_dir, optarg, sizeof(state_dir));
+          strncpy(state_dir, optarg, sizeof(state_dir) - 1);
+          state_dir[sizeof(state_dir) - 1] = '\0';
         } else if (strcmp(long_options[option_index].name, "hooksdir") == 0) {
-          strncpy(hooks_dir, optarg, sizeof(hooks_dir));
+          strncpy(hooks_dir, optarg, sizeof(hooks_dir) - 1);
+          hooks_dir[sizeof(hooks_dir) - 1] = '\0';
         } else if (strcmp(long_options[option_index].name, "volume") == 0) {
           char *end;
           double value = strtod(optarg, &end);
@@ -4429,12 +4462,14 @@ int main(int argc, char **argv) {
           is_audio_preview_enabled = 1;
           break;
         } else if (strcmp(long_options[option_index].name, "audiopreviewdev") == 0) {
-          strncpy(audio_preview_dev, optarg, sizeof(audio_preview_dev));
+          strncpy(audio_preview_dev, optarg, sizeof(audio_preview_dev) - 1);
+          audio_preview_dev[sizeof(audio_preview_dev) - 1] = '\0';
           break;
         } else if (strcmp(long_options[option_index].name, "hlsenc") == 0) {
           is_hls_encryption_enabled = 1;
         } else if (strcmp(long_options[option_index].name, "hlsenckeyuri") == 0) {
-          strncpy(hls_encryption_key_uri, optarg, sizeof(hls_encryption_key_uri));
+          strncpy(hls_encryption_key_uri, optarg, sizeof(hls_encryption_key_uri) - 1);
+          hls_encryption_key_uri[sizeof(hls_encryption_key_uri) - 1] = '\0';
         } else if (strcmp(long_options[option_index].name, "hlsenckey") == 0) {
           int i;
           for (i = 0; i < 16; i++) {
@@ -4663,7 +4698,8 @@ int main(int argc, char **argv) {
         }
       case 'o':
         is_hlsout_enabled = 1;
-        strncpy(hls_output_dir, optarg, sizeof(hls_output_dir));
+        strncpy(hls_output_dir, optarg, sizeof(hls_output_dir) - 1);
+        hls_output_dir[sizeof(hls_output_dir) - 1] = '\0';
         break;
       case 'p':
         is_preview_enabled = 1;
@@ -4681,8 +4717,8 @@ int main(int argc, char **argv) {
   if (video_width * video_height > 1280 * 720) {
     if (strcmp(video_avc_profile, "high") != 0 || strcmp(video_avc_level, "4") != 0) {
       log_info("using AVC High Profile Level 4\n");
-      strncpy(video_avc_profile, "high", sizeof(video_avc_profile));
-      strncpy(video_avc_level, "4", sizeof(video_avc_level));
+      snprintf(video_avc_profile, sizeof(video_avc_profile), "high");
+      snprintf(video_avc_level, sizeof(video_avc_level), "4");
     }
     if (!is_vfr_enabled && video_fps > 20.0f) {
       log_warn("warn: fps > 20 might not work properly when width and height is large.\n");
