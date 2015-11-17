@@ -1127,9 +1127,11 @@ static void parse_start_record_file(char *full_filename) {
 
 /**
  * Reads a file and returns the contents.
- * Returned pointer must be freed by caller after use.
+ * file_contents argument will be set to the pointer to the
+ * newly-allocated memory block that holds the NULL-terminated contents.
+ * It must be freed by caller after use.
  */
-static char *read_file(const char *filepath) {
+static int read_file(const char *filepath, char **file_contents, size_t *file_contents_len) {
   FILE *fp;
   long filesize;
   char *buf;
@@ -1137,7 +1139,7 @@ static char *read_file(const char *filepath) {
 
   fp = fopen(filepath, "rb");
   if (fp == NULL) {
-    return NULL;
+    return -1;
   }
 
   // obtain file size
@@ -1145,11 +1147,11 @@ static char *read_file(const char *filepath) {
   filesize = ftell(fp);
   fseek(fp, 0L, SEEK_SET);
 
-  buf = malloc(filesize);
+  buf = malloc(filesize + 1);
   if (buf == NULL) {
-    log_error("read_file: error reading %s: failed to allocate memory (%d bytes)", filepath, filesize);
+    log_error("read_file: error reading %s: failed to allocate memory (%d bytes)", filepath, filesize + 1);
     fclose(fp);
-    return NULL;
+    return -1;
   }
 
   result = fread(buf, 1, filesize, fp);
@@ -1157,11 +1159,15 @@ static char *read_file(const char *filepath) {
     log_error("read_file: error reading %s", filepath);
     fclose(fp);
     free(buf);
-    return NULL;
+    return -1;
   }
 
   fclose(fp);
-  return buf;
+  buf[filesize] = '\0';
+  *file_contents = buf;
+  *file_contents_len = filesize + 1;
+
+  return 0;
 }
 
 void on_file_create(char *filename, char *content) {
@@ -1212,19 +1218,23 @@ void on_file_create(char *filename, char *content) {
   } else if (strcmp(filename, "set_recordbuf") == 0) { // set global recordbuf
     char buf[256];
     snprintf(buf, sizeof(buf), "%s/%s", hooks_dir, filename);
-    char *file_buf = read_file(buf);
-    if (file_buf != NULL) {
-      // read a number
-      char *end;
-      int value = strtol(file_buf, &end, 10);
-      if (end == file_buf || errno == ERANGE) { // parse error
-        log_error("error parsing file %s\n", buf);
-      } else { // parse ok
-        if (set_record_buffer_keyframes(value) == 0) {
-          log_info("recordbuf set to %d; existing record buffer cleared\n", value);
+    char *file_buf;
+    size_t file_buf_len;
+    if (read_file(buf, &file_buf, &file_buf_len) == 0) {
+      if (file_buf != NULL) {
+        // read a number
+        char *end;
+        printf("file_buf: %s\n", file_buf);
+        int value = strtol(file_buf, &end, 10);
+        if (end == file_buf || errno == ERANGE) { // parse error
+          log_error("error parsing file %s\n", buf);
+        } else { // parse ok
+          if (set_record_buffer_keyframes(value) == 0) {
+            log_info("recordbuf set to %d; existing record buffer cleared\n", value);
+          }
         }
+        free(file_buf);
       }
-      free(file_buf);
     }
   } else {
     log_error("error: invalid hook: %s\n", filename);
