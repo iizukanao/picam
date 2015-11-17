@@ -252,11 +252,13 @@ To unmute microphone, create a file named `hooks/unmute`.
 
 #### Changing the white balance
 
-The white balance can be set either via command line option or hooks. To change the white balance while picam is running, create `hooks/wb_<wbname>`, where `<wbname>` is the white balance name.
+The white balance can be set either via command line option (e.g. `--wb sun`) or hooks. To change the white balance while picam is running, create `hooks/wb_<wbname>`, where `<wbname>` is the white balance name.
 
-For example, the following command changes the white balance to **sun**.
+For example, the following command dynamically changes the white balance to **sun**.
 
     $ touch hooks/wb_sun
+
+Available white balance modes are: off, auto, sun, cloudy, shade, tungsten, fluorescent, incandescent, flash, and horizon.
 
 #### Recordbuf
 
