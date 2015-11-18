@@ -358,6 +358,13 @@ Each line of hooks/subtitle must be in the format of `key=value`. Lines starting
 
 [![Subtitle example 4](images/subtitle_example4_small.png)](images/subtitle_example4.png)
 
+#### Changing the filename for recording
+
+To change the directory and/or filename for the recorded file, specify `dir` and/or `filename` parameters in hooks/start_record.
+
+    # Start recording to /tmp/myout.ts
+    $ echo -e "dir=/tmp\nfilename=myout.ts" > hooks/start_record
+
 
 ### HTTP Live Streaming
 
