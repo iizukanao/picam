@@ -745,79 +745,97 @@ int create_dir(const char *dir) {
   return 0;
 }
 
-void *rec_thread_stop() {
+void *rec_thread_stop(int skip_cleanup) {
   FILE *fsrc, *fdest;
   int read_len;
   uint8_t *copy_buf;
 
   log_info("stop rec\n");
-  copy_buf = malloc(BUFSIZ);
-  if (copy_buf == NULL) {
-    perror("malloc for copy_buf");
-    pthread_exit(0);
-  }
-
-  pthread_mutex_lock(&rec_write_mutex);
-  mpegts_close_stream(rec_format_ctx);
-  mpegts_destroy_context(rec_format_ctx);
-  pthread_mutex_unlock(&rec_write_mutex);
-
-  log_debug("copy ");
-  fsrc = fopen(recording_tmp_filepath, "r");
-  if (fsrc == NULL) {
-    log_error("error: failed to open %s: %s\n",
-        recording_tmp_filepath, strerror(errno));
-  }
-  fdest = fopen(recording_archive_filepath, "a");
-  if (fdest == NULL) {
-    log_error("error: failed to open %s: %s\n",
-        recording_archive_filepath, strerror(errno));
-  }
-  while (1) {
-    read_len = fread(copy_buf, 1, BUFSIZ, fsrc);
-    if (read_len > 0) {
-      fwrite(copy_buf, 1, read_len, fdest);
+  if (!skip_cleanup) {
+    copy_buf = malloc(BUFSIZ);
+    if (copy_buf == NULL) {
+      perror("malloc for copy_buf");
+      pthread_exit(0);
     }
-    if (read_len != BUFSIZ) {
-      break;
+
+    pthread_mutex_lock(&rec_write_mutex);
+    mpegts_close_stream(rec_format_ctx);
+    mpegts_destroy_context(rec_format_ctx);
+    pthread_mutex_unlock(&rec_write_mutex);
+
+    log_debug("copy ");
+    fsrc = fopen(recording_tmp_filepath, "r");
+    if (fsrc == NULL) {
+      log_error("error: failed to open %s: %s\n",
+          recording_tmp_filepath, strerror(errno));
     }
+    fdest = fopen(recording_archive_filepath, "a");
+    if (fdest == NULL) {
+      log_error("error: failed to open %s: %s\n",
+          recording_archive_filepath, strerror(errno));
+      fclose(fsrc);
+    }
+    while (1) {
+      read_len = fread(copy_buf, 1, BUFSIZ, fsrc);
+      if (read_len > 0) {
+        fwrite(copy_buf, 1, read_len, fdest);
+      }
+      if (read_len != BUFSIZ) {
+        break;
+      }
+    }
+    if (feof(fsrc)) {
+      fclose(fsrc);
+      fclose(fdest);
+    } else {
+      log_error("error: rec_thread_stop: not an EOF?: %s\n", strerror(errno));
+    }
+
+    // Create a symlink
+    char symlink_dest_path[1024];
+    size_t rec_dir_len = strlen(rec_dir);
+    struct stat file_stat;
+
+    // If recording_archive_filepath starts with "rec/", then remove it
+    if (strncmp(recording_archive_filepath, rec_dir, rec_dir_len) == 0 &&
+        recording_archive_filepath[rec_dir_len] == '/') {
+      snprintf(symlink_dest_path, sizeof(symlink_dest_path),
+          recording_archive_filepath + rec_dir_len + 1);
+    } else if (recording_archive_filepath[0] == '/') { // absolute path
+      snprintf(symlink_dest_path, sizeof(symlink_dest_path),
+          recording_archive_filepath);
+    } else { // relative path
+      char cwd[1024];
+      if (getcwd(cwd, sizeof(cwd)) == NULL) {
+        log_error("error: failed to get current working directory: %s\n",
+            strerror(errno));
+        cwd[0] = '.';
+        cwd[1] = '.';
+        cwd[2] = '\0';
+      }
+      snprintf(symlink_dest_path, sizeof(symlink_dest_path),
+          "%s/%s", cwd, recording_archive_filepath);
+    }
+
+    log_debug("symlink(%s, %s)\n", symlink_dest_path, recording_filepath);
+    if (lstat(recording_filepath, &file_stat) == 0) { // file (symlink) exists
+      log_info("replacing existing symlink: %s\n", recording_filepath);
+      unlink(recording_filepath);
+    }
+    if (symlink(symlink_dest_path, recording_filepath) != 0) {
+      log_error("error: cannot create symlink from %s to %s: %s\n",
+          symlink_dest_path, recording_filepath, strerror(errno));
+    }
+
+    // unlink tmp file
+    log_debug("unlink");
+    unlink(recording_tmp_filepath);
+
+    state_set(state_dir, "last_rec", recording_filepath);
+
+    free(copy_buf);
   }
-  if (feof(fsrc)) {
-    fclose(fsrc);
-    fclose(fdest);
-  } else {
-    log_error("error: rec_thread_stop: not an EOF?: %s\n", strerror(errno));
-  }
 
-  // link
-  char *dest_path = recording_archive_filepath;
-  size_t rec_dir_len = strlen(rec_dir);
-  struct stat file_stat;
-
-  // If dest_path starts with "rec/", then remove it
-  if (strncmp(dest_path, rec_dir, rec_dir_len) == 0 &&
-      dest_path[rec_dir_len] == '/') {
-    dest_path += rec_dir_len + 1;
-  }
-
-  log_debug("symlink(%s, %s)\n", dest_path, recording_filepath);
-  if (lstat(recording_filepath, &file_stat) == 0) { // file (symlink) exists
-    log_info("replacing existing symlink: %s\n", recording_filepath);
-    unlink(recording_filepath);
-  }
-
-  if (symlink(dest_path, recording_filepath) != 0) {
-    log_error("error: cannot create symlink from %s to %s: %s\n",
-        dest_path, recording_filepath, strerror(errno));
-  }
-
-  // unlink tmp file
-  log_debug("unlink");
-  unlink(recording_tmp_filepath);
-
-  state_set(state_dir, "last_rec", recording_filepath);
-
-  free(copy_buf);
   is_recording = 0;
   state_set(state_dir, "record", "false");
 
@@ -858,7 +876,9 @@ void *rec_thread_start() {
   FILE *fsrc, *fdest;
   int read_len;
   char *dest_dir;
+  int has_error;
 
+  has_error = 0;
   copy_buf = malloc(BUFSIZ);
   if (copy_buf == NULL) {
     perror("malloc for copy_buf");
@@ -973,14 +993,21 @@ void *rec_thread_start() {
 
       fsrc = fopen(recording_tmp_filepath, "r");
       if (fsrc == NULL) {
-        perror("fopen recording_tmp_filepath");
+        log_error("error: failed to open %s: %s\n",
+            recording_tmp_filepath, strerror(errno));
+        has_error = 1;
+        break;
       }
       fdest = fopen(recording_archive_filepath, "a");
       if (fdest == NULL) {
-        perror("fopen recording_archive_filepath");
+        log_error("error: failed to open %s: %s\n",
+            recording_archive_filepath, strerror(errno));
+        has_error = 1;
+        break;
       }
       while (1) {
         read_len = fread(copy_buf, 1, BUFSIZ, fsrc);
+
         if (read_len > 0) {
           fwrite(copy_buf, 1, read_len, fdest);
         }
@@ -1014,7 +1041,7 @@ void *rec_thread_start() {
       (rec_end_pts - rec_start_pts) / 90000.0f);
   state_set(state_dir, recording_basename, state_buf);
 
-  return rec_thread_stop();
+  return rec_thread_stop(has_error);
 }
 
 void start_record() {
