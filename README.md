@@ -365,6 +365,16 @@ To change the directory and/or filename for the recorded file, specify `dir` and
     # Start recording to /tmp/myout.ts
     $ echo -e "dir=/tmp\nfilename=myout.ts" > hooks/start_record
 
+#### Determine the length of a recorded file
+
+The file state/*recorded_filename* has some info about the recording.
+
+    $ cat state/2015-11-19_01-18-09.ts
+    duration_pts=2083530
+    duration_sec=23.150333
+
+You can remove state/*.ts files if you do not need them.
+
 
 ### HTTP Live Streaming
 
