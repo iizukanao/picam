@@ -750,6 +750,7 @@ void *rec_thread_stop() {
   int read_len;
   uint8_t *copy_buf;
 
+  log_info("stop rec\n");
   copy_buf = malloc(BUFSIZ);
   if (copy_buf == NULL) {
     perror("malloc for copy_buf");
@@ -759,8 +760,6 @@ void *rec_thread_stop() {
   pthread_mutex_lock(&rec_write_mutex);
   mpegts_close_stream(rec_format_ctx);
   mpegts_destroy_context(rec_format_ctx);
-  log_info("stop rec\n");
-  state_set(state_dir, "record", "false");
   pthread_mutex_unlock(&rec_write_mutex);
 
   log_debug("copy ");
@@ -820,6 +819,7 @@ void *rec_thread_stop() {
 
   free(copy_buf);
   is_recording = 0;
+  state_set(state_dir, "record", "false");
 
   pthread_exit(0);
 }
