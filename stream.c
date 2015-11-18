@@ -941,7 +941,7 @@ void *rec_thread_start() {
   rec_format_ctx = mpegts_create_context(&codec_settings);
   mpegts_open_stream(rec_format_ctx, recording_tmp_filepath, 0);
   is_recording = 1;
-  log_info("start rec to %s\n", recording_tmp_filepath);
+  log_info("start rec to %s\n", recording_archive_filepath);
   state_set(state_dir, "record", "true");
   pthread_mutex_unlock(&rec_write_mutex);
 
