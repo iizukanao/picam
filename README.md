@@ -298,7 +298,7 @@ Each line of hooks/subtitle must be in the format of `key=value`. Lines starting
 
 | Key | Description | Default value |
 | :-- | :---------- | :------------ |
-| text | UTF-8 encoded text. "\n" will be treated as a line break. | (none) |
+| text | UTF-8 encoded text. `\n` will be treated as a line break. | (none) |
 | font_name | Font name which can be recognized by Fontconfig | sans |
 | font_file | Path to font file. If this is specified, **font_name** will not be used. | (none) |
 | face_index | Font face index. Effective only if **font_file** is specified. | 0 |
@@ -312,8 +312,8 @@ Each line of hooks/subtitle must be in the format of `key=value`. Lines starting
 | text_align | Text alignment inside the positioned box (left, center, right) | center |
 | line_height | Multiplier for line spacing | 1.0 |
 | letter_spacing | Additional letter spacing in pixels | 0 |
-| color | Text color in hex color code | ffffff |
-| stroke_color | Text stroke (outline) color in hex color code | 000000 |
+| color | Text color in hex color code. Rendered in grayscale. | ffffff |
+| stroke_color | Text stroke (outline) color in hex color code. Rendered in grayscale. | 000000 |
 | stroke_width | Text stroke (outline) border radius in points | 1.0 |
 
 ##### Examples
