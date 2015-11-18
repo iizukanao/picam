@@ -360,12 +360,16 @@ Each line of hooks/subtitle must be in the format of `key=value`. Lines starting
 
 #### Changing the filename for recording
 
+*Added in version 1.4.0*
+
 To change the directory and/or filename for the recorded file, specify `dir` and/or `filename` parameters in hooks/start_record.
 
     # Start recording to /tmp/myout.ts
     $ echo -e "dir=/tmp\nfilename=myout.ts" > hooks/start_record
 
 #### Determine the length of a recorded file
+
+*Added in version 1.4.0*
 
 The file state/*recorded_filename* has some info about the recording.
 
