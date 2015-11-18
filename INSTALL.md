@@ -224,6 +224,13 @@ From now on, all steps are performed on Raspberry Pi.
 If you do not have /opt/vc/src/ directory, download the firmware from https://github.com/raspberrypi/firmware and put all the contents under /opt/vc/src/. On Raspbian, /opt/vc/src/ is installed by default.
 
 
+## Install dependencies
+
+Install **libfontconfig1-dev** and **libharfbuzz-dev** via `apt-get`.
+
+    $ sudo apt-get install libfontconfig1-dev libharfbuzz-dev
+
+
 ## Build picam
 
     $ cd (to anywhere you like)
