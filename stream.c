@@ -1143,24 +1143,24 @@ static void parse_start_record_file(char *full_filename) {
         }
         recording_look_back_keyframes = value;
         log_info("using recordbuf=%d for this recording\n", recording_look_back_keyframes);
-      } else if (strncmp(buf, "dir", sep_p - buf) == 0) {
+      } else if (strncmp(buf, "dir", sep_p - buf) == 0) { // directory
         size_t len = strcspn(sep_p + 1, "\r\n");
         if (len > sizeof(recording_dest_dir) - 1) {
           len = sizeof(recording_dest_dir) - 1;
         }
         strncpy(recording_dest_dir, sep_p + 1, len);
         recording_dest_dir[len] = '\0';
-        log_info("dir set to %s\n", recording_dest_dir);
-      } else if (strncmp(buf, "filename", sep_p - buf) == 0) {
+        // Create the directory if it does not exist
+        create_dir(recording_dest_dir);
+      } else if (strncmp(buf, "filename", sep_p - buf) == 0) { // basename
         size_t len = strcspn(sep_p + 1, "\r\n");
         if (len > sizeof(recording_basename) - 1) {
           len = sizeof(recording_basename) - 1;
         }
         strncpy(recording_basename, sep_p + 1, len);
         recording_basename[len] = '\0';
-        log_info("filename set to %s\n", recording_basename);
       } else {
-        log_error("can't recognize line in %s: %s\n",
+        log_error("failed to parse line in %s: %s\n",
             full_filename, buf);
       }
     }
