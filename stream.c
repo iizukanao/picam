@@ -932,6 +932,11 @@ void *rec_thread_start() {
     }
   }
 
+  // Remove existing file
+  if (unlink(recording_archive_filepath) == 0) {
+    log_info("removed existing file: %s\n", recording_archive_filepath);
+  }
+
   pthread_mutex_lock(&rec_write_mutex);
   rec_format_ctx = mpegts_create_context(&codec_settings);
   mpegts_open_stream(rec_format_ctx, recording_tmp_filepath, 0);
