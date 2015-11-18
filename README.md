@@ -250,7 +250,7 @@ To unmute microphone, create a file named `hooks/unmute`.
       --version           Print program version
       --help              Print this help
 
-#### Changing the white balance
+#### White balance
 
 The white balance can be set either via command line option (e.g. `--wb sun`) or hooks. To change the white balance while picam is running, create `hooks/wb_<wbname>`, where `<wbname>` is the white balance name.
 
@@ -266,6 +266,8 @@ Recordbuf is a parameter which controls how many past keyframes should be includ
 
 ##### Global and per-recording recordbuf
 
+*Added in version 1.4.0*
+
 There are two types of recordbuf; global and per-recording. Global recordbuf is the default value for all recordings. Per-recording recordbuf only applies to the current recording. Per-recording recordbuf must be less than or equal to global recordbuf.
 
 ##### Setting global recordbuf
@@ -279,7 +281,7 @@ Global recordbuf can be specified by either `--recordbuf` option or hooks/set_re
 
 Per-recording recordbuf has a default value which is the same value as global recordbuf. Per-recording recordbuf can be specified via hooks/start_record.
 
-    # Set per-recording recordbuf to 2
+    # Start recording with per-recording recordbuf set to 2
     $ echo recordbuf=2 > hooks/start_record
 
 #### Displaying text (subtitle)
