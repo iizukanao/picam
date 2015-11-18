@@ -282,6 +282,80 @@ Per-recording recordbuf has a default value which is the same value as global re
     # Set per-recording recordbuf to 2
     $ echo recordbuf=2 > hooks/start_record
 
+#### Displaying text (subtitle)
+
+*Added in version 1.4.0*
+
+picam can display text with correct ligatures and kerning, with a font of your choice. To display a text, create hooks/subtitle.
+
+    $ echo 'text=Houston, we have a problem' > hooks/subtitle
+
+[![Subtitle example image](images/subtitle_intro_small.png)](images/subtitle_intro.png)
+
+Each line of hooks/subtitle must be in the format of `key=value`. Lines starting with `#` will be ignored. Supported keys are:
+
+| Key | Description | Default value |
+| :-- | :---------- | :------------ |
+| text | UTF-8 encoded text. "\n" will be treated as a line break. | (none) |
+| font_name | Font name which can be recognized by Fontconfig | sans |
+| font_file | Path to font file. If this is specified, **font_name** will not be used. | (none) |
+| face_index | Font face index. Effective only if **font_file** is specified. | 0 |
+| pt | Text size in points | 28.0 |
+| dpi | DPI for calculating text size | 96 |
+| duration | Number of seconds the text appears on the screen. If this is set to 0, the text will be displayed indefinitely. | 7.0 |
+| layout_align | Layout alignment of the text box on the screen. Comma-separated list of: top middle bottom  left center right | bottom,center |
+| horizontal_margin | Horizontal margin from the nearest edge in pixels. Does nothing when **pos** is specified or **layout_align** has "center". | 0 |
+| vertical_margin | Vertical margin from the nearest edge in pixels. Does nothing when **pos** is specified or **layout_align** has "middle". | 35 |
+| pos | Absolute position of the text box on the screen. This invalidates **layout_align** settings. | (none) |
+| text_align | Text alignment inside the positioned box (left, center, right) | center |
+| line_height | Multiplier for line spacing | 1.0 |
+| letter_spacing | Additional letter spacing in pixels | 0 |
+| color | Text color in hex color code | ffffff |
+| stroke_color | Text stroke (outline) color in hex color code | 000000 |
+| stroke_width | Text stroke (outline) border radius in points | 1.0 |
+
+##### Examples
+
+    $ cat example1
+    text=What goes up\nmust come down\nfinally floor AV Wa
+    font_name=serif
+    pt=40
+    $ cat example1 > hooks/subtitle
+
+[![Subtitle example 1](images/subtitle_example1_small.png)](images/subtitle_example1.png)
+
+    $ cat example2
+    text=お気の毒ですが\n冒険の書は\n消えちゃいました☆
+    font_file=/home/pi/uzura.ttf
+    pt=46
+    $ cat example2 > hooks/subtitle
+
+[![Subtitle example 2](images/subtitle_example2_small.png)](images/subtitle_example2.png)
+
+    $ cat example3
+    text=♨☀♻♥⚠
+    font_file=/home/pi/NotoSansCJKjp-Regular.otf
+    pt=120
+    layout_align=middle,center
+    letter_spacing=40
+    $ cat example3 > hooks/subtitle
+
+[![Subtitle example 3](images/subtitle_example3_small.png)](images/subtitle_example3.png)
+
+    $ cat example4
+    text=●REC
+    font_name=FreeSans
+    pt=40
+    layout_align=top,right
+    horizontal_margin=30
+    vertical_margin=30
+    color=000000
+    stroke_width=0
+    duration=0
+    $ cat example4 > hooks/subtitle
+
+[![Subtitle example 4](images/subtitle_example4_small.png)](images/subtitle_example4.png)
+
 
 ### HTTP Live Streaming
 
