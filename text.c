@@ -997,7 +997,7 @@ void text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height) {
 //            uint8_t blue = textdata->bitmap[offset + 3];
             if (opacity > 0) {
               // Blend colors
-              int orig_color = canvas[(pen_y + row) * canvas_width + (pen_x + col)];
+              uint8_t orig_color = canvas[(pen_y + row) * canvas_width + (pen_x + col)];
               float intensity = opacity / 255.0f;
               if (textdata->blend_mode == BLEND_MODE_NORMAL) {
                 canvas[(pen_y + row) * canvas_width + (pen_x + col)] =
