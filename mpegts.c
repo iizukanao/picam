@@ -25,7 +25,7 @@ void setup_video_stream(AVFormatContext *format_ctx) {
   video_stream->id = format_ctx->nb_streams - 1;
 
   video_codec_ctx                = video_stream->codec;
-  video_codec_ctx->codec_id      = CODEC_ID_H264;
+  video_codec_ctx->codec_id      = AV_CODEC_ID_H264;
   video_codec_ctx->codec_type    = AVMEDIA_TYPE_VIDEO;
   video_codec_ctx->codec_tag     = 0;
   video_codec_ctx->bit_rate      = video_bitrate;
