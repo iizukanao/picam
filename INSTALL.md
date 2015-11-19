@@ -21,9 +21,9 @@ First we need to install crosstool-ng on a powerful Linux machine (not Raspberry
 
     $ mkdir ~/pi
     $ cd ~/pi
-    $ wget http://crosstool-ng.org/download/crosstool-ng/crosstool-ng-1.20.0.tar.bz2
-    $ tar jxvf crosstool-ng-1.20.0.tar.bz2
-    $ cd crosstool-ng-1.20.0
+    $ wget http://crosstool-ng.org/download/crosstool-ng/crosstool-ng-1.21.0.tar.xz
+    $ tar xvf crosstool-ng-1.21.0.tar.xz
+    $ cd crosstool-ng-1.21.0
     $ ./configure --prefix=/opt/cross
     $ make
     $ sudo make install
@@ -33,7 +33,7 @@ First we need to install crosstool-ng on a powerful Linux machine (not Raspberry
     $ cd ctng
     $ ct-ng menuconfig
 
-Then a configuration screen appears. The followings are for crosstool-ng 1.20.0, and it may not be applicable to later versions.
+Then a configuration screen appears. The followings are for crosstool-ng 1.21.0, and it may not be applicable to later versions.
 
 - Paths and misc options
     - Check "Try features marked as EXPERIMENTAL"
@@ -57,21 +57,22 @@ Then a configuration screen appears. The followings are for crosstool-ng 1.20.0,
     - Set "Binary format" to "ELF"
     - Set "binutils version" to "2.22"
 - C-library
-    - Set "C library" to "eglibc"
-    - Set "eglibc version" to "2_13" (if you are using Raspbian)
-    - Set "eglibc version" to "2_18" (if you are using Arch Linux)
+    - Set "C library" to "glibc"
+    - Set "glibc version" to "2.19"
 - C compiler
     - Check "Show Linaro versions"
-    - Set "gcc version" to "linaro-4.8-2014.01"
+    - Set "gcc version" to "linaro-4.9-2015.03"
     - Check "C++" under "Additional supported languages"
     - Set "gcc extra config" to "--with-float=hard"
     - Check "Link libstdc++ statically into the gcc binary"
+- Companion libraries
+    - Set "ISL version" to "0.12.2"
 
 Save the configuration and build.
 
     $ sudo chown -R $USER /opt/cross
     $ ct-ng build
-    $ export CCPREFIX="/opt/cross/x-tools/arm-rpi-linux-gnueabi/bin/arm-rpi-linux-gnueabi-"
+    $ export CCPREFIX="/opt/cross/x-tools/arm-rpi-linux-gnueabihf/bin/arm-rpi-linux-gnueabihf-"
 
 
 ## Build fdk-aac
