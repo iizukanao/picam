@@ -2582,7 +2582,7 @@ static void teardown_audio_encode() {
     av_freep(&audio_buffer[i]);
   }
 #endif
-  avcodec_free_frame(&av_frame);
+  av_frame_free(&av_frame);
 }
 
 static void teardown_audio_capture_device() {
