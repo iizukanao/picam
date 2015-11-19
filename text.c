@@ -7,7 +7,6 @@
 #include FT_GLYPH_H
 #include FT_OUTLINE_H
 #include FT_STROKER_H
-#include <unicode/utf8.h>
 
 // HarfBuzz
 #include <hb.h>
