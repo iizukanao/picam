@@ -335,7 +335,7 @@ static int is_timestamp_abs_pos_enabled = 0;
 static TEXT_ALIGN timestamp_text_align;
 static const TEXT_ALIGN timestamp_text_align_default = TEXT_ALIGN_LEFT;
 static char timestamp_font_name[128];
-static const char *timestamp_font_name_default = "Droid Sans Mono";
+static const char *timestamp_font_name_default = "FreeMono:style=Bold";
 static char timestamp_font_file[1024];
 static int timestamp_font_face_index;
 static const int timestamp_font_face_index_default = 0;
