@@ -284,7 +284,7 @@ Per-recording recordbuf has a default value which is the same value as global re
     # Start recording with per-recording recordbuf set to 2
     $ echo recordbuf=2 > hooks/start_record
 
-#### Displaying text (subtitle)
+#### Overlaying text (subtitle)
 
 *Added in version 1.4.0*
 
@@ -293,6 +293,8 @@ picam can display text with correct ligatures and kerning, with a font of your c
     $ echo 'text=Houston, we have a problem' > hooks/subtitle
 
 [![Subtitle example image](images/subtitle_intro_small.png)](images/subtitle_intro.png)
+
+NOTE: On the first generation models of Raspberry Pi (before Pi 2), subtitles cause CPU usage high and the video frame rate may drop below 30 fps.
 
 Each line of hooks/subtitle must be in the format of `key=value`. Lines starting with `#` will be ignored. Supported keys are:
 
