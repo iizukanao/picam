@@ -16,6 +16,7 @@
 *.exe
 *.out
 *.app
+picam
 
 *~
 *.sw[po]
