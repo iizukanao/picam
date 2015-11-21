@@ -995,7 +995,15 @@ void text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height) {
             // TODO: map colors to UV
 //            uint8_t green = textdata->bitmap[offset + 2];
 //            uint8_t blue = textdata->bitmap[offset + 3];
-            if (opacity > 0) {
+            if (opacity == 255) {
+              if (textdata->blend_mode == BLEND_MODE_NORMAL) {
+                canvas[(pen_y + row) * canvas_width + (pen_x + col)] = red;
+              } else {
+                // TODO: Implement other blending modes
+                fprintf(stderr, "blending mode not implemented: %d\n",
+                    textdata->blend_mode);
+              }
+            } else if (opacity > 0) {
               // Blend colors
               uint8_t orig_color = canvas[(pen_y + row) * canvas_width + (pen_x + col)];
               float intensity = opacity / 255.0f;
