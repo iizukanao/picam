@@ -294,8 +294,6 @@ picam can display text with correct ligatures and kerning, with a font of your c
 
 [![Subtitle example image](images/subtitle_intro_small.png)](images/subtitle_intro.png)
 
-NOTE: On the first generation models of Raspberry Pi (before Pi 2), subtitles cause CPU usage high and the video frame rate may drop below 30 fps.
-
 Each line of hooks/subtitle must be in the format of `key=value`. Lines starting with `#` will be ignored. Supported keys are:
 
 | Key | Description | Default value |
@@ -317,6 +315,8 @@ Each line of hooks/subtitle must be in the format of `key=value`. Lines starting
 | color | Text color in hex color code. Rendered in grayscale. | ffffff |
 | stroke_color | Text stroke (outline) color in hex color code. Rendered in grayscale. | 000000 |
 | stroke_width | Text stroke (outline) border radius in points | 1.0 |
+
+NOTE: On the first generation models of Raspberry Pi (before Pi 2), subtitles cause CPU usage high and the video frame rate may drop below 30 fps.
 
 ##### Examples
 
