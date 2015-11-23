@@ -318,7 +318,7 @@ picam can display text with correct ligatures and kerning, with a font of your c
 
     $ echo 'text=Houston, we have a problem' > hooks/subtitle
 
-[<img src="https://github.com/iizukanao/picam/raw/readme/images/subtitle_intro_small.png" alt="Subtitle example image" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/readme/images/subtitle_intro.png)
+[<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_intro_small.png" alt="Subtitle example image" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_intro.png)
 
 Each line of hooks/subtitle must be in the format of `key=value`. Lines starting with `#` will be ignored. Supported keys are:
 
@@ -352,7 +352,7 @@ NOTE: On the first generation models of Raspberry Pi (before Pi 2), subtitles ca
     pt=40
     $ cat example1 > hooks/subtitle
 
-[<img src="https://github.com/iizukanao/picam/raw/readme/images/subtitle_example1_small.png" alt="Subtitle example 1" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/readme/images/subtitle_example1.png)
+[<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_example1_small.png" alt="Subtitle example 1" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_example1.png)
 
     $ cat example2
     text=お気の毒ですが\n冒険の書は\n消えちゃいました☆
@@ -360,7 +360,7 @@ NOTE: On the first generation models of Raspberry Pi (before Pi 2), subtitles ca
     pt=46
     $ cat example2 > hooks/subtitle
 
-[<img src="https://github.com/iizukanao/picam/raw/readme/images/subtitle_example2_small.png" alt="Subtitle example 2" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/readme/images/subtitle_example2.png)
+[<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_example2_small.png" alt="Subtitle example 2" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_example2.png)
 
     $ cat example3
     text=♨☀♻♥⚠
@@ -370,7 +370,7 @@ NOTE: On the first generation models of Raspberry Pi (before Pi 2), subtitles ca
     letter_spacing=40
     $ cat example3 > hooks/subtitle
 
-[<img src="https://github.com/iizukanao/picam/raw/readme/images/subtitle_example3_small.png" alt="Subtitle example 3" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/readme/images/subtitle_example3.png)
+[<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_example3_small.png" alt="Subtitle example 3" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_example3.png)
 
     $ cat example4
     text=●REC
@@ -384,7 +384,7 @@ NOTE: On the first generation models of Raspberry Pi (before Pi 2), subtitles ca
     duration=0
     $ cat example4 > hooks/subtitle
 
-[<img src="https://github.com/iizukanao/picam/raw/readme/images/subtitle_example4_small.png" alt="Subtitle example 4" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/readme/images/subtitle_example4.png)
+[<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_example4_small.png" alt="Subtitle example 4" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_example4.png)
 
 #### Changing the filename for recording
 
@@ -469,7 +469,7 @@ To upload streams from picam to Ustream, run ffmpeg with the following options. 
 
     $ ffmpeg -i tcp://127.0.0.1:8181?listen -c:v copy -c:a aac -strict -2 -ar 44100 -ab 40000 -f flv RTMP_URL/STREAM_KEY
 
-<img src="https://github.com/iizukanao/picam/raw/readme/images/ustream.png" alt="Encoder settings on Ustream" style="max-width:100%;" width="600" height="459">
+<img src="https://github.com/iizukanao/picam/raw/master/images/ustream.png" alt="Encoder settings on Ustream" style="max-width:100%;" width="600" height="459">
 
 Then, run picam to start streaming.
 
