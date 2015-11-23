@@ -143,7 +143,7 @@ To unmute microphone, create a file named `hooks/unmute`.
 #### Command options
 
     $ ./picam --help
-    picam version 1.3.3
+    picam version 1.4.0
     Usage: picam [options]
     
     Options:
@@ -240,9 +240,34 @@ To unmute microphone, create a file named `hooks/unmute`.
       --opacity           Preview window opacity
                           (0=transparent..255=opaque; default=255)
       --query             Query camera capabilities then exit
+     [timestamp]
+      --time              Enable timestamp
+      --timeformat <spec>  Timestamp format (see "man strftime" for spec)
+                           (default: %a %b %d %l:%M:%S %p)
+      --timelayout <spec>  Timestamp position (relative mode)
+                           layout is comma-separated list of:
+                            top middle bottom  left center right
+                           (default: bottom,right)
+      --timehorizmargin <px>  Horizontal margin from edge (default: 10).
+                              Effective only if --timelayout is used.
+      --timevertmargin <px>  Vertical margin from edge (default: 10).
+                             Effective only if --timelayout is used.
+      --timepos <x,y>     Timestamp position (absolute mode)
+      --timefontname <name>  Timestamp font name (default: FreeMono:style=Bold)
+      --timefontfile <file>  Timestamp font file. This invalidates --timefontname.
+      --timefontface <num>  Timestamp font face index (default: 0).
+                            Effective only if --timefontfile is used.
+      --timept <pt>       Text size in points (default: 14.0)
+      --timedpi <num>     DPI for calculating text size (default: 96)
+      --timecolor <hex>   Text color (default: ffffff)
+      --timestrokecolor <hex>  Text stroke color (default: 000000)
+                          Note that texts are rendered in grayscale.
+      --timestrokewidth <pt>  Text stroke border radius (default: 1.3).
+                              To disable stroking borders, set this value to 0.
+      --timespacing <px>  Additional letter spacing (default: 0)
      [misc]
       --recordbuf <num>   Start recording from <num> keyframes ago
-                          (default: 5)
+                          (must be >= 1; default: 5)
       --statedir <dir>    Set state dir (default: state)
       --hooksdir <dir>    Set hooks dir (default: hooks)
       -q, --quiet         Suppress all output except errors
