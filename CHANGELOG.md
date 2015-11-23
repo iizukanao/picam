@@ -1,6 +1,21 @@
 Change Log
 ==========
 
+Version 1.4.0 *(2015-11-23)*
+-----------------------------
+
+### Major changes
+
+- Add timestamp feature.
+- Add subtitle feature.
+- Introduce concepts of global and per-recording recordbuf.
+- Now it is able to specify the directory and filename for each recording.
+
+### Minor changes
+
+- Set state/record to false after the recording has actually completed.
+- Change the format of state/*.ts files.
+
 Version 1.3.3 *(2015-10-06)*
 -----------------------------
 
