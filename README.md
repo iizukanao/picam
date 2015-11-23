@@ -47,7 +47,7 @@ The above results were tested with:
 
 ### Installation
 
-picam binary is available at https://github.com/iizukanao/picam/releases/latest
+Binary release is available at https://github.com/iizukanao/picam/releases/latest
 
 [picam preinstalled Raspbian jessie image](http://s.kyu-mu.net/raspbian-picam/) is also available. Write it to an SD card larger than 4.5GB, boot it, then run `raspi-config` to expand the filesystem.
 
