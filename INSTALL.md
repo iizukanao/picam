@@ -1,18 +1,14 @@
-# Binary distributions
-
-## picam standalone binary
-
-Pre-built binary is available at https://github.com/iizukanao/picam/releases/latest
-
-
-## picam preinstalled Raspbian image
-
-picam preinstalled Raspbian SD card image is available at <http://s.kyu-mu.net/raspbian-picam/>. If you use an SD card larger than 4GB, run `raspi-config` and expand the filesystem after you boot Raspbian.
-
-
 # picam Compilation Guide
 
 This document describes how to build picam. The whole process takes about 2-3 hours with a standard Linux box.
+
+## Binary releases are also available
+
+For those who don't want to build picam yourself, standalone binary is available at https://github.com/iizukanao/picam/releases/latest
+
+picam preinstalled Raspbian SD card image is available at <http://s.kyu-mu.net/raspbian-picam/>. Write it to an SD card larger than 4.5GB, boot it, then run `raspi-config` to expand the filesystem.
+
+To build picam yourself, continue reading.
 
 
 ## Install crosstool-ng
