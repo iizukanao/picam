@@ -13,7 +13,7 @@ Version 1.4.0 *(2015-11-23)*
 
 ### Minor changes
 
-- Set state/record to false after the recording has actually completed.
+- Set state/record to false after the recording is actually complete.
 - Change the format of state/*.ts files.
 
 Version 1.3.3 *(2015-10-06)*
