@@ -4459,7 +4459,7 @@ static void print_usage() {
   log_info(" [timestamp]\n");
   log_info("  --time              Enable timestamp\n");
   log_info("  --timeformat <spec>  Timestamp format (see \"man strftime\" for spec)\n");
-  log_info("                       (default: %s)\n", timestamp_format_default);
+  log_info("                       (default: \"%s\")\n", timestamp_format_default);
   log_info("  --timelayout <spec>  Timestamp position (relative mode)\n");
   log_info("                       layout is comma-separated list of:\n");
   log_info("                        top middle bottom  left center right\n");
