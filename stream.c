@@ -1354,7 +1354,6 @@ void on_file_create(char *filename, char *content) {
       if (file_buf != NULL) {
         // read a number
         char *end;
-        printf("file_buf: %s\n", file_buf);
         int value = strtol(file_buf, &end, 10);
         if (end == file_buf || errno == ERANGE) { // parse error
           log_error("error parsing file %s\n", buf);
