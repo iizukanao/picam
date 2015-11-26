@@ -144,7 +144,7 @@ To unmute microphone, create a file named `hooks/unmute`.
 #### Command options
 
     $ ./picam --help
-    picam version 1.4.0
+    picam version 1.4.1
     Usage: picam [options]
     
     Options:
@@ -226,6 +226,8 @@ To unmute microphone, create a file named `hooks/unmute`.
                             incandescent: Light source is incandescent
                             flash: Light source is a flash
                             horizon: Light source is the sun on the horizon
+      --wbred <num>       Red gain. Implies "--wb off".
+      --wbblue <num>      Blue gain. Implies "--wb off".
       --metering <value>  Set metering type. <value> is one of:
                             average: Center weight average metering (default)
                             spot: Spot (partial) metering
@@ -241,10 +243,10 @@ To unmute microphone, create a file named `hooks/unmute`.
       --opacity           Preview window opacity
                           (0=transparent..255=opaque; default=255)
       --query             Query camera capabilities then exit
-     [timestamp]
+     [timestamp] (may be a bit heavy on Raspberry Pi 1)
       --time              Enable timestamp
       --timeformat <spec>  Timestamp format (see "man strftime" for spec)
-                           (default: %a %b %d %l:%M:%S %p)
+                           (default: "%a %b %d %l:%M:%S %p")
       --timelayout <spec>  Timestamp position (relative mode)
                            layout is comma-separated list of:
                             top middle bottom  left center right
