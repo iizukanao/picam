@@ -4456,7 +4456,7 @@ static void print_usage() {
   log_info("  --opacity           Preview window opacity\n");
   log_info("                      (0=transparent..255=opaque; default=%d)\n", preview_opacity_default);
   log_info("  --query             Query camera capabilities then exit\n");
-  log_info(" [timestamp]\n");
+  log_info(" [timestamp] (may be a bit heavy on Raspberry Pi 1)\n");
   log_info("  --time              Enable timestamp\n");
   log_info("  --timeformat <spec>  Timestamp format (see \"man strftime\" for spec)\n");
   log_info("                       (default: \"%s\")\n", timestamp_format_default);
