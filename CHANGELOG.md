@@ -1,6 +1,12 @@
 Change Log
 ==========
 
+Version 1.4.1 *(2015-11-26)*
+-----------------------------
+
+- Add `--wbred` and `--wbblue` options.
+- Add wbred and wbblue hooks.
+
 Version 1.4.0 *(2015-11-23)*
 -----------------------------
 
