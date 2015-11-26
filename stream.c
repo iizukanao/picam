@@ -257,6 +257,13 @@ static const white_balance_option white_balance_options[] = {
   { .name = "horizon",      .control = OMX_WhiteBalControlHorizon },
 };
 
+// Red gain used when AWB is off
+static float awb_red_gain;
+static const float awb_red_gain_default = 0.0f;
+// Blue gain used when AWB is off
+static float awb_blue_gain;
+static const float awb_blue_gain_default = 0.0f;
+
 static char exposure_metering[8];
 static const char *exposure_metering_default = "average";
 typedef struct exposure_metering_option {
@@ -2923,6 +2930,29 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
   }
 }
 
+// Set red and blue gains used when AWB is off
+static int camera_set_custom_awb_gains() {
+  OMX_CONFIG_CUSTOMAWBGAINSTYPE custom_awb_gains;
+  OMX_ERRORTYPE error;
+
+// NOTE: OMX_IndexConfigCameraSettings is read-only
+
+  memset(&custom_awb_gains, 0, sizeof(OMX_CONFIG_CUSTOMAWBGAINSTYPE));
+  custom_awb_gains.nSize = sizeof(OMX_CONFIG_CUSTOMAWBGAINSTYPE);
+  custom_awb_gains.nVersion.nVersion = OMX_VERSION;
+  custom_awb_gains.xGainR = round(awb_red_gain * 65536); // Q16
+  custom_awb_gains.xGainB = round(awb_blue_gain * 65536); // Q16
+
+  error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
+      OMX_IndexConfigCustomAwbGains, &custom_awb_gains);
+  if (error != OMX_ErrorNone) {
+    log_fatal("error: failed to set camera custom awb gains: 0x%x\n", error);
+    return -1;
+  }
+
+  return 0;
+}
+
 static int camera_set_exposure_value() {
   OMX_CONFIG_EXPOSUREVALUETYPE exposure_value;
   OMX_ERRORTYPE error;
@@ -4163,6 +4193,10 @@ static void openmax_cam_loop() {
   if (camera_set_white_balance(white_balance) != 0) {
     exit(EXIT_FAILURE);
   }
+
+  if (camera_set_custom_awb_gains() != 0) {
+    exit(EXIT_FAILURE);
+  }
 }
 
 static void *audio_nop_loop() {
@@ -4403,6 +4437,8 @@ static void print_usage() {
   log_info("                        incandescent: Light source is incandescent\n");
   log_info("                        flash: Light source is a flash\n");
   log_info("                        horizon: Light source is the sun on the horizon\n");
+  log_info("  --wbred <num>       Red gain. Implies \"--wb off\".\n");
+  log_info("  --wbblue <num>      Blue gain. Implies \"--wb off\".\n");
   log_info("  --metering <value>  Set metering type. <value> is one of:\n");
   log_info("                        average: Center weight average metering (default)\n");
   log_info("                        spot: Spot (partial) metering\n");
@@ -4494,6 +4530,8 @@ int main(int argc, char **argv) {
     { "autoex", no_argument, NULL, 0 },
     { "autoexthreshold", required_argument, NULL, 0 },
     { "wb", required_argument, NULL, 0 },
+    { "wbred", required_argument, NULL, 0 },
+    { "wbblue", required_argument, NULL, 0 },
     { "metering", required_argument, NULL, 0 },
     { "evcomp", required_argument, NULL, 0 },
     { "aperture", required_argument, NULL, 0 },
@@ -4590,6 +4628,8 @@ int main(int argc, char **argv) {
   auto_exposure_threshold = auto_exposure_threshold_default;
   strncpy(white_balance, white_balance_default, sizeof(white_balance) - 1);
   white_balance[sizeof(white_balance) - 1] = '\0';
+  awb_red_gain = awb_red_gain_default;
+  awb_blue_gain = awb_blue_gain_default;
   strncpy(exposure_metering, exposure_metering_default, sizeof(exposure_metering) - 1);
   exposure_metering[sizeof(exposure_metering) - 1] = '\0';
   strncpy(state_dir, state_dir_default, sizeof(state_dir) - 1);
@@ -4783,6 +4823,24 @@ int main(int argc, char **argv) {
             log_fatal("error: invalid white balance: %s\n", optarg);
             return EXIT_FAILURE;
           }
+        } else if (strcmp(long_options[option_index].name, "wbred") == 0) {
+          char *end;
+          double value = strtod(optarg, &end);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid camrg: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          awb_red_gain = value;
+          strcpy(white_balance, "off"); // Turns off AWB
+        } else if (strcmp(long_options[option_index].name, "wbblue") == 0) {
+          char *end;
+          double value = strtod(optarg, &end);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid cambg: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          awb_blue_gain = value;
+          strcpy(white_balance, "off"); // Turns off AWB
         } else if (strcmp(long_options[option_index].name, "metering") == 0) {
           strncpy(exposure_metering, optarg, sizeof(exposure_metering) - 1);
           exposure_metering[sizeof(exposure_metering) - 1] = '\0';
@@ -5429,6 +5487,8 @@ int main(int argc, char **argv) {
   log_debug("auto_exposure_threshold=%f\n", auto_exposure_threshold);
   log_debug("is_vfr_enabled=%d\n", is_vfr_enabled);
   log_debug("white_balance=%s\n", white_balance);
+  log_debug("awb_red_gain=%f\n", awb_red_gain);
+  log_debug("awb_blue_gain=%f\n", awb_blue_gain);
   log_debug("metering=%s\n", exposure_metering);
   log_debug("manual_exposure_compensation=%d\n", manual_exposure_compensation);
   log_debug("exposure_compensation=%f\n", exposure_compensation);
