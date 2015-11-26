@@ -390,6 +390,7 @@ static int fr_q16;
 
 // Function prototypes
 static int camera_set_white_balance(char *wb);
+static int camera_set_custom_awb_gains();
 static void encode_and_send_image();
 static void encode_and_send_audio();
 void start_record();
@@ -1267,6 +1268,52 @@ void on_file_create(char *filename, char *content) {
     mute_audio();
   } else if (strcmp(filename, "unmute") == 0) {
     unmute_audio();
+  } else if (strcmp(filename, "wbred") == 0) {
+    char buf[256];
+    snprintf(buf, sizeof(buf), "%s/%s", hooks_dir, filename);
+    char *file_buf;
+    size_t file_buf_len;
+    if (read_file(buf, &file_buf, &file_buf_len) == 0) {
+      if (file_buf != NULL) {
+        // read a number
+        char *end;
+        double value = strtod(file_buf, &end);
+        if (end == file_buf || errno == ERANGE) { // parse error
+          log_error("error parsing file %s\n", buf);
+        } else { // parse ok
+          awb_red_gain = value;
+          if (camera_set_custom_awb_gains() == 0) {
+            log_info("changed red gain to %.2f\n", awb_red_gain);
+          } else {
+            log_error("error: failed to set wbred\n");
+          }
+        }
+        free(file_buf);
+      }
+    }
+  } else if (strcmp(filename, "wbblue") == 0) {
+    char buf[256];
+    snprintf(buf, sizeof(buf), "%s/%s", hooks_dir, filename);
+    char *file_buf;
+    size_t file_buf_len;
+    if (read_file(buf, &file_buf, &file_buf_len) == 0) {
+      if (file_buf != NULL) {
+        // read a number
+        char *end;
+        double value = strtod(file_buf, &end);
+        if (end == file_buf || errno == ERANGE) { // parse error
+          log_error("error parsing file %s\n", buf);
+        } else { // parse ok
+          awb_blue_gain = value;
+          if (camera_set_custom_awb_gains() == 0) {
+            log_info("changed blue gain to %.2f\n", awb_blue_gain);
+          } else {
+            log_error("error: failed to set wbblue\n");
+          }
+        }
+        free(file_buf);
+      }
+    }
   } else if (strncmp(filename, "wb_", 3) == 0) { // e.g. wb_sun
     char *wb_mode = filename + 3;
     int matched = 0;
