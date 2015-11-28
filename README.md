@@ -34,7 +34,7 @@ The above results were tested with:
 
 - Raspberry Pi
 - Raspberry Pi Camera Board
-- USB microphone (see [Recommended hardware](#recommended-hardware)) or Wolfson Audio Card
+- (optionally) USB microphone or Wolfson Audio Card
 
 
 ### Supported operating systems
