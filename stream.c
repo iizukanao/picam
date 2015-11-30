@@ -4483,8 +4483,8 @@ static void print_usage() {
   log_info("                        incandescent: Light source is incandescent\n");
   log_info("                        flash: Light source is a flash\n");
   log_info("                        horizon: Light source is the sun on the horizon\n");
-  log_info("  --wbred <num>       Red gain. Implies \"--wb off\".\n");
-  log_info("  --wbblue <num>      Blue gain. Implies \"--wb off\".\n");
+  log_info("  --wbred <num>       Red gain. Implies \"--wb off\". (0.0 .. 8.0)\n");
+  log_info("  --wbblue <num>      Blue gain. Implies \"--wb off\". (0.0 .. 8.0)\n");
   log_info("  --metering <value>  Set metering type. <value> is one of:\n");
   log_info("                        average: Center weight average metering (default)\n");
   log_info("                        spot: Spot (partial) metering\n");
