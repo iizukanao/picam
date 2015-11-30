@@ -224,8 +224,8 @@ To unmute microphone, create a file named `hooks/unmute`.
                             incandescent: Light source is incandescent
                             flash: Light source is a flash
                             horizon: Light source is the sun on the horizon
-      --wbred <num>       Red gain. Implies "--wb off".
-      --wbblue <num>      Blue gain. Implies "--wb off".
+      --wbred <num>       Red gain. Implies "--wb off". (0.0 .. 8.0)
+      --wbblue <num>      Blue gain. Implies "--wb off". (0.0 .. 8.0)
       --metering <value>  Set metering type. <value> is one of:
                             average: Center weight average metering (default)
                             spot: Spot (partial) metering
