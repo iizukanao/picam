@@ -1,10 +1,27 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <syslog.h>
 
 #include "log.h"
 
 static int log_level = LOG_LEVEL_DEBUG;
 static FILE *out_stream = NULL;
+
+static int using_syslog = 0;
+
+void log_enable_syslog(char *ident) {
+  if (!using_syslog) {
+    using_syslog = 1;
+    openlog(ident, LOG_PERROR | LOG_CONS | LOG_PID, LOG_USER);
+  }
+}
+
+void log_disable_syslog() {
+  if (using_syslog) {
+    using_syslog = 0;
+    closelog();
+  }
+}
 
 void log_set_level(int level) {
   log_level = level;
@@ -36,7 +53,32 @@ void log_msg(int msg_log_level, const char *format, const va_list args) {
   }
 
   if (msg_log_level >= log_level) {
-    vfprintf(out_stream, format, args);
+    if (using_syslog) {
+      switch (msg_log_level) {
+        case LOG_LEVEL_DEBUG:
+          vsyslog(LOG_DEBUG, format, args);
+          break;
+        case LOG_LEVEL_INFO:
+          vsyslog(LOG_INFO, format, args);
+          break;
+        case LOG_LEVEL_WARN:
+          vsyslog(LOG_WARNING, format, args);
+          break;
+        case LOG_LEVEL_ERROR:
+          vsyslog(LOG_ERR, format, args);
+          break;
+        case LOG_LEVEL_FATAL:
+          vsyslog(LOG_CRIT, format, args);
+          break;
+        default:
+          syslog(LOG_ALERT, "unknown log level: %d\n--- message begin ---\n", msg_log_level);
+          vsyslog(LOG_ALERT, format, args);
+          syslog(LOG_ALERT, "--- message end ---\n");
+          break;
+      }
+    } else {
+      vfprintf(out_stream, format, args);
+    }
   }
 }
 

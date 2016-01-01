@@ -12,6 +12,8 @@ enum {
   LOG_LEVEL_OFF,
 };
 
+void log_enable_syslog(char *ident);
+void log_disable_syslog();
 void log_set_level(int level);
 int  log_get_level();
 void log_set_stream(FILE *stream);
