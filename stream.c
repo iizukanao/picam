@@ -359,6 +359,12 @@ static const float timestamp_stroke_width_default = 1.3f;
 static int timestamp_letter_spacing;
 static const int timestamp_letter_spacing_default = 0;
 
+// daemon
+static int use_daemon = 0; // 1=start daemon, 0=do not use daemon
+static int kill_daemon = 0; // 1=stop daemon, 0=do nothing
+static char pid_file[256];
+static const char *pid_file_default = "/tmp/" PROGRAM_NAME ".pid";
+
 // how many keyframes should we look back for the next recording
 static int recording_look_back_keyframes;
 
@@ -1906,7 +1912,7 @@ static int64_t get_next_audio_write_time() {
   return audio_start_time + audio_frame_count * 1000000000.0f / ((float)audio_sample_rate / (float)period_size);
 }
 
-static void print_audio_timing() {
+static void print_timing_info(char *fps_info) {
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
   int64_t cur_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
@@ -1918,7 +1924,8 @@ static void print_audio_timing() {
   // (cur_time - audio_start_time) * INT64_C(90000) / INT64_C(1000000000);
   int64_t clock_pts = (cur_time - audio_start_time) * .00009f;
 
-  log_debug(" a-v=%lld c-a=%lld u=%d d=%d pts=%" PRId64,
+  log_debug("%s%s a-v=%lld c-a=%lld u=%d d=%d pts=%" PRId64,
+      use_daemon ? "" : " ", fps_info,
       avdiff, clock_pts - audio_pts, speed_up_count, speed_down_count, last_pts);
 }
 
@@ -2927,7 +2934,9 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
             log_debug("dV");
             video_pending_drop_frames--;
           } else {
-            log_debug(".");
+            if (!use_daemon) {
+              log_debug(".");
+            }
             timestamp_update();
             subtitle_update();
             text_draw_all(last_video_buffer, video_width_32, video_height_16);
@@ -3522,9 +3531,10 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
           } else {
             fps = 1.0f / divisor;
           }
-          log_debug(" %5.2f fps k=%d", fps, keyframes_count);
           if (log_get_level() <= LOG_LEVEL_DEBUG) {
-            print_audio_timing();
+            char fps_info[64];
+            snprintf(fps_info, sizeof(fps_info), "%5.2f fps k=%d", fps, keyframes_count);
+            print_timing_info(fps_info);
           }
           current_audio_frames = 0;
           frame_count = 0;
@@ -3533,7 +3543,9 @@ static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
             auto_select_exposure(video_width, video_height, last_video_buffer, fps);
           }
 
-          log_debug("\n");
+          if (!use_daemon) {
+            log_debug("\n");
+          }
         }
         clock_gettime(CLOCK_MONOTONIC, &tsBegin);
       } else { // inter frame
@@ -4529,6 +4541,10 @@ static void print_usage() {
       timestamp_stroke_width_default);
   log_info("                          To disable stroking borders, set this value to 0.\n");
   log_info("  --timespacing <px>  Additional letter spacing (default: %d)\n", timestamp_letter_spacing_default);
+  log_info(" [daemon]\n");
+  log_info("  -d, --daemon        Start picam as daemon (run in background)\n");
+  log_info("  -k, --kill          Stop running daemon\n");
+  log_info("  --pidfile <file>    PID file (default: %s)\n", pid_file_default);
   log_info(" [misc]\n");
   log_info("  --recordbuf <num>   Start recording from <num> keyframes ago\n");
   log_info("                      (must be >= 1; default: %d)\n", record_buffer_keyframes_default);
@@ -4538,6 +4554,101 @@ static void print_usage() {
   log_info("  --verbose           Enable verbose output\n");
   log_info("  --version           Print program version\n");
   log_info("  --help              Print this help\n");
+}
+
+/**
+ * Daemonize this process
+ */
+static void daemonize() {
+  pid_t pid;
+  int i, pid_fd;
+  char pid_buf[16];
+
+  if (getppid() == 1) { // parent == init, already a daemon
+    return;
+  }
+
+  pid = fork();
+
+  if (pid < 0) {
+    // Fork error
+    exit(EXIT_FAILURE);
+  }
+
+  if (pid > 0) {
+    // Parent exits
+    exit(EXIT_SUCCESS);
+  }
+
+  // Obtain a new process group
+  if (setsid() < 0) {
+    exit(EXIT_FAILURE);
+  }
+
+  umask(027);
+
+  pid_fd = open(pid_file, O_RDWR | O_CREAT, 0640);
+  if (pid_fd < 0) {
+    // Cannot open pid file
+    log_fatal("error: cannot open %s: %s\n", pid_file, strerror(errno));
+    exit(EXIT_FAILURE);
+  }
+  if (lockf(pid_fd, F_TLOCK, 0) < 0) {
+    // Cannot lock pid file
+    log_fatal("error: cannot lock %s (another " PROGRAM_NAME
+        " daemon is running?): %s\n", pid_file, strerror(errno));
+    exit(EXIT_FAILURE);
+  }
+
+  // Close all descriptors except pid_fd
+  for (i = getdtablesize(); i >= 0; --i) {
+    if (i != pid_fd) {
+      close(i);
+    }
+  }
+
+  // Open dummy stdin, stdout, and stderr
+  i = open("/dev/null", O_RDWR);
+  dup(i); // stdout
+  dup(i); // stderr
+
+  // Write pid to file
+  sprintf(pid_buf, "%d\n", getpid());
+  write(pid_fd, pid_buf, strlen(pid_buf));
+  // Do not close pid_fd so that other process cannot lock the same pid file
+
+  // Ignore signals
+  signal(SIGCHLD, SIG_IGN); // SIGCHLD: Child stopped or terminated
+  signal(SIGTSTP, SIG_IGN); // SIGTSTP: Stop typed at tty
+  signal(SIGTTOU, SIG_IGN); // SIGTTOU: tty output for background process
+  signal(SIGTTIN, SIG_IGN); // SIGTTIN: tty input for background process
+}
+
+/**
+ * Stop running daemon
+ */
+static int stop_daemon() {
+  FILE *fp;
+  int pid;
+
+  fp = fopen(pid_file, "r");
+  if (fp != NULL) {
+    fscanf(fp, "%d", &pid);
+    fclose(fp);
+  } else {
+    log_fatal("error: cannot open pid file %s (maybe " PROGRAM_NAME
+        " daemon is not running?): %s\n", pid_file, strerror(errno));
+    return -1;
+  }
+
+  // Terminate existing picam process
+  log_info("stopping " PROGRAM_NAME " daemon (pid %d)\n", pid);
+  kill(pid, SIGTERM);
+
+  // Remove the pid file
+  unlink(pid_file);
+
+  return 0;
 }
 
 int main(int argc, char **argv) {
@@ -4614,6 +4725,9 @@ int main(int argc, char **argv) {
     { "previewrect", required_argument, NULL, 0 },
     { "opacity", required_argument, NULL, 0 },
     { "quiet", no_argument, NULL, 'q' },
+    { "daemon", no_argument, NULL, 'd' },
+    { "kill", no_argument, NULL, 'k' },
+    { "pidfile", required_argument, NULL, 0 },
     { "recordbuf", required_argument, NULL, 0 },
     { "verbose", no_argument, NULL, 0 },
     { "version", no_argument, NULL, 0 },
@@ -4706,8 +4820,10 @@ int main(int argc, char **argv) {
   timestamp_stroke_color = timestamp_stroke_color_default;
   timestamp_stroke_width = timestamp_stroke_width_default;
   timestamp_letter_spacing = timestamp_letter_spacing_default;
+  strncpy(pid_file, pid_file_default, sizeof(pid_file) - 1);
+  pid_file[sizeof(pid_file) - 1] = '\0';
 
-  while ((opt = getopt_long(argc, argv, "w:h:v:f:g:c:r:a:o:pq", long_options, &option_index)) != -1) {
+  while ((opt = getopt_long(argc, argv, "w:h:v:f:g:c:r:a:o:pdkq", long_options, &option_index)) != -1) {
     switch (opt) {
       case 0:
         if (long_options[option_index].flag != 0) {
@@ -5281,6 +5397,9 @@ int main(int argc, char **argv) {
           }
           preview_opacity = value;
           break;
+        } else if (strcmp(long_options[option_index].name, "pidfile") == 0) {
+          strncpy(pid_file, optarg, sizeof(pid_file) - 1);
+          pid_file[sizeof(pid_file) - 1] = '\0';
         } else if (strcmp(long_options[option_index].name, "recordbuf") == 0) {
           char *end;
           long value = strtol(optarg, &end, 10);
@@ -5441,6 +5560,20 @@ int main(int argc, char **argv) {
       case 'p':
         is_preview_enabled = 1;
         break;
+      case 'd':
+        if (kill_daemon) {
+          log_fatal("error: -d (--daemon) and -k (--kill) cannot be used at the same time\n");
+          return EXIT_FAILURE;
+        }
+        use_daemon = 1;
+        break;
+      case 'k':
+        if (use_daemon) {
+          log_fatal("error: -d (--daemon) and -k (--kill) cannot be used at the same time\n");
+          return EXIT_FAILURE;
+        }
+        kill_daemon = 1;
+        break;
       case 'q':
         log_set_level(LOG_LEVEL_ERROR);
         break;
@@ -5573,9 +5706,26 @@ int main(int argc, char **argv) {
   log_debug("preview_opacity=%d\n", preview_opacity);
   log_debug("is_audio_preview_enabled=%d\n", is_audio_preview_enabled);
   log_debug("audio_preview_dev=%s\n", audio_preview_dev);
+  log_debug("use_daemon=%d\n", use_daemon);
+  log_debug("kill_daemon=%d\n", kill_daemon);
+  log_debug("pid_file=%s\n", pid_file);
   log_debug("record_buffer_keyframes=%d\n", record_buffer_keyframes);
   log_debug("state_dir=%s\n", state_dir);
   log_debug("hooks_dir=%s\n", hooks_dir);
+
+  if (kill_daemon) {
+    if (stop_daemon() == 0) {
+      exit(EXIT_SUCCESS);
+    } else {
+      exit(EXIT_FAILURE);
+    }
+  }
+
+  if (use_daemon) {
+    log_info("starting " PROGRAM_NAME " daemon (error messages will be sent to syslog)\n");
+    daemonize();
+    log_enable_syslog(PROGRAM_NAME);
+  }
 
   video_width_32 = (video_width+31)&~31;
   video_height_16 = (video_height+15)&~15;
