@@ -1636,6 +1636,14 @@ void on_file_create(char *filename, char *content) {
               *replaced_text_ptr = text[i];
             }
             replaced_text_ptr++;
+          } else if (text[i] == 't') {
+            if (is_escape_active) { // t after escape char
+              *replaced_text_ptr = '\t';
+              is_escape_active = 0;
+            } else { // t after non-escape char
+              *replaced_text_ptr = text[i];
+            }
+            replaced_text_ptr++;
           } else {
             if (is_escape_active) {
               is_escape_active = 0;
@@ -2588,7 +2596,7 @@ static int configure_audio_capture_device() {
     log_error("microphone error: unable to obtain poll descriptors for capture: %s\n", snd_strerror(err));
     return err;
   }
-  is_first_audio = 1; 
+  is_first_audio = 1;
 
   // dump the configuration of capture_handle
   if (log_get_level() <= LOG_LEVEL_DEBUG) {
@@ -4020,13 +4028,13 @@ static int read_audio_poll_mmap() {
     }
     is_first_audio = 1;
     return error;
-  }   
+  }
   if (avail < period_size) { // check if one period is ready to process
-    switch (is_first_audio) 
+    switch (is_first_audio)
     {
       case 1:
         // if the capture from PCM is started (is_first_audio=1) and one period is ready to process,
-        // the stream must start 
+        // the stream must start
         is_first_audio = 0;
         log_debug("[microphone started]");
         if ( (error = snd_pcm_start(capture_handle)) < 0) {
@@ -4045,14 +4053,14 @@ static int read_audio_poll_mmap() {
           }
           is_first_audio = 1;
         }
-    } 
+    }
     return -1;
   }
   int read_size = 0;
   size = period_size;
   while (size > 0) { // wait until we have period_size frames (in the most cases only one loop is needed)
     frames = size; // expected number of frames to be processed
-    // frames is a bidirectional variable, this means that the real number of frames processed is written 
+    // frames is a bidirectional variable, this means that the real number of frames processed is written
     // to this variable by the function.
     if ((error = snd_pcm_mmap_begin (capture_handle, &my_areas, &offset, &frames)) < 0) {
       if ((error = xrun_recovery(capture_handle, error)) < 0) {
@@ -4060,7 +4068,7 @@ static int read_audio_poll_mmap() {
         exit(EXIT_FAILURE);
       }
       is_first_audio = 1;
-    } 
+    }
     size_t copy_size = frames * sizeof(short) * audio_channels;
     memcpy(this_samples + read_size, (my_areas[0].addr)+(offset*sizeof(short)*audio_channels), copy_size);
     read_size += copy_size;

@@ -684,7 +684,7 @@ static int draw_glyphs(TextData *textdata) {
   }
   line_start_pos[0] = 0; // stores the starting positions of each line
   int lines = 1;
-  int i;
+  int i, j;
   for (i = 0; i < textdata->text_len; i++) {
     if (textdata->text[i] == '\n') {
       if (i < textdata->text_len) {
@@ -699,6 +699,24 @@ static int draw_glyphs(TextData *textdata) {
         line_start_pos[lines] = i + 1;
       }
       lines++;
+    } else if (textdata->text[i] == '\t') {
+      if (i < textdata->text_len) {
+        int rounded = (((i-line_start_pos[lines - 1]) + 4) / 4) * 4 - (i-line_start_pos[lines - 1]); // next multiple of 4
+        char *more_text = realloc(textdata->text, sizeof(char) * (rounded) + textdata->text_len);
+        if (more_text == NULL) {
+          free(textdata->text);
+          fprintf(stderr, "cannot allocate memory for textdata->text: %d bytes\n",
+              sizeof(char) * (rounded) + textdata->text_len);
+          exit(EXIT_FAILURE);
+        }
+        textdata->text = more_text;
+        memmove(&textdata->text[i+rounded], &textdata->text[i+1], &textdata->text[textdata->text_len] - &textdata->text[i+1]);
+        for (j = 0; j < rounded; j++) {
+          textdata->text[i+j] = ' ';
+        }
+        textdata->text_len += rounded-1;
+        i += rounded-1;
+      }
     }
   }
 
