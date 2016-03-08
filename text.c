@@ -81,6 +81,7 @@ typedef struct TextData {
   int32_t text_len;
   FT_Face face;
   float line_height_multiply;
+  float tab_scale;
 
   // baton
   int pen_x;
@@ -220,6 +221,7 @@ int text_create(const char *font_file, long face_index, float point, int dpi) {
   textdata->text = NULL;
   textdata->face = face;
   textdata->line_height_multiply = 1.0f;
+  textdata->tab_scale = 1.0f;
   textdata->layout_mode = LAYOUT_MODE_ABSOLUTE;
   textdata->x = 0;
   textdata->y = 0;
@@ -253,6 +255,7 @@ int text_get_tab_width(TextData *textdata) {
     return DEFAULT_TAB_WIDTH;
   }
   float m_width = textdata->face->glyph->linearHoriAdvance / 65536.0f;
+  m_width *= textdata->tab_scale;
   int tab_width = roundf(m_width * 4.5f);
   if (tab_width < 0) {
     tab_width = 0;
@@ -318,6 +321,19 @@ int text_set_line_height_multiply(int text_id, float multiply) {
   }
   TextData *textdata = textdata_list[text_id-1];
   textdata->line_height_multiply = multiply;
+  return 0;
+}
+
+/**
+ * Sets the scale of a tab (\t) character.
+ * Tab width will be multiplied by the given number.
+ */
+int text_set_tab_scale(int text_id, float multiply) {
+  if (text_id <= 0 || text_id > max_text_id) {
+    return -1; // non-existent text id
+  }
+  TextData *textdata = textdata_list[text_id-1];
+  textdata->tab_scale = multiply;
   return 0;
 }
 

@@ -77,6 +77,12 @@ int text_set_color(int text_id, int color);
 int text_set_line_height_multiply(int text_id, float multiply);
 
 /**
+ * Sets the scale of a tab (\t) character.
+ * Tab width will be multiplied by the given number.
+ */
+int text_set_tab_scale(int text_id, float multiply);
+
+/**
  * Returns the default line spacing in pixels.
  */
 float text_get_line_height(int text_id);

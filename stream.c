@@ -1380,6 +1380,7 @@ void on_file_create(char *filename, char *content) {
     float stroke_width = 1.0f;
     int letter_spacing = 0;
     float line_height_multiply = 1.0f;
+    float tab_scale = 1.0f;
     int abspos_x = 0;
     int abspos_y = 0;
     float duration = 7.0f;
@@ -1523,6 +1524,14 @@ void on_file_create(char *filename, char *content) {
               return;
             }
             line_height_multiply = value;
+          } else if (strncmp(line, "tab_scale=", key_len+1) == 0) {
+            char *end;
+            double value = strtod(delimiter_p+1, &end);
+            if (end == delimiter_p+1 || *end != '\0' || errno == ERANGE) { // parse error
+              log_error("subtitle error: invalid tab_scale: %s\n", delimiter_p+1);
+              return;
+            }
+            tab_scale = value;
           } else if (strncmp(line, "pos=", key_len+1) == 0) { // absolute position
             char *comma_p = strchr(delimiter_p+1, ',');
             if (comma_p == NULL) {
@@ -1664,6 +1673,7 @@ void on_file_create(char *filename, char *content) {
         subtitle_set_stroke_width(stroke_width);
         subtitle_set_letter_spacing(letter_spacing);
         subtitle_set_line_height_multiply(line_height_multiply);
+        subtitle_set_tab_scale(tab_scale);
         if (is_abspos_specified) {
           subtitle_set_position(abspos_x, abspos_y);
         } else {
