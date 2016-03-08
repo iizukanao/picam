@@ -489,3 +489,7 @@ Any cheap USB microphone should work as long as it is supported by ALSA. I have 
 ### License
 
 LGPL v2.1, as some parts of FFmpeg source is included.
+
+### Contributor
+
+Linus Styrén ([@Linkaan](https://github.com/Linkaan))
