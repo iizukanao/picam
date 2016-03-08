@@ -336,7 +336,8 @@ Each line of hooks/subtitle must be in the format of `key=value`. Lines starting
 | vertical_margin | Vertical margin from the nearest edge in pixels. Does nothing when **pos** is specified or **layout_align** has "middle". | 35 |
 | pos | Absolute position of the text box on the screen. This invalidates **layout_align** settings. | (none) |
 | text_align | Text alignment inside the positioned box (left, center, right) | center |
-| line_height | Multiplier for line spacing | 1.0 |
+| line_height | Line spacing is multiplied by this number | 1.0 |
+| tab_scale | Tab width is multiplied by this number | 1.0 |
 | letter_spacing | Additional letter spacing in pixels | 0 |
 | color | Text color in hex color code. Rendered in grayscale. | ffffff |
 | stroke_color | Text stroke (outline) color in hex color code. Rendered in grayscale. | 000000 |
@@ -488,3 +489,7 @@ Any cheap USB microphone should work as long as it is supported by ALSA. I have 
 ### License
 
 LGPL v2.1, as some parts of FFmpeg source is included.
+
+### Contributor
+
+Linus Styrén ([@Linkaan](https://github.com/Linkaan))

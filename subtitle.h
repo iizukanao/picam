@@ -43,6 +43,12 @@ void subtitle_set_letter_spacing(int letter_spacing);
 void subtitle_set_line_height_multiply(float line_height_multiply);
 
 /**
+ * Sets the scale of a tab (\t) character.
+ * Tab width will be multiplied by the given number.
+ */
+void subtitle_set_tab_scale(float tab_scale);
+
+/**
  * Sets the absolute position for the timestamp.
  */
 void subtitle_set_position(int x, int y);

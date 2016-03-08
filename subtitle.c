@@ -97,6 +97,14 @@ void subtitle_set_line_height_multiply(float multiply) {
 }
 
 /**
+ * Sets the scale of a tab (\t) character.
+ * Tab width will be multiplied by the given number.
+ */
+void subtitle_set_tab_scale(float multiply) {
+  text_set_tab_scale(text_id, multiply);
+}
+
+/**
  * Sets the absolute position for the timestamp.
  */
 void subtitle_set_position(int x, int y) {

@@ -17,7 +17,8 @@
 
 #include "text.h"
 
-const static int BYTES_PER_PIXEL = 4;
+static const int BYTES_PER_PIXEL = 4;
+static const int DEFAULT_TAB_WIDTH = 80;
 
 #ifndef unlikely
 #ifdef __GNUC__
@@ -80,6 +81,7 @@ typedef struct TextData {
   int32_t text_len;
   FT_Face face;
   float line_height_multiply;
+  float tab_scale;
 
   // baton
   int pen_x;
@@ -219,6 +221,7 @@ int text_create(const char *font_file, long face_index, float point, int dpi) {
   textdata->text = NULL;
   textdata->face = face;
   textdata->line_height_multiply = 1.0f;
+  textdata->tab_scale = 1.0f;
   textdata->layout_mode = LAYOUT_MODE_ABSOLUTE;
   textdata->x = 0;
   textdata->y = 0;
@@ -228,6 +231,36 @@ int text_create(const char *font_file, long face_index, float point, int dpi) {
   textdata_list[text_id-1] = textdata;
 
   return text_id;
+}
+
+/**
+ * Returns the width of a tab for the FT_Face.
+ */
+int text_get_tab_width(TextData *textdata) {
+  FT_Error error;
+
+  // Get glyph_index of character 'm'
+  FT_UInt glyph_index = FT_Get_Char_Index(textdata->face, (FT_ULong) 'm');
+  if (glyph_index == 0) { // undefined character code
+    fprintf(stderr, "warn: character 'm' not found in the font file; "
+        "using default tab_width (%dpx)\n", DEFAULT_TAB_WIDTH);
+    return DEFAULT_TAB_WIDTH;
+  }
+
+  // Load the glyph into slot (textdata->face->glyph)
+  error = FT_Load_Glyph(textdata->face, glyph_index, FT_LOAD_DEFAULT);
+  if (error) {
+    fprintf(stderr, "load glyph error: %d\n", error);
+    fprintf(stderr, "warn: using default tab_width (%dpx)\n", DEFAULT_TAB_WIDTH);
+    return DEFAULT_TAB_WIDTH;
+  }
+  float m_width = textdata->face->glyph->linearHoriAdvance / 65536.0f;
+  m_width *= textdata->tab_scale;
+  int tab_width = roundf(m_width * 4.5f);
+  if (tab_width < 0) {
+    tab_width = 0;
+  }
+  return tab_width;
 }
 
 /**
@@ -288,6 +321,19 @@ int text_set_line_height_multiply(int text_id, float multiply) {
   }
   TextData *textdata = textdata_list[text_id-1];
   textdata->line_height_multiply = multiply;
+  return 0;
+}
+
+/**
+ * Sets the scale of a tab (\t) character.
+ * Tab width will be multiplied by the given number.
+ */
+int text_set_tab_scale(int text_id, float multiply) {
+  if (text_id <= 0 || text_id > max_text_id) {
+    return -1; // non-existent text id
+  }
+  TextData *textdata = textdata_list[text_id-1];
+  textdata->tab_scale = multiply;
   return 0;
 }
 
@@ -511,8 +557,22 @@ int text_get_bounds(int text_id, const char *text, size_t text_len, text_bounds 
   float total_advance_x = 0.0f;
   float total_advance_y = 0.0f;
 
+  int tab_width = -1;
   int j;
   for (j = 0; j < glyph_count; j++) {
+    char current_char = *(text + glyph_info[j].cluster);
+    if (current_char == '\t') { // Tab character found
+      if (tab_width == -1) {
+        // Calculate tab width
+        tab_width = text_get_tab_width(textdata);
+      }
+      if (tab_width > 0) {
+        // Advance total_advance_x to the next tab position
+        total_advance_x += tab_width - (((int)total_advance_x) % tab_width);
+      }
+      continue;
+    }
+
     fterr = FT_Load_Glyph(textdata->face, glyph_info[j].codepoint, ft_load_flags);
     if (fterr) {
       fprintf(stderr, "failed to load %08x (freetype error code=%d)\n",  glyph_info[j].codepoint, fterr);
@@ -685,6 +745,7 @@ static int draw_glyphs(TextData *textdata) {
   line_start_pos[0] = 0; // stores the starting positions of each line
   int lines = 1;
   int i;
+  int contains_tab = 0;
   for (i = 0; i < textdata->text_len; i++) {
     if (textdata->text[i] == '\n') {
       if (i < textdata->text_len) {
@@ -699,7 +760,19 @@ static int draw_glyphs(TextData *textdata) {
         line_start_pos[lines] = i + 1;
       }
       lines++;
+    } else if (textdata->text[i] == '\t') {
+      if (!contains_tab) {
+        contains_tab = 1;
+      }
     }
+  }
+
+  int tab_width;
+  if (contains_tab) {
+    // Calculate tab width
+    tab_width = text_get_tab_width(textdata);
+  } else {
+    tab_width = 0; // We will not use this variable
   }
 
   // calculate the maximum width among all lines
@@ -746,6 +819,9 @@ static int draw_glyphs(TextData *textdata) {
     (lines - 1) * line_height * textdata->line_height_multiply;
 
   max_width += 0 - min_left; // XXX: Is this compensation OK?
+  if (max_width < 0) { // integer overflow
+    max_width = 0;
+  }
 
   TextData *tmp_textdata = malloc(sizeof(TextData));
   if (tmp_textdata == NULL) {
@@ -822,6 +898,16 @@ static int draw_glyphs(TextData *textdata) {
 
     int j;
     for (j = 0; j < glyph_count; j++) {
+      // glyph_info.cluster indicates the index of the character in the input text
+      char current_char = *(tmp_textdata->text +
+          line_start_pos[i] + glyph_info[j].cluster);
+      if (current_char == '\t') { // Tab character found
+        if (tab_width > 0) {
+          // Advance x to the next tab position
+          x += tab_width - (((int)x) % tab_width);
+        }
+        continue;
+      }
       fterr = FT_Load_Glyph(tmp_textdata->face, glyph_info[j].codepoint, ft_load_flags);
       if (fterr) {
         fprintf(stderr, "failed to load %08x (freetype error code=%d)\n",  glyph_info[j].codepoint, fterr);
