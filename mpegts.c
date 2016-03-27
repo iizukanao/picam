@@ -65,7 +65,7 @@ void setup_audio_stream(AVFormatContext *format_ctx, MpegTSCodecSettings *settin
   AVStream *audio_stream;
   int ret;
 
-  aac_codec = avcodec_find_encoder(AV_CODEC_ID_AAC);
+  aac_codec = avcodec_find_encoder_by_name("libfdk_aac");
   if (!aac_codec) {
     fprintf(stderr, "codec not found\n");
     exit(EXIT_FAILURE);
