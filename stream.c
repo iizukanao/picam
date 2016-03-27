@@ -5668,6 +5668,7 @@ int main(int argc, char **argv) {
     }
 
     if (disable_audio_capturing) {
+      // HLS will not work when video-only, so we add silent audio track.
       audio_channels = 1;
       codec_settings.audio_sample_rate = audio_sample_rate;
       codec_settings.audio_bit_rate = 1000;
