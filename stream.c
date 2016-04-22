@@ -1726,8 +1726,8 @@ static void send_audio_start_time() {
 // Send video packet to node-rtsp-rtmp-server
 static void send_video_start_time() {
   if (is_rtspout_enabled) {
-    int payload_size = 6;
-    uint8_t sendbuf[9] = {
+    int payload_size = 11;
+    uint8_t sendbuf[14] = {
       // payload size
       (payload_size >> 16) & 0xff,
       (payload_size >> 8) & 0xff,
@@ -1737,7 +1737,7 @@ static void send_video_start_time() {
       // packet type
       0x00,
       // stream name
-      'p', 'i', 'c', 'a', 'm'
+      'l', 'i', 'v', 'e', '/', 'p', 'i', 'c', 'a', 'm',
     };
     if (send(sockfd_video_control, sendbuf, sizeof(sendbuf), 0) == -1) {
       perror("send video start time");
