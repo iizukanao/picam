@@ -2,7 +2,7 @@
 
 ### Features
 
-- Generate H.264/AAC encoded MPEG-TS file from Raspberry Pi Camera and optionally USB microphone or Wolfson Audio Card
+- Generate H.264/AAC encoded MPEG-TS file from Raspberry Pi Camera (v1/v2) and optionally USB microphone or Wolfson Audio Card
 - Generate HTTP Live Streaming files with optional encryption
 - Add timestamp
 - Display Unicode text with arbitrary font
@@ -33,7 +33,7 @@ The above results were tested with:
 ### Required hardware
 
 - Raspberry Pi
-- Raspberry Pi Camera Board
+- Raspberry Pi Camera Board v1 or v2
 - (optionally) USB microphone or Wolfson Audio Card
 
 
