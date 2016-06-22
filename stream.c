@@ -513,9 +513,9 @@ static int is_camera_finished = 0;
 // Variables for variable frame rate
 static int64_t last_keyframe_pts = 0;
 static int frames_since_last_keyframe = 0;
+#endif
 static float min_fps = -1.0f;
 static float max_fps = -1.0f;
-#endif
 
 // Query camera capabilities and exit
 static int query_and_exit = 0;
@@ -2735,7 +2735,6 @@ static void shutdown_openmax() {
   ilclient_destroy(ilclient);
 }
 
-#if ENABLE_AUTO_GOP_SIZE_CONTROL_FOR_VFR
 static void set_gop_size(int gop_size) {
   OMX_VIDEO_CONFIG_AVCINTRAPERIOD avc_intra_period;
   OMX_ERRORTYPE error;
@@ -2758,7 +2757,6 @@ static void set_gop_size(int gop_size) {
     exit(EXIT_FAILURE);
   }
 }
-#endif
 
 static void query_sensor_mode() {
   OMX_CONFIG_CAMERASENSORMODETYPE sensor_mode;
@@ -3728,6 +3726,9 @@ static int video_encode_startup() {
     log_fatal("Probably the combination of --avcprofile and --avclevel is not supported on Raspberry Pi\n");
     exit(EXIT_FAILURE);
   }
+
+  // Set GOP size
+  set_gop_size(video_gop_size);
 
   // Set bitrate
   memset(&bitrate_type, 0, sizeof(OMX_VIDEO_PARAM_BITRATETYPE));
