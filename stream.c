@@ -3906,7 +3906,7 @@ static void encode_and_send_image() {
     if (out->nFilledLen > 0) {
       video_encode_fill_buffer_done(out);
     } else {
-      log_debug("E(%d)", out->nFlags);
+      log_debug("E(0x%x)", out->nFlags);
       break;
     }
 
