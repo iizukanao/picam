@@ -3620,11 +3620,11 @@ static int video_encode_startup() {
   // Configure port 200 (video_encode input)
   portdef.format.video.nFrameWidth = video_width;
   portdef.format.video.nFrameHeight = video_height;
-  if (is_vfr_enabled) {
-    portdef.format.video.xFramerate = 0x0; // variable frame rate
-  } else {
-    portdef.format.video.xFramerate = fr_q16; // specify the frame rate in Q.16 (framerate * 2^16)
-  }
+
+  // Do not set xFramerate to 0x0 even when we use VFR (variable frame rate),
+  // since it will not work properly when video size is smaller than 1024x768.
+  portdef.format.video.xFramerate = fr_q16; // specify the frame rate in Q.16 (framerate * 2^16)
+
   portdef.format.video.nBitrate = 0x0;
   portdef.format.video.nSliceHeight = (video_height+15)&~15;
   portdef.format.video.nStride = (video_width+31)&~31;
