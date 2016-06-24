@@ -28,7 +28,6 @@ extern "C" {
 #include <sys/statvfs.h>
 #include <sys/socket.h>
 #include <sys/un.h>
-#include <linux/videodev2.h>
 #include <alsa/asoundlib.h>
 #include <libavformat/avformat.h>
 #include <libavcodec/avcodec.h>
