@@ -4,9 +4,9 @@ This document describes how to build picam. The whole process takes about 2-3 ho
 
 ## Binary releases are also available
 
-For those who don't want to build picam yourself, standalone binary is available at https://github.com/iizukanao/picam/releases/latest
+For those who don't want to build picam themselves, the standalone binary is available at https://github.com/iizukanao/picam/releases/latest
 
-Also, picam preinstalled Raspbian SD card image is available at <http://s.kyu-mu.net/raspbian-picam/>. Write it to an SD card larger than 4.5GB, boot it, then run `raspi-config` to expand the filesystem.
+Also, a SD card image preinstalled with picam on Raspbian is available at <http://s.kyu-mu.net/raspbian-picam/>. Write the image to a SD card larger than 4.5GB, boot it, then run `raspi-config` to expand the filesystem.
 
 To build picam yourself, continue reading.
 
@@ -26,7 +26,7 @@ We need to install some packages used to build crosstool-ng
 
 ## Install crosstool-ng
 
-First we need to install crosstool-ng on a powerful Linux machine (not Raspberry Pi) to be able to cross-compile ffmpeg.
+First we need to install crosstool-ng on a powerful Linux machine (not the Raspberry Pi) to be able to cross-compile ffmpeg.
 
     $ mkdir ~/pi
     $ cd ~/pi
@@ -42,7 +42,7 @@ First we need to install crosstool-ng on a powerful Linux machine (not Raspberry
     $ cd ctng
     $ ct-ng menuconfig
 
-Then a configuration screen appears. The followings are for crosstool-ng 1.22.0, and it may not be applicable to later versions.
+Then we need to configure the cross compiler for our Raspberry Pi version. The following configurations are for crosstool-ng 1.22.0, and they may not be applicable to later versions.
 
 ### For Raspberry Pi generation 1 (A, B, A+, B+, zero)
 
@@ -81,6 +81,7 @@ Then a configuration screen appears. The followings are for crosstool-ng 1.22.0,
 - Paths and misc options
     - Check "Try features marked as EXPERIMENTAL"
     - Set "Prefix directory" to "/opt/cross/x-tools/${CT_TARGET}"
+    - (OPTIONAL) Set "Number of parallel jobs" to amount of cores your processor has
 - Target options
     - Set "Target Architecture" to "arm"
     - Set "Endianness" to "Little endian"
@@ -245,7 +246,7 @@ Then, put those files into /usr/local/ so that you have /usr/local/bin/ffmpeg.
     bin  include  lib  share
     $ sudo rsync -rav ./ /usr/local/
 
-We have done with the powerful machine which we used for cross compiling.
+We are done with the powerful machine which we used for cross compiling.
 
 If you don't have /etc/ld.so.conf.d/libc.conf on Raspberry Pi, create that file with the following contents. On Raspbian, /etc/ld.so.conf.d/libc.conf is installed by default.
 
@@ -267,7 +268,7 @@ From now on, all steps are performed on Raspberry Pi.
     $ cd /opt/vc/src/hello_pi/libs/ilclient
     $ make
 
-If you do not have /opt/vc/src/ directory, download the firmware from https://github.com/raspberrypi/firmware and put all the contents under /opt/vc/src/. On Raspbian, /opt/vc/src/ is installed by default.
+If you do not have the /opt/vc/src/ directory, download the firmware from https://github.com/raspberrypi/firmware and put all the contents under /opt/vc/src/. On Raspbian, /opt/vc/src/ is installed by default.
 
 
 ## Install dependencies
