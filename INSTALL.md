@@ -10,6 +10,19 @@ Also, picam preinstalled Raspbian SD card image is available at <http://s.kyu-mu
 
 To build picam yourself, continue reading.
 
+## Prerequisites
+
+We need to install some packages used to build crosstool-ng
+
+### On Debian based systems
+
+    $ apt-get install flex bison automake gperf libtool patch texinfo ncurses-dev help2man
+
+### On Fedora based systems
+
+    $ yum install flex bison automake gperf libtool texinfo patch gcc gcc-c++ gmp-devel help2man
+    $ yum install ncurses-devel ncurses glibc-devel glibc-static libstdc++-static
+
 
 ## Install crosstool-ng
 
@@ -17,9 +30,9 @@ First we need to install crosstool-ng on a powerful Linux machine (not Raspberry
 
     $ mkdir ~/pi
     $ cd ~/pi
-    $ wget http://crosstool-ng.org/download/crosstool-ng/crosstool-ng-1.21.0.tar.xz
-    $ tar xvf crosstool-ng-1.21.0.tar.xz
-    $ cd crosstool-ng-1.21.0
+    $ wget http://crosstool-ng.org/download/crosstool-ng/crosstool-ng-1.22.0.tar.xz
+    $ tar xvf crosstool-ng-1.22.0.tar.xz
+    $ cd crosstool-ng
     $ ./configure --prefix=/opt/cross
     $ make
     $ sudo make install
@@ -29,18 +42,19 @@ First we need to install crosstool-ng on a powerful Linux machine (not Raspberry
     $ cd ctng
     $ ct-ng menuconfig
 
-Then a configuration screen appears. The followings are for crosstool-ng 1.21.0, and it may not be applicable to later versions.
+Then a configuration screen appears. The followings are for crosstool-ng 1.22.0, and it may not be applicable to later versions.
+
+### For Raspberry Pi generation 1 (A, B, A+, B+, zero)
 
 - Paths and misc options
     - Check "Try features marked as EXPERIMENTAL"
     - Set "Prefix directory" to "/opt/cross/x-tools/${CT_TARGET}"
+    - (OPTIONAL) Set "Number of parallel jobs" to amount of cores your processor has
 - Target options
     - Set "Target Architecture" to "arm"
     - Set "Endianness" to "Little endian"
     - Set "Bitness" to "32-bit"
-    - Set "Architecture level" to "armv6zk"
     - Set "Emit assembly for CPU" to "arm1176jzf-s"
-    - Set "Tune for CPU" to "arm1176jzf-s"
     - Set "Use specific FPU" to "vfp"
     - Set "Floating point" to "hardware (FPU)"
     - Set "Default instruction set mode" to "arm"
@@ -51,18 +65,47 @@ Then a configuration screen appears. The followings are for crosstool-ng 1.21.0,
     - Set "Target OS" to "linux"
 - Binary utilities
     - Set "Binary format" to "ELF"
-    - Set "binutils version" to "2.22"
+    - Set "binutils version" to "2.25.1"
 - C-library
     - Set "C library" to "glibc"
-    - Set "glibc version" to "2.19"
+    - Set "glibc version" to "2.22"
 - C compiler
     - Check "Show Linaro versions"
-    - Set "gcc version" to "linaro-4.9-2015.03"
-    - Check "C++" under "Additional supported languages"
+    - Set "gcc version" to "linaro-4.9-2015.06"
     - Set "gcc extra config" to "--with-float=hard"
     - Check "Link libstdc++ statically into the gcc binary"
-- Companion libraries
-    - Set "ISL version" to "0.12.2"
+    - Check "C++" under "Additional supported languages"
+
+### For Raspberry Pi generation 2
+
+- Paths and misc options
+    - Check "Try features marked as EXPERIMENTAL"
+    - Set "Prefix directory" to "/opt/cross/x-tools/${CT_TARGET}"
+- Target options
+    - Set "Target Architecture" to "arm"
+    - Set "Endianness" to "Little endian"
+    - Set "Bitness" to "32-bit"
+    - Set "Emit assembly for CPU" to "cortex-a7"
+    - Set "Use specific FPU" to "neon-vfpv4"
+    - Set "Floating point" to "hardware (FPU)"
+    - Set "Default instruction set mode" to "arm"
+    - Check "Use EABI"
+- Toolchain options
+    - Set "Tuple's vendor string" to "rpi"
+- Operating System
+    - Set "Target OS" to "linux"
+- Binary utilities
+    - Set "Binary format" to "ELF"
+    - Set "binutils version" to "2.25.1"
+- C-library
+    - Set "C library" to "glibc"
+    - Set "glibc version" to "2.22"
+- C compiler
+    - Check "Show Linaro versions"
+    - Set "gcc version" to "linaro-4.9-2015.06"
+    - Set "gcc extra config" to "--with-float=hard"
+    - Check "Link libstdc++ statically into the gcc binary"
+    - Check "C++" under "Additional supported languages"
 
 Save the configuration and build.
 
@@ -181,6 +224,12 @@ If all goes well, build ffmpeg.
     $ make
     $ make install
 
+If you are running on a system with multiple cores you can invoke make with the -j option. You get the number of cores with the first command.
+
+    $ cat /proc/cpuinfo | grep processor | wc -l
+    $ make -j <num cores>
+    $ make install
+
 
 ## Transfer the files to Raspberry Pi
 
@@ -233,6 +282,7 @@ Install **libfontconfig1-dev** and **libharfbuzz-dev** via `apt-get`.
     $ cd (to anywhere you like)
     $ git clone https://github.com/iizukanao/picam.git
     $ cd picam
+    $ chmod +x whichpi
     $ make
 
 If you want to save some disk space, strip the binary.
