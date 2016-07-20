@@ -92,6 +92,16 @@ extern "C" {
 #define FILL_COLOR_U 128
 #define FILL_COLOR_V 128
 
+// default ARGB color for preview background (black)
+#define BLANK_BACKGROUND_DEFAULT    0xff000000
+
+// dispmanx layers consts for displaying multiple accelerated overlays in preview
+#define LAYER_BACKGROUD     0xe
+#define LAYER_VIDEO_PREVIEW 0xf
+
+// display to which we will output the preview overlays
+#define DISPLAY_DEFAULT     0
+
 // Whether or not to pass pBuffer from camera to video_encode directly
 #define ENABLE_PBUFFER_OPTIMIZATION_HACK 1
 
@@ -323,6 +333,7 @@ static int preview_y;
 static int preview_width;
 static int preview_height;
 static int preview_opacity;
+static uint32_t blank_background_color;
 static const int preview_opacity_default = 255;
 static int record_buffer_keyframes;
 static const int record_buffer_keyframes_default = 5;
@@ -3127,6 +3138,49 @@ static int camera_set_white_balance(char *wb) {
   return 0;
 }
 
+// NOTE: function based on https://github.com/popcornmix/omxplayer/blob/master/omxplayer.cpp
+static void create_blank_background(uint32_t argb)
+{
+  // if alpha is fully transparent then background has no effect
+  if (!(argb & 0xff000000))
+    return;
+  // we create a 1x1 black pixel image that is added to display just behind video
+  DISPMANX_DISPLAY_HANDLE_T   display;
+  DISPMANX_UPDATE_HANDLE_T    update;
+  DISPMANX_RESOURCE_HANDLE_T  resource;
+  DISPMANX_ELEMENT_HANDLE_T   element;
+  int             ret;
+  uint32_t vc_image_ptr;
+  VC_IMAGE_TYPE_T type = VC_IMAGE_ARGB8888;
+  int             layer = LAYER_BACKGROUD;
+
+  VC_RECT_T dst_rect, src_rect;
+
+  display = vc_dispmanx_display_open(DISPLAY_DEFAULT);
+  assert(display);
+
+  resource = vc_dispmanx_resource_create( type, 1 /*width*/, 1 /*height*/, &vc_image_ptr );
+  assert( resource );
+
+  vc_dispmanx_rect_set( &dst_rect, 0, 0, 1, 1);
+
+  ret = vc_dispmanx_resource_write_data( resource, type, sizeof(argb), &argb, &dst_rect );
+  assert(ret == 0);
+
+  vc_dispmanx_rect_set( &src_rect, 0, 0, 1<<16, 1<<16);
+  vc_dispmanx_rect_set( &dst_rect, 0, 0, 0, 0);
+
+  update = vc_dispmanx_update_start(0);
+  assert(update);
+
+  element = vc_dispmanx_element_add(update, display, layer, &dst_rect, resource, &src_rect,
+                                    DISPMANX_PROTECTION_NONE, NULL, NULL, DISPMANX_STEREOSCOPIC_MONO );
+  assert(element);
+
+  ret = vc_dispmanx_update_submit_sync( update );
+  assert( ret == 0 );
+}
+
 static int openmax_cam_open() {
   OMX_PARAM_PORTDEFINITIONTYPE cam_def;
   OMX_ERRORTYPE error;
@@ -3361,14 +3415,20 @@ static int openmax_cam_open() {
     }
     component_list[n_component_list++] = render_component;
 
+    // setup background overlay
+    create_blank_background(blank_background_color);
+
     // Setup display region for preview window
     memset(&display_region, 0, sizeof(OMX_CONFIG_DISPLAYREGIONTYPE));
     display_region.nSize = sizeof(OMX_CONFIG_DISPLAYREGIONTYPE);
     display_region.nVersion.nVersion = OMX_VERSION;
     display_region.nPortIndex = VIDEO_RENDER_INPUT_PORT;
 
+    // set default display
+    display_region.num = DISPLAY_DEFAULT;
+
     if (is_previewrect_enabled) { // display preview window at specified position
-      display_region.set = OMX_DISPLAY_SET_DEST_RECT | OMX_DISPLAY_SET_FULLSCREEN | OMX_DISPLAY_SET_NOASPECT;
+      display_region.set = OMX_DISPLAY_SET_DEST_RECT | OMX_DISPLAY_SET_FULLSCREEN | OMX_DISPLAY_SET_NOASPECT | OMX_DISPLAY_SET_NUM;
       display_region.dest_rect.x_offset = preview_x;
       display_region.dest_rect.y_offset = preview_y;
       display_region.dest_rect.width = preview_width;
@@ -3376,7 +3436,7 @@ static int openmax_cam_open() {
       display_region.fullscreen = OMX_FALSE;
       display_region.noaspect = OMX_TRUE;
     } else { // fullscreen
-      display_region.set = OMX_DISPLAY_SET_FULLSCREEN;
+      display_region.set = OMX_DISPLAY_SET_FULLSCREEN | OMX_DISPLAY_SET_NUM;
       display_region.fullscreen = OMX_TRUE;
     }
 
@@ -3387,9 +3447,10 @@ static int openmax_cam_open() {
       exit(EXIT_FAILURE);
     }
 
-    // Set the opacity of the preview window
-    display_region.set = OMX_DISPLAY_SET_ALPHA;
+    // Set the opacity and layer of the preview window
+    display_region.set = OMX_DISPLAY_SET_ALPHA | OMX_DISPLAY_SET_LAYER;
     display_region.alpha = (OMX_U32) preview_opacity;
+    display_region.layer = LAYER_VIDEO_PREVIEW;
     error = OMX_SetParameter(ILC_GET_HANDLE(render_component),
         OMX_IndexConfigDisplayRegion, &display_region);
     if (error != OMX_ErrorNone) {
@@ -4520,6 +4581,7 @@ static void print_usage() {
   log_info("                      Display preview window at specified position\n");
   log_info("  --opacity           Preview window opacity\n");
   log_info("                      (0=transparent..255=opaque; default=%d)\n", preview_opacity_default);
+  log_info("  --blank[=0xAARRGGBB]  Set the video background color to black (or optional ARGB value)\n");
   log_info("  --query             Query camera capabilities then exit\n");
   log_info(" [timestamp] (may be a bit heavy on Raspberry Pi 1)\n");
   log_info("  --time              Enable timestamp\n");
@@ -4631,6 +4693,7 @@ int main(int argc, char **argv) {
     { "hlsenciv", required_argument, NULL, 0 },
     { "preview", no_argument, NULL, 'p' },
     { "previewrect", required_argument, NULL, 0 },
+    { "blank", optional_argument, NULL, 0 },
     { "opacity", required_argument, NULL, 0 },
     { "quiet", no_argument, NULL, 'q' },
     { "recordbuf", required_argument, NULL, 0 },
@@ -5290,6 +5353,9 @@ int main(int argc, char **argv) {
           }
           is_preview_enabled = 1;
           is_previewrect_enabled = 1;
+        } else if (strcmp(long_options[option_index].name, "blank") == 0) {
+          blank_background_color = optarg ? strtoul(optarg, NULL, 0) : BLANK_BACKGROUND_DEFAULT;
+          break;
         } else if (strcmp(long_options[option_index].name, "opacity") == 0) {
           char *end;
           int value = strtol(optarg, &end, 10);
@@ -5590,6 +5656,7 @@ int main(int argc, char **argv) {
   log_debug("preview_width=%d\n", preview_width);
   log_debug("preview_height=%d\n", preview_height);
   log_debug("preview_opacity=%d\n", preview_opacity);
+  log_debug("blank_background_color=0x%x\n", blank_background_color);
   log_debug("is_audio_preview_enabled=%d\n", is_audio_preview_enabled);
   log_debug("audio_preview_dev=%s\n", audio_preview_dev);
   log_debug("record_buffer_keyframes=%d\n", record_buffer_keyframes);
