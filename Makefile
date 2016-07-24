@@ -7,12 +7,17 @@ HEADERS=hooks.h mpegts.h httplivestreaming.h state.h log.h text.h timestamp.h su
 OBJECTS=$(SOURCES:.c=.o)
 EXECUTABLE=picam
 RASPBERRYPI=$(shell sh ./whichpi)
+GCCVERSION=$(shell gcc --version | grep ^gcc | sed "s/.* //g")
 
 # detect if we are compiling for RPi 1 or RPi 2 (or 3)
 ifeq ($(RASPBERRYPI),Pi)
-  CFLAGS += -mfpu=vfp -mfloat-abi=hard -march=armv6zk -mtune=arm1176jzf-s
+	CFLAGS += -mfpu=vfp -mfloat-abi=hard -march=armv6zk -mtune=arm1176jzf-s
 else
+ifneq (,$(findstring 4.6.,$(GCCVERSION)))  # gcc version 4.6.x
+	CFLAGS += -mfpu=neon-vfpv4 -mfloat-abi=hard -march=armv7-a
+else  # other gcc versions
 	CFLAGS += -mfpu=neon-vfpv4 -mfloat-abi=hard -march=armv7-a -mtune=cortex-a7
+endif
 endif
 
 all: $(SOURCES) $(EXECUTABLE)
