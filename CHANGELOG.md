@@ -1,6 +1,16 @@
 Change Log
 ==========
 
+Version 1.4.2 *(2016-07-24)*
+-----------------------------
+
+- Add tab_scale directive to hooks/subtitle
+- Fix stream name for --rtspout option
+- bugfix: picam does not generate frames in VFR
+- Improve build settings and instructions (by @Linkaan)
+- Add option to set backgroud color for the preview (by @nalajcie)
+- Other small fixes
+
 Version 1.4.1 *(2015-11-26)*
 -----------------------------
 
