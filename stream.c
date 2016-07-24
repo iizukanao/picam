@@ -5651,7 +5651,7 @@ int main(int argc, char **argv) {
     return ret;
   }
 
-  av_log_set_level(AV_LOG_INFO);
+  av_log_set_level(AV_LOG_ERROR);
 
   if (!query_and_exit) {
     if (disable_audio_capturing) {
