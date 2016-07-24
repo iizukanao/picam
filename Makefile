@@ -6,7 +6,7 @@ SOURCES=stream.c hooks.c mpegts.c httplivestreaming.c state.c log.c text.c times
 HEADERS=hooks.h mpegts.h httplivestreaming.h state.h log.h text.h timestamp.h subtitle.h
 OBJECTS=$(SOURCES:.c=.o)
 EXECUTABLE=picam
-RASPBERRYPI = $(shell ./whichpi)
+RASPBERRYPI=$(shell sh ./whichpi)
 
 # detect if we are compiling for RPi 1 or RPi 2 (or 3)
 ifeq ($(RASPBERRYPI),Pi)
