@@ -53,7 +53,72 @@ Also, out-of-the-box SD card image for live streaming (picam + Raspbian + live s
 If you want to build picam yourself, see [INSTALL.md](INSTALL.md).
 
 
+### Using a binary release
+
+The fastest way to use picam is to use a binary release. To set up and use it, run the following commands on your Raspberry Pi (Raspbian). It will set up picam in ~/picam/.
+
+```
+(If you have not enabled camera, enable it with raspi-config then reboot)
+$ sudo raspi-config
+
+(Install dependencies)
+$ sudo apt-get update
+$ sudo apt-get install libharfbuzz0b libfontconfig1
+
+(Create directories and symbolic links)
+$ cat > make_dirs.sh <<'EOF'
+DEST_DIR=~/picam
+SHM_DIR=/run/shm
+mkdir -p $SHM_DIR/rec
+mkdir -p $SHM_DIR/hooks
+mkdir -p $SHM_DIR/state
+mkdir -p $DEST_DIR/archive
+ln -sfn $DEST_DIR/archive $SHM_DIR/rec/archive
+ln -sfn $SHM_DIR/rec $DEST_DIR/rec
+ln -sfn $SHM_DIR/hooks $DEST_DIR/hooks
+ln -sfn $SHM_DIR/state $DEST_DIR/state
+EOF
+$ chmod +x make_dirs.sh
+$ ./make_dirs.sh
+
+(Optionally, increase microphone volume with alsamixer)
+$ alsamixer
+
+(Install picam binary)
+$ wget https://github.com/iizukanao/picam/releases/download/v1.4.2/picam-1.4.2-binary.tar.gz
+$ tar xvf picam-1.4.2-binary.tar.gz
+$ cp picam-1.4.2-binary/picam ~/picam/
+
+(Run picam)
+$ cd ~/picam
+$ ./picam --alsadev hw:1,0
+```
+
+
 ### Usage
+
+#### Create symbolic links (optional, but strongly recommended)
+
+You can take advantage of RAM drive (/run/shm/) and reduce access to SD card. It also provides better quality of recording.
+
+First, stop picam if it is running. Create **rec**, **hooks**, and **state** directories in /run/shm/, then change directories with the same name in picam to symbolic links. Create another symbolic link from /run/shm/rec/archive to somewhere on SD card.
+
+Result:
+
+    picam
+    | ...
+    |-- archive
+    |-- hooks -> /run/shm/hooks
+    |-- rec -> /run/shm/rec
+    `-- state -> /run/shm/state
+
+    /run/shm/
+    |-- hooks
+    |-- rec
+    |   |-- archive -> /home/pi/picam/archive
+    |   `-- tmp (automatically created by picam)
+    `-- state
+
 
 #### Finding ALSA device name
 
@@ -86,29 +151,6 @@ Run picam with your ALSA device name.
     $ ./picam --alsadev hw:1,0
     configuring devices
     capturing started
-
-#### Create symbolic links (optional, but strongly recommended)
-
-You can take advantage of RAM drive (/run/shm/) and reduce access to SD card. It also provides better quality of recording.
-
-First, stop picam if it is running. Create **rec**, **hooks**, and **state** directories in /run/shm/, then change directories with the same name in picam to symbolic links. Create another symbolic link from /run/shm/rec/archive to somewhere on SD card.
-
-Result:
-
-    picam
-    | ...
-    |-- archive
-    |-- hooks -> /run/shm/hooks
-    |-- rec -> /run/shm/rec
-    `-- state -> /run/shm/state
-
-    /run/shm/
-    |-- hooks
-    |-- rec
-    |   |-- archive -> /home/pi/picam/archive
-    |   `-- tmp (automatically created by picam)
-    `-- state
-
 
 
 #### Recording
