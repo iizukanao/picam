@@ -142,7 +142,7 @@ To unmute microphone, create a file named `hooks/unmute`.
 #### Command options
 
     $ ./picam --help
-    picam version 1.4.1
+    picam version 1.4.2
     Usage: picam [options]
     
     Options:
@@ -240,6 +240,7 @@ To unmute microphone, create a file named `hooks/unmute`.
                           Display preview window at specified position
       --opacity           Preview window opacity
                           (0=transparent..255=opaque; default=255)
+      --blank[=0xAARRGGBB]  Set the video background color to black (or optional ARGB value)
       --query             Query camera capabilities then exit
      [timestamp] (may be a bit heavy on Raspberry Pi 1)
       --time              Enable timestamp
