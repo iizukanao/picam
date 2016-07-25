@@ -5677,7 +5677,7 @@ int main(int argc, char **argv) {
 
   if (is_preview_enabled) {
     // setup dispmanx preview (backgroud + subtitle overlay)
-    dispmanx_init(blank_background_color);
+    dispmanx_init(blank_background_color, video_width, video_height);
   }
 
   ret = openmax_cam_open();

@@ -14,7 +14,7 @@
 // display to which we will output the preview overlays
 #define DISP_DISPLAY_DEFAULT     0
 
-void dispmanx_init(uint32_t bg_color);
+void dispmanx_init(uint32_t bg_color, uint32_t video_width, uint32_t video_height);
 void dispmanx_destroy(void);
 void dispmanx_update_text_overlay(void);
 

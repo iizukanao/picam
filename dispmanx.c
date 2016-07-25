@@ -25,6 +25,9 @@ static uint32_t g_canvas_size;
 static uint32_t g_canvas_height;
 static uint32_t g_canvas_width;
 
+static uint32_t g_video_width;
+static uint32_t g_video_height;
+
 #define DISP_CANVAS_BYTES_PER_PIXEL 4
 
 #ifdef DEBUG_FILL_TEXT_OVERLAY
@@ -37,8 +40,8 @@ static void fill_rect(VC_IMAGE_TYPE_T type, void *canvas, int width, int height,
   int pitch = width * DISP_CANVAS_BYTES_PER_PIXEL;
   uint32_t *line = (uint32_t*)((uint8_t *)(canvas) + ((y * width) + x) * DISP_CANVAS_BYTES_PER_PIXEL);
 
-  for (row = 0; row < h; ++row) {
-    for (col = 0; col < w; ++col) {
+  for (row = 0; (row < h) && (y + row < height); ++row) {
+    for (col = 0; (col < w) && (x + col < width); ++col) {
         line[col] = val;
     }
     line = (uint32_t*)((uint8_t *)line + pitch);
@@ -89,8 +92,10 @@ static void dispmanx_create_text_overlay(void)
   uint32_t vc_image_ptr;
   int ret;
 
-  int width = g_modeInfo.width;
-  int height = g_modeInfo.height;
+  int width  = ALIGN_UP(g_video_width,  32);
+  int height = ALIGN_UP(g_video_height, 16);
+  int x = (g_modeInfo.width - width) / 2;
+  int y = (g_modeInfo.height - height) / 2;
 
 #if 0
   VC_DISPMANX_ALPHA_T alpha = { DISPMANX_FLAGS_ALPHA_FROM_SOURCE | DISPMANX_FLAGS_ALPHA_FIXED_ALL_PIXELS,
@@ -104,8 +109,8 @@ static void dispmanx_create_text_overlay(void)
   g_backResource = vc_dispmanx_resource_create(VC_IMAGE_ARGB8888, width, height, &vc_image_ptr);
   assert(g_backResource);
 
-  g_canvas_height = ALIGN_UP(height, 16);
-  g_canvas_width  = ALIGN_UP(width, 32);
+  g_canvas_height = height;
+  g_canvas_width  = width;
   int pitch = g_canvas_width * DISP_CANVAS_BYTES_PER_PIXEL;
   g_canvas_size = pitch * g_canvas_height;
   g_canvas = calloc(1, g_canvas_size);
@@ -113,8 +118,9 @@ static void dispmanx_create_text_overlay(void)
 
 #ifdef DEBUG_FILL_TEXT_OVERLAY
   // for debugging: write TEST DATA
+  fill_rect(VC_IMAGE_ARGB8888, g_canvas, g_canvas_width, g_canvas_height,  0, 0, 50, 50,     0xFFFFFFFF);
   fill_rect(VC_IMAGE_ARGB8888, g_canvas, g_canvas_width, g_canvas_height,  100, 100, 200, 200,     0xFFFF0000);
-  fill_rect(VC_IMAGE_ARGB8888, g_canvas, g_canvas_width, g_canvas_height,  100, 600, 500, 200,     0xFFFF0000);
+  fill_rect(VC_IMAGE_ARGB8888, g_canvas, g_canvas_width, g_canvas_height,  1100, 600, 500, 200,     0xFF0000FF);
   fill_rect(VC_IMAGE_ARGB8888, g_canvas, g_canvas_width, g_canvas_height,  150, 150, 200, 200,     0xFF00FF00);
   fill_rect(VC_IMAGE_ARGB8888, g_canvas, g_canvas_width, g_canvas_height,  500, 500, 200, 200,     0x8800FF00);
 
@@ -124,7 +130,7 @@ static void dispmanx_create_text_overlay(void)
 #endif
 
   vc_dispmanx_rect_set(&src_rect, 0, 0, width << 16, height << 16);
-  vc_dispmanx_rect_set(&dst_rect, 0, 0, width, height);
+  vc_dispmanx_rect_set(&dst_rect, x, y, width, height);
 
   update = vc_dispmanx_update_start(0);
   assert(update);
@@ -138,16 +144,19 @@ static void dispmanx_create_text_overlay(void)
   log_debug("dispmanx: text overlay created!\n");
 }
 
-void dispmanx_init(uint32_t bg_color)
+void dispmanx_init(uint32_t bg_color, uint32_t video_width, uint32_t video_height)
 {
   int ret;
   log_debug("dispmanx: init\n");
   g_display = vc_dispmanx_display_open(DISP_DISPLAY_DEFAULT);
   assert(g_display);
 
+  g_video_width = video_width;
+  g_video_height = video_height;
   ret = vc_dispmanx_display_get_info(g_display, &g_modeInfo);
   assert(ret == 0);
-  log_info("dispmanx: display %d: %d x %d\n", DISP_DISPLAY_DEFAULT, g_modeInfo.width, g_modeInfo.height);
+  log_info("dispmanx: display %d: %d x %d (video: %d x %d) \n", DISP_DISPLAY_DEFAULT,
+      g_modeInfo.width, g_modeInfo.height, g_video_width, g_video_height);
 
   dispmanx_create_background(bg_color);
   dispmanx_create_text_overlay();
@@ -195,7 +204,7 @@ void dispmanx_update_text_overlay(void)
   text_draw_all(g_canvas, g_canvas_width, g_canvas_height, 0); // is_video = 0
 
   // write data to back resource
-  vc_dispmanx_rect_set(&dst_rect, 0, 0, g_modeInfo.width, g_modeInfo.height);
+  vc_dispmanx_rect_set(&dst_rect, 0, 0, g_canvas_width, g_canvas_height);
   int pitch = g_canvas_width * DISP_CANVAS_BYTES_PER_PIXEL;
   ret = vc_dispmanx_resource_write_data(g_backResource, VC_IMAGE_ARGB8888, pitch, g_canvas, &dst_rect);
   assert(ret == 0);
