@@ -137,8 +137,11 @@ int redraw_text(int text_id);
 
 /**
  * Draw all text objects to the canvas.
+ * we support writing on two types of canvas: ARGB8888 and YUV420PackedPlanar
+ *
+ * returns: nonzero if the canvas content has been changed
  */
-void text_draw_all(uint8_t *canvas, int canvas_width, int video_height);
+int text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height, int is_canvas_argb);
 
 /**
  * Clear the text. Once this is called, the bitmap will not be drawn
