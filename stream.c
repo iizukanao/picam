@@ -1390,6 +1390,8 @@ void on_file_create(char *filename, char *content) {
     TEXT_ALIGN text_align = TEXT_ALIGN_CENTER;
     int horizontal_margin = 0;
     int vertical_margin = 35;
+    int in_preview = 1;
+    int in_video = 1;
 
     char filepath[256];
     snprintf(filepath, sizeof(filepath), "%s/%s", hooks_dir, filename);
@@ -1616,6 +1618,22 @@ void on_file_create(char *filename, char *content) {
               }
               search_p = comma_p + 1;
             }
+          } else if (strncmp(line, "in_preview=", key_len+1) == 0) {
+            char *end;
+            double value = strtod(delimiter_p+1, &end);
+            if (end == delimiter_p+1 || *end != '\0' || errno == ERANGE) { // parse error
+              log_error("subtitle error: invalid in_preview: %s\n", delimiter_p+1);
+              return;
+            }
+            in_preview = (value != 0);
+          } else if (strncmp(line, "in_video=", key_len+1) == 0) {
+            char *end;
+            double value = strtod(delimiter_p+1, &end);
+            if (end == delimiter_p+1 || *end != '\0' || errno == ERANGE) { // parse error
+              log_error("subtitle error: invalid in_video: %s\n", delimiter_p+1);
+              return;
+            }
+            in_video = (value != 0);
           } else {
             log_error("subtitle error: cannot parse line: %s\n", line);
           }
@@ -1672,6 +1690,7 @@ void on_file_create(char *filename, char *content) {
         subtitle_set_color(color);
         subtitle_set_stroke_color(stroke_color);
         subtitle_set_stroke_width(stroke_width);
+        subtitle_set_visibility(in_preview, in_video);
         subtitle_set_letter_spacing(letter_spacing);
         subtitle_set_line_height_multiply(line_height_multiply);
         subtitle_set_tab_scale(tab_scale);
@@ -2947,7 +2966,7 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
             log_debug(".");
             timestamp_update();
             subtitle_update();
-            int is_text_changed = text_draw_all(last_video_buffer, video_width_32, video_height_16, 0); // is_argb = 0
+            int is_text_changed = text_draw_all(last_video_buffer, video_width_32, video_height_16, 1); // is_video = 1
             if (is_text_changed && is_preview_enabled) {
               // the text has actually changed, redraw preview subtitle overlay
               dispmanx_update_text_overlay();

@@ -22,6 +22,11 @@ void subtitle_shutdown();
 void subtitle_set_color(int color);
 
 /**
+ * Sets text visibility
+ */
+void subtitle_set_visibility(int in_preview, int in_video);
+
+/**
  * Sets text stroke color.
  */
 void subtitle_set_stroke_color(uint32_t color);

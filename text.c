@@ -97,6 +97,10 @@ typedef struct TextData {
   int bounds_right;
   int bounds_top;
   int bounds_bottom;
+
+  // text visibility
+  int in_preview;
+  int in_video;
 } TextData;
 
 static TextData **textdata_list = NULL;
@@ -235,6 +239,8 @@ int text_create(const char *font_file, long face_index, float point, int dpi) {
   textdata->y = 0;
   textdata->pen_x = 0;
   textdata->pen_y = 0;
+  textdata->in_preview = 1;
+  textdata->in_video = 1;
   textdata->next_textdata = NULL;
   textdata_list[text_id-1] = textdata;
 
@@ -316,6 +322,19 @@ int text_set_color(int text_id, int color) {
   }
   TextData *textdata = textdata_list[text_id-1];
   textdata->color = color;
+  return 0;
+}
+
+/**
+ * Sets text visibility
+ */
+int text_set_visibility(int text_id, int in_preview, int in_video) {
+  if (text_id <= 0 || text_id > max_text_id) {
+    return -1; // non-existent text id
+  }
+  TextData *textdata = textdata_list[text_id-1];
+  textdata->in_preview = in_preview;
+  textdata->in_video = in_video;
   return 0;
 }
 
@@ -1082,10 +1101,10 @@ int text_get_position(int text_id, int canvas_width, int canvas_height, int *x, 
  *
  * returns: nonzero if the canvas content has been changed
  */
-int text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height, int is_canvas_argb) {
+int text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height, int is_video) {
   int i;
   int has_anything_changed = 0;
-  int canvas_bytes_per_pixel = (is_canvas_argb) ? BYTES_PER_PIXEL : 1; // note: in YUV we're poinig to Y planar pixel
+  int canvas_bytes_per_pixel = (is_video) ? 1 : BYTES_PER_PIXEL; // note: in YUV we're poinig to Y planar pixel
   //clock_t start_time = clock();
 
   for (i = 0; i < max_text_id; i++) {
@@ -1102,6 +1121,10 @@ int text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height, int is_c
       has_anything_changed |= textdata->has_changed;
       textdata->has_changed = 0;
       if (textdata->is_bitmap_ready) {
+        if ((is_video && !textdata->in_video)
+            || (!is_video && !textdata->in_preview)) {
+          continue; // skip this textdata if we don't want to show it on this medium
+        }
         int pen_x, pen_y;
         text_get_position(textdata->id, canvas_width, canvas_height, &pen_x, &pen_y);
         int row, col;
@@ -1124,7 +1147,7 @@ int text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height, int is_c
             color.x = *((uint32_t*) (textdata->bitmap + offset));
             uint8_t* canvas_pixel = canvas + ((pen_y + row) * canvas_width + (pen_x + col)) * canvas_bytes_per_pixel;
 
-            if (!is_canvas_argb) {
+            if (is_video) { // YUV420PackedPlanar video frame
               uint8_t opacity = color.c.a;
               uint8_t y = ( (  66 * color.c.r + 129 * color.c.g +  25 * color.c.b + 128) >> 8) + 16;
 #if 0
@@ -1153,7 +1176,7 @@ int text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height, int is_c
                       textdata->blend_mode);
                 }
               }
-            } else { // is_canvas_argb == 1
+            } else { // ARGB preview canvas
 #ifdef USE_ARGB_PIXEL_BLENDING
               color_argb_t bg_color, new_color;
               bg_color.x = *((uint32_t*) canvas_pixel);

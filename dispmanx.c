@@ -192,7 +192,7 @@ void dispmanx_update_text_overlay(void)
   memset(g_canvas, 0, g_canvas_size);
 
   // render texts
-  text_draw_all(g_canvas, g_canvas_width, g_canvas_height, 1); // is_argb = 1
+  text_draw_all(g_canvas, g_canvas_width, g_canvas_height, 0); // is_video = 0
 
   // write data to back resource
   vc_dispmanx_rect_set(&dst_rect, 0, 0, g_modeInfo.width, g_modeInfo.height);

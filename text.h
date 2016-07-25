@@ -71,6 +71,11 @@ int text_set_stroke_width(int text_id, float stroke_width);
 int text_set_color(int text_id, int color);
 
 /**
+ * Sets text visibility
+ */
+int text_set_visibility(int text_id, int in_preview, int in_video);
+
+/**
  * Sets multiplying factor for line spacing.
  * If this is set to 1, default line spacing is used.
  */
@@ -137,11 +142,11 @@ int redraw_text(int text_id);
 
 /**
  * Draw all text objects to the canvas.
- * we support writing on two types of canvas: ARGB8888 and YUV420PackedPlanar
+ * we support writing on two types of canvas: ARGB8888 (is_video = 0) and YUV420PackedPlanar (is_video = 1)
  *
  * returns: nonzero if the canvas content has been changed
  */
-int text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height, int is_canvas_argb);
+int text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height, int is_video);
 
 /**
  * Clear the text. Once this is called, the bitmap will not be drawn
