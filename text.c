@@ -506,6 +506,7 @@ int text_destroy(int text_id) {
     return -1; // non-existent text id
   }
   TextData *textdata = textdata_list[text_id-1];
+  textdata->has_changed = 1;
   textdata->will_dispose_bitmap = 1;
   return 0;
 }
@@ -1120,6 +1121,10 @@ int text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height, int is_v
       }
       has_anything_changed |= textdata->has_changed;
       textdata->has_changed = 0;
+      if (textdata->will_dispose_bitmap) {
+        text_destroy_real(textdata->id);
+        continue;
+      }
       if (textdata->is_bitmap_ready) {
         if ((is_video && !textdata->in_video)
             || (!is_video && !textdata->in_preview)) {
@@ -1189,12 +1194,9 @@ int text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height, int is_v
           }
         }
       }
-      if (textdata->will_dispose_bitmap) {
-        text_destroy_real(textdata->id);
-      }
     }
   }
-  //log_debug("text_draw_all(is_canvas_argb=%d) took %d ms\n", is_canvas_argb, (clock() - start_time) * 1000 / CLOCKS_PER_SEC);
+  //log_debug("\n\ntext_draw_all(is_video=%d) took %d ms, has_changed=%d\n", is_video, (clock() - start_time) * 1000 / CLOCKS_PER_SEC, has_anything_changed);
   return has_anything_changed;
 }
 

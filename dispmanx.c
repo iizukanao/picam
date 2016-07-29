@@ -7,7 +7,8 @@
 
 #include <bcm_host.h>
 
-// for debugging: write TEST DATA
+// for debugging: write TEST DATA at startup
+// and semi-transparet overlay each refresh to see all th texts overlayed
 //#define DEBUG_FILL_TEXT_OVERLAY
 
 
@@ -199,6 +200,10 @@ void dispmanx_update_text_overlay(void)
 
   // reset overlay to fully-transparent
   memset(g_canvas, 0, g_canvas_size);
+#ifdef DEBUG_FILL_TEXT_OVERLAY // really nice: see refresehed areas (layout boxes)
+  fill_rect(VC_IMAGE_ARGB8888, g_canvas, g_canvas_width, g_canvas_height,  0, 0, g_canvas_width, g_canvas_height,     0x33ff0000);
+#endif
+
 
   // render texts
   text_draw_all(g_canvas, g_canvas_width, g_canvas_height, 0); // is_video = 0
