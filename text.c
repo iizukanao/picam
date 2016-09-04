@@ -666,7 +666,6 @@ int text_get_bounds(int text_id, const char *text, size_t text_len, text_bounds 
   int top = - max_y;
   int bottom = - max_y + bbox_h;
 
-  hb_buffer_clear_contents(buf);
   hb_buffer_destroy(buf);
   hb_font_destroy(hb_ft_font);
 
