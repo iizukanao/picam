@@ -1,6 +1,12 @@
 Change Log
 ==========
 
+Version 1.4.3 *(2016-09-05)*
+-----------------------------
+
+- Display texts in preview (by @nalajcie)
+- bugfix: Memory leak when using --time option
+
 Version 1.4.2 *(2016-07-24)*
 -----------------------------
 
