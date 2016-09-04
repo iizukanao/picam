@@ -183,141 +183,143 @@ To unmute microphone, create a file named `hooks/unmute`.
 
 #### Command options
 
-    $ ./picam --help
-    picam version 1.4.2
-    Usage: picam [options]
-    
-    Options:
-     [video]
-      -w, --width <num>   Width in pixels (default: 1280)
-      -h, --height <num>  Height in pixels (default: 720)
-      -v, --videobitrate <num>  Video bit rate (default: 2000000)
-                          Set 0 to disable rate control
-      -f, --fps <num>     Frame rate (default: 30.0)
-      -g, --gopsize <num>  GOP size (default: same value as fps)
-      --vfr               Enable variable frame rate. GOP size will be
-                          dynamically controlled.
-      --minfps <num>      Minimum frames per second. Implies --vfr.
-                          It might not work if width / height >= 1.45.
-      --maxfps <num>      Maximum frames per second. Implies --vfr.
-                          It might not work if width / height >= 1.45.
-      --rotation <num>    Image rotation in clockwise degrees
-                          (0, 90, 180, 270)
-      --hflip             Flip image horizontally
-      --vflip             Flip image vertically
-      --avcprofile <str>  Set AVC/H.264 profile to one of:
-                          constrained_baseline/baseline/main/high
-                          (default: constrained_baseline)
-      --avclevel <value>  Set AVC/H.264 level (default: 3.1)
-      --qpmin <num>       Minimum quantization level (0..51)
-      --qpmax <num>       Maximum quantization level (0..51)
-      --qpinit <num>      Initial quantization level
-      --dquant <num>      Slice DQuant level
-     [audio]
-      -c, --channels <num>  Audio channels (1=mono, 2=stereo)
-                          Default is mono. If it fails, stereo is used.
-      -r, --samplerate <num>  Audio sample rate (default: 48000)
-      -a, --audiobitrate <num>  Audio bit rate (default: 40000)
-      --alsadev <dev>     ALSA microphone device (default: hw:0,0)
-      --volume <num>      Amplify audio by multiplying the volume by <num>
-                          (default: 1.0)
-      --noaudio           Disable audio capturing
-      --audiopreview      Enable audio preview
-      --audiopreviewdev <dev>  Audio preview output device (default: plughw:0,0)
-     [HTTP Live Streaming (HLS)]
-      -o, --hlsdir <dir>  Generate HTTP Live Streaming files in <dir>
-      --hlsenc            Enable HLS encryption
-      --hlsenckeyuri <uri>  Set HLS encryption key URI (default: stream.key)
-      --hlsenckey <hex>   Set HLS encryption key in hex string
-                          (default: 75b0a81de17487c88a47507a7e1fdf73)
-      --hlsenciv <hex>    Set HLS encryption IV in hex string
-                          (default: 000102030405060708090a0b0c0d0e0f)
-     [output for node-rtsp-rtmp-server]
-      --rtspout           Enable output for node-rtsp-rtmp-server
-      --rtspvideocontrol <path>  Set video control socket path
-                          (default: /tmp/node_rtsp_rtmp_videoControl)
-      --rtspaudiocontrol <path>  Set audio control socket path
-                          (default: /tmp/node_rtsp_rtmp_audioControl)
-      --rtspvideodata <path>  Set video data socket path
-                          (default: /tmp/node_rtsp_rtmp_videoData)
-      --rtspaudiodata <path>  Set audio data socket path
-                          (default: /tmp/node_rtsp_rtmp_audioData)
-     [MPEG-TS output via TCP]
-      --tcpout <url>      Enable TCP output to <url>
-                          (e.g. --tcpout tcp://127.0.0.1:8181)
-     [camera]
-      --autoex            Enable automatic control of camera exposure between
-                          daylight and night modes. This forces --vfr enabled.
-      --autoexthreshold <num>  When average value of Y (brightness) for
-                          10 milliseconds of captured image falls below <num>,
-                          camera exposure will change to night mode. Otherwise
-                          camera exposure is in daylight mode. Implies --autoex.
-                          (default: 5.0)
-                          If --verbose option is enabled as well, average value of
-                          Y is printed like y=28.0.
-      --wb <value>        Set white balance. <value> is one of:
-                            off: Disable exposure control
-                            auto: Automatic white balance control (default)
-                            sun: The sun provides the light source
-                            cloudy: The sun provides the light source through clouds
-                            shade: Light source is the sun and scene is in the shade
-                            tungsten: Light source is tungsten
-                            fluorescent: Light source is fluorescent
-                            incandescent: Light source is incandescent
-                            flash: Light source is a flash
-                            horizon: Light source is the sun on the horizon
-      --wbred <num>       Red gain. Implies "--wb off". (0.0 .. 8.0)
-      --wbblue <num>      Blue gain. Implies "--wb off". (0.0 .. 8.0)
-      --metering <value>  Set metering type. <value> is one of:
-                            average: Center weight average metering (default)
-                            spot: Spot (partial) metering
-                            matrix: Matrix or evaluative metering
-                            backlit: Assume a backlit image
-      --evcomp <num>      Set Exposure Value compensation (-10..10) (default: 0)
-      --shutter <num>     Set shutter speed in microseconds (default: auto).
-                          Implies --vfr.
-      --iso <num>         Set ISO sensitivity (100..800) (default: auto)
-      -p, --preview       Display fullscreen preview
-      --previewrect <x,y,width,height>
-                          Display preview window at specified position
-      --opacity           Preview window opacity
-                          (0=transparent..255=opaque; default=255)
-      --blank[=0xAARRGGBB]  Set the video background color to black (or optional ARGB value)
-      --query             Query camera capabilities then exit
-     [timestamp] (may be a bit heavy on Raspberry Pi 1)
-      --time              Enable timestamp
-      --timeformat <spec>  Timestamp format (see "man strftime" for spec)
-                           (default: "%a %b %d %l:%M:%S %p")
-      --timelayout <spec>  Timestamp position (relative mode)
-                           layout is comma-separated list of:
-                            top middle bottom  left center right
-                           (default: bottom,right)
-      --timehorizmargin <px>  Horizontal margin from edge (default: 10).
-                              Effective only if --timelayout is used.
-      --timevertmargin <px>  Vertical margin from edge (default: 10).
-                             Effective only if --timelayout is used.
-      --timepos <x,y>     Timestamp position (absolute mode)
-      --timefontname <name>  Timestamp font name (default: FreeMono:style=Bold)
-      --timefontfile <file>  Timestamp font file. This invalidates --timefontname.
-      --timefontface <num>  Timestamp font face index (default: 0).
-                            Effective only if --timefontfile is used.
-      --timept <pt>       Text size in points (default: 14.0)
-      --timedpi <num>     DPI for calculating text size (default: 96)
-      --timecolor <hex>   Text color (default: ffffff)
-      --timestrokecolor <hex>  Text stroke color (default: 000000)
-                          Note that texts are rendered in grayscale.
-      --timestrokewidth <pt>  Text stroke border radius (default: 1.3).
-                              To disable stroking borders, set this value to 0.
-      --timespacing <px>  Additional letter spacing (default: 0)
-     [misc]
-      --recordbuf <num>   Start recording from <num> keyframes ago
-                          (must be >= 1; default: 5)
-      --statedir <dir>    Set state dir (default: state)
-      --hooksdir <dir>    Set hooks dir (default: hooks)
-      -q, --quiet         Suppress all output except errors
-      --verbose           Enable verbose output
-      --version           Print program version
-      --help              Print this help
+```
+$ ./picam --help
+picam version 1.4.3
+Usage: picam [options]
+
+Options:
+ [video]
+  -w, --width <num>   Width in pixels (default: 1280)
+  -h, --height <num>  Height in pixels (default: 720)
+  -v, --videobitrate <num>  Video bit rate (default: 2000000)
+                      Set 0 to disable rate control
+  -f, --fps <num>     Frame rate (default: 30.0)
+  -g, --gopsize <num>  GOP size (default: same value as fps)
+  --vfr               Enable variable frame rate. GOP size will be
+                      dynamically controlled.
+  --minfps <num>      Minimum frames per second. Implies --vfr.
+                      It might not work if width / height >= 1.45.
+  --maxfps <num>      Maximum frames per second. Implies --vfr.
+                      It might not work if width / height >= 1.45.
+  --rotation <num>    Image rotation in clockwise degrees
+                      (0, 90, 180, 270)
+  --hflip             Flip image horizontally
+  --vflip             Flip image vertically
+  --avcprofile <str>  Set AVC/H.264 profile to one of:
+                      constrained_baseline/baseline/main/high
+                      (default: constrained_baseline)
+  --avclevel <value>  Set AVC/H.264 level (default: 3.1)
+  --qpmin <num>       Minimum quantization level (0..51)
+  --qpmax <num>       Maximum quantization level (0..51)
+  --qpinit <num>      Initial quantization level
+  --dquant <num>      Slice DQuant level
+ [audio]
+  -c, --channels <num>  Audio channels (1=mono, 2=stereo)
+                      Default is mono. If it fails, stereo is used.
+  -r, --samplerate <num>  Audio sample rate (default: 48000)
+  -a, --audiobitrate <num>  Audio bit rate (default: 40000)
+  --alsadev <dev>     ALSA microphone device (default: hw:0,0)
+  --volume <num>      Amplify audio by multiplying the volume by <num>
+                      (default: 1.0)
+  --noaudio           Disable audio capturing
+  --audiopreview      Enable audio preview
+  --audiopreviewdev <dev>  Audio preview output device (default: plughw:0,0)
+ [HTTP Live Streaming (HLS)]
+  -o, --hlsdir <dir>  Generate HTTP Live Streaming files in <dir>
+  --hlsenc            Enable HLS encryption
+  --hlsenckeyuri <uri>  Set HLS encryption key URI (default: stream.key)
+  --hlsenckey <hex>   Set HLS encryption key in hex string
+                      (default: 75b0a81de17487c88a47507a7e1fdf73)
+  --hlsenciv <hex>    Set HLS encryption IV in hex string
+                      (default: 000102030405060708090a0b0c0d0e0f)
+ [output for node-rtsp-rtmp-server]
+  --rtspout           Enable output for node-rtsp-rtmp-server
+  --rtspvideocontrol <path>  Set video control socket path
+                      (default: /tmp/node_rtsp_rtmp_videoControl)
+  --rtspaudiocontrol <path>  Set audio control socket path
+                      (default: /tmp/node_rtsp_rtmp_audioControl)
+  --rtspvideodata <path>  Set video data socket path
+                      (default: /tmp/node_rtsp_rtmp_videoData)
+  --rtspaudiodata <path>  Set audio data socket path
+                      (default: /tmp/node_rtsp_rtmp_audioData)
+ [MPEG-TS output via TCP]
+  --tcpout <url>      Enable TCP output to <url>
+                      (e.g. --tcpout tcp://127.0.0.1:8181)
+ [camera]
+  --autoex            Enable automatic control of camera exposure between
+                      daylight and night modes. This forces --vfr enabled.
+  --autoexthreshold <num>  When average value of Y (brightness) for
+                      10 milliseconds of captured image falls below <num>,
+                      camera exposure will change to night mode. Otherwise
+                      camera exposure is in daylight mode. Implies --autoex.
+                      (default: 5.0)
+                      If --verbose option is enabled as well, average value of
+                      Y is printed like y=28.0.
+  --wb <value>        Set white balance. <value> is one of:
+                        off: Disable exposure control
+                        auto: Automatic white balance control (default)
+                        sun: The sun provides the light source
+                        cloudy: The sun provides the light source through clouds
+                        shade: Light source is the sun and scene is in the shade
+                        tungsten: Light source is tungsten
+                        fluorescent: Light source is fluorescent
+                        incandescent: Light source is incandescent
+                        flash: Light source is a flash
+                        horizon: Light source is the sun on the horizon
+  --wbred <num>       Red gain. Implies "--wb off". (0.0 .. 8.0)
+  --wbblue <num>      Blue gain. Implies "--wb off". (0.0 .. 8.0)
+  --metering <value>  Set metering type. <value> is one of:
+                        average: Center weight average metering (default)
+                        spot: Spot (partial) metering
+                        matrix: Matrix or evaluative metering
+                        backlit: Assume a backlit image
+  --evcomp <num>      Set Exposure Value compensation (-10..10) (default: 0)
+  --shutter <num>     Set shutter speed in microseconds (default: auto).
+                      Implies --vfr.
+  --iso <num>         Set ISO sensitivity (100..800) (default: auto)
+  -p, --preview       Display fullscreen preview
+  --previewrect <x,y,width,height>
+                      Display preview window at specified position
+  --opacity           Preview window opacity
+                      (0=transparent..255=opaque; default=255)
+  --blank[=0xAARRGGBB]  Set the video background color to black (or optional ARGB value)
+  --query             Query camera capabilities then exit
+ [timestamp] (may be a bit heavy on Raspberry Pi 1)
+  --time              Enable timestamp
+  --timeformat <spec>  Timestamp format (see "man strftime" for spec)
+                       (default: "%a %b %d %l:%M:%S %p")
+  --timelayout <spec>  Timestamp position (relative mode)
+                       layout is comma-separated list of:
+                        top middle bottom  left center right
+                       (default: bottom,right)
+  --timehorizmargin <px>  Horizontal margin from edge (default: 10).
+                          Effective only if --timelayout is used.
+  --timevertmargin <px>  Vertical margin from edge (default: 10).
+                         Effective only if --timelayout is used.
+  --timepos <x,y>     Timestamp position (absolute mode)
+  --timefontname <name>  Timestamp font name (default: FreeMono:style=Bold)
+  --timefontfile <file>  Timestamp font file. This invalidates --timefontname.
+  --timefontface <num>  Timestamp font face index (default: 0).
+                        Effective only if --timefontfile is used.
+  --timept <pt>       Text size in points (default: 14.0)
+  --timedpi <num>     DPI for calculating text size (default: 96)
+  --timecolor <hex>   Text color (default: ffffff)
+  --timestrokecolor <hex>  Text stroke color (default: 000000)
+                      Note that texts are rendered in grayscale.
+  --timestrokewidth <pt>  Text stroke border radius (default: 1.3).
+                          To disable stroking borders, set this value to 0.
+  --timespacing <px>  Additional letter spacing (default: 0)
+ [misc]
+  --recordbuf <num>   Start recording from <num> keyframes ago
+                      (must be >= 1; default: 5)
+  --statedir <dir>    Set state dir (default: state)
+  --hooksdir <dir>    Set hooks dir (default: hooks)
+  -q, --quiet         Suppress all output except errors
+  --verbose           Enable verbose output
+  --version           Print program version
+  --help              Print this help
+```
 
 #### White balance
 
