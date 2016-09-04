@@ -85,9 +85,9 @@ $ ./make_dirs.sh
 $ alsamixer
 
 (Install picam binary)
-$ wget https://github.com/iizukanao/picam/files/380246/picam-1.4.2-binary.tar.gz
-$ tar xvf picam-1.4.2-binary.tar.gz
-$ cp picam-1.4.2-binary/picam ~/picam/
+$ wget https://github.com/iizukanao/picam/releases/download/v1.4.3/picam-1.4.3-binary.tar.xz
+$ tar xvf picam-1.4.3-binary.tar.xz
+$ cp picam-1.4.3-binary/picam ~/picam/
 
 (Run picam)
 $ cd ~/picam
