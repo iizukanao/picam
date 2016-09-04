@@ -385,6 +385,8 @@ Each line of hooks/subtitle must be in the format of `key=value`. Lines starting
 | color | Text color in hex color code. Rendered in grayscale. | ffffff |
 | stroke_color | Text stroke (outline) color in hex color code. Rendered in grayscale. | 000000 |
 | stroke_width | Text stroke (outline) border radius in points | 1.0 |
+| in_preview | Visibility of the text in the preview | 1 |
+| in_video | Visibility of the text in the encoded video | 1 |
 
 NOTE: On the first generation models of Raspberry Pi (before Pi 2), subtitles cause CPU usage high and the video frame rate may drop below 30 fps.
 

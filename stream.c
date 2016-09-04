@@ -43,6 +43,7 @@ extern "C" {
 #include "state.h"
 #include "log.h"
 #include "text.h"
+#include "dispmanx.h"
 #include "timestamp.h"
 #include "subtitle.h"
 
@@ -90,16 +91,6 @@ extern "C" {
 #define FILL_COLOR_Y 0
 #define FILL_COLOR_U 128
 #define FILL_COLOR_V 128
-
-// default ARGB color for preview background (black)
-#define BLANK_BACKGROUND_DEFAULT    0xff000000
-
-// dispmanx layers consts for displaying multiple accelerated overlays in preview
-#define LAYER_BACKGROUD     0xe
-#define LAYER_VIDEO_PREVIEW 0xf
-
-// display to which we will output the preview overlays
-#define DISPLAY_DEFAULT     0
 
 // Whether or not to pass pBuffer from camera to video_encode directly
 #define ENABLE_PBUFFER_OPTIMIZATION_HACK 1
@@ -1399,6 +1390,8 @@ void on_file_create(char *filename, char *content) {
     TEXT_ALIGN text_align = TEXT_ALIGN_CENTER;
     int horizontal_margin = 0;
     int vertical_margin = 35;
+    int in_preview = 1;
+    int in_video = 1;
 
     char filepath[256];
     snprintf(filepath, sizeof(filepath), "%s/%s", hooks_dir, filename);
@@ -1625,6 +1618,22 @@ void on_file_create(char *filename, char *content) {
               }
               search_p = comma_p + 1;
             }
+          } else if (strncmp(line, "in_preview=", key_len+1) == 0) {
+            char *end;
+            double value = strtod(delimiter_p+1, &end);
+            if (end == delimiter_p+1 || *end != '\0' || errno == ERANGE) { // parse error
+              log_error("subtitle error: invalid in_preview: %s\n", delimiter_p+1);
+              return;
+            }
+            in_preview = (value != 0);
+          } else if (strncmp(line, "in_video=", key_len+1) == 0) {
+            char *end;
+            double value = strtod(delimiter_p+1, &end);
+            if (end == delimiter_p+1 || *end != '\0' || errno == ERANGE) { // parse error
+              log_error("subtitle error: invalid in_video: %s\n", delimiter_p+1);
+              return;
+            }
+            in_video = (value != 0);
           } else {
             log_error("subtitle error: cannot parse line: %s\n", line);
           }
@@ -1681,6 +1690,7 @@ void on_file_create(char *filename, char *content) {
         subtitle_set_color(color);
         subtitle_set_stroke_color(stroke_color);
         subtitle_set_stroke_width(stroke_width);
+        subtitle_set_visibility(in_preview, in_video);
         subtitle_set_letter_spacing(letter_spacing);
         subtitle_set_line_height_multiply(line_height_multiply);
         subtitle_set_tab_scale(tab_scale);
@@ -2956,7 +2966,11 @@ static void cam_fill_buffer_done(void *data, COMPONENT_T *comp) {
             log_debug(".");
             timestamp_update();
             subtitle_update();
-            text_draw_all(last_video_buffer, video_width_32, video_height_16);
+            int is_text_changed = text_draw_all(last_video_buffer, video_width_32, video_height_16, 1); // is_video = 1
+            if (is_text_changed && is_preview_enabled) {
+              // the text has actually changed, redraw preview subtitle overlay
+              dispmanx_update_text_overlay();
+            }
             encode_and_send_image();
           }
         }
@@ -3135,49 +3149,6 @@ static int camera_set_white_balance(char *wb) {
   }
 
   return 0;
-}
-
-// NOTE: function based on https://github.com/popcornmix/omxplayer/blob/master/omxplayer.cpp
-static void create_blank_background(uint32_t argb)
-{
-  // if alpha is fully transparent then background has no effect
-  if (!(argb & 0xff000000))
-    return;
-  // we create a 1x1 black pixel image that is added to display just behind video
-  DISPMANX_DISPLAY_HANDLE_T   display;
-  DISPMANX_UPDATE_HANDLE_T    update;
-  DISPMANX_RESOURCE_HANDLE_T  resource;
-  DISPMANX_ELEMENT_HANDLE_T   element;
-  int             ret;
-  uint32_t vc_image_ptr;
-  VC_IMAGE_TYPE_T type = VC_IMAGE_ARGB8888;
-  int             layer = LAYER_BACKGROUD;
-
-  VC_RECT_T dst_rect, src_rect;
-
-  display = vc_dispmanx_display_open(DISPLAY_DEFAULT);
-  assert(display);
-
-  resource = vc_dispmanx_resource_create( type, 1 /*width*/, 1 /*height*/, &vc_image_ptr );
-  assert( resource );
-
-  vc_dispmanx_rect_set( &dst_rect, 0, 0, 1, 1);
-
-  ret = vc_dispmanx_resource_write_data( resource, type, sizeof(argb), &argb, &dst_rect );
-  assert(ret == 0);
-
-  vc_dispmanx_rect_set( &src_rect, 0, 0, 1<<16, 1<<16);
-  vc_dispmanx_rect_set( &dst_rect, 0, 0, 0, 0);
-
-  update = vc_dispmanx_update_start(0);
-  assert(update);
-
-  element = vc_dispmanx_element_add(update, display, layer, &dst_rect, resource, &src_rect,
-                                    DISPMANX_PROTECTION_NONE, NULL, NULL, DISPMANX_STEREOSCOPIC_MONO );
-  assert(element);
-
-  ret = vc_dispmanx_update_submit_sync( update );
-  assert( ret == 0 );
 }
 
 static int openmax_cam_open() {
@@ -3414,9 +3385,6 @@ static int openmax_cam_open() {
     }
     component_list[n_component_list++] = render_component;
 
-    // setup background overlay
-    create_blank_background(blank_background_color);
-
     // Setup display region for preview window
     memset(&display_region, 0, sizeof(OMX_CONFIG_DISPLAYREGIONTYPE));
     display_region.nSize = sizeof(OMX_CONFIG_DISPLAYREGIONTYPE);
@@ -3424,7 +3392,7 @@ static int openmax_cam_open() {
     display_region.nPortIndex = VIDEO_RENDER_INPUT_PORT;
 
     // set default display
-    display_region.num = DISPLAY_DEFAULT;
+    display_region.num = DISP_DISPLAY_DEFAULT;
 
     if (is_previewrect_enabled) { // display preview window at specified position
       display_region.set = OMX_DISPLAY_SET_DEST_RECT | OMX_DISPLAY_SET_FULLSCREEN | OMX_DISPLAY_SET_NOASPECT | OMX_DISPLAY_SET_NUM;
@@ -3449,7 +3417,7 @@ static int openmax_cam_open() {
     // Set the opacity and layer of the preview window
     display_region.set = OMX_DISPLAY_SET_ALPHA | OMX_DISPLAY_SET_LAYER;
     display_region.alpha = (OMX_U32) preview_opacity;
-    display_region.layer = LAYER_VIDEO_PREVIEW;
+    display_region.layer = DISP_LAYER_VIDEO_PREVIEW;
     error = OMX_SetParameter(ILC_GET_HANDLE(render_component),
         OMX_IndexConfigDisplayRegion, &display_region);
     if (error != OMX_ErrorNone) {
@@ -5707,6 +5675,11 @@ int main(int argc, char **argv) {
   }
   memset(component_list, 0, sizeof(component_list));
 
+  if (is_preview_enabled) {
+    // setup dispmanx preview (backgroud + subtitle overlay)
+    dispmanx_init(blank_background_color, video_width, video_height);
+  }
+
   ret = openmax_cam_open();
   if (ret != 0) {
     log_fatal("error: openmax_cam_open failed: %d\n", ret);
@@ -5879,6 +5852,9 @@ int main(int argc, char **argv) {
   }
 
   stop_openmax_capturing();
+  if (is_preview_enabled) {
+    dispmanx_destroy();
+  }
   shutdown_openmax();
   shutdown_video();
 

@@ -1,5 +1,7 @@
 #include <stdint.h>
 #include <math.h>
+#include <time.h> // clock()
+#include "log.h"
 
 // FreeType
 #include <ft2build.h>
@@ -49,6 +51,10 @@ typedef enum BlendMode {
   BLEND_MODE_LIGHTEN_ONLY = 3,
 } BlendMode;
 
+//NOTE: enable if you need to blend multiple text overlays in preview and can trade off lower FPS because of that
+// If You really need it, use multiple dispmanx layers (or EGL overlay) and let the hardware do the blending
+//#define USE_ARGB_PIXEL_BLENDING
+
 // Represents a text object
 typedef struct TextData {
   int id;
@@ -69,6 +75,7 @@ typedef struct TextData {
 
   int is_bitmap_ready;
   int will_dispose_bitmap;
+  int has_changed; // do we need to redraw the overlay
   int width;
   int height;
   int is_stroke;
@@ -90,6 +97,10 @@ typedef struct TextData {
   int bounds_right;
   int bounds_top;
   int bounds_bottom;
+
+  // text visibility
+  int in_preview;
+  int in_video;
 } TextData;
 
 static TextData **textdata_list = NULL;
@@ -210,6 +221,7 @@ int text_create(const char *font_file, long face_index, float point, int dpi) {
   textdata->id = text_id;
   textdata->bitmap = NULL;
   textdata->is_bitmap_ready = 0;
+  textdata->has_changed = 0;
   textdata->will_dispose_bitmap = 0;
   textdata->width = 0;
   textdata->height = 0;
@@ -227,6 +239,8 @@ int text_create(const char *font_file, long face_index, float point, int dpi) {
   textdata->y = 0;
   textdata->pen_x = 0;
   textdata->pen_y = 0;
+  textdata->in_preview = 1;
+  textdata->in_video = 1;
   textdata->next_textdata = NULL;
   textdata_list[text_id-1] = textdata;
 
@@ -308,6 +322,19 @@ int text_set_color(int text_id, int color) {
   }
   TextData *textdata = textdata_list[text_id-1];
   textdata->color = color;
+  return 0;
+}
+
+/**
+ * Sets text visibility
+ */
+int text_set_visibility(int text_id, int in_preview, int in_video) {
+  if (text_id <= 0 || text_id > max_text_id) {
+    return -1; // non-existent text id
+  }
+  TextData *textdata = textdata_list[text_id-1];
+  textdata->in_preview = in_preview;
+  textdata->in_video = in_video;
   return 0;
 }
 
@@ -479,6 +506,7 @@ int text_destroy(int text_id) {
     return -1; // non-existent text id
   }
   TextData *textdata = textdata_list[text_id-1];
+  textdata->has_changed = 1;
   textdata->will_dispose_bitmap = 1;
   return 0;
 }
@@ -683,7 +711,43 @@ int text_get_bounds(int text_id, const char *text, size_t text_len, text_bounds 
   return 0;
 }
 
+// NOTE: PI is little-endian so the actual color order in memory is as below
+typedef union {
+  uint32_t x;
+  struct {
+    uint8_t b;
+    uint8_t g;
+    uint8_t r;
+    uint8_t a;
+  } c;
+} color_argb_t;
+
+static color_argb_t blend_colors_argb(color_argb_t bg_color, color_argb_t fg_color, BlendMode blend_mode)
+{
+  color_argb_t out;
+
+  if (blend_mode != BLEND_MODE_NORMAL) {
+    // TODO: Implement other blending modes
+    fprintf(stderr, "blend_colors_argb: blending mode not implemented: %d\n", blend_mode);
+    blend_mode = BLEND_MODE_NORMAL;
+  }
+
+  // shortcut
+  if (bg_color.c.a == 0 || fg_color.c.a == 0xff) {
+    return fg_color;
+  }
+
+  // alpha blending two ARGB from wikipedia:
+  out.c.r = fg_color.c.r * fg_color.c.a / 255 + (bg_color.c.r * bg_color.c.a * (255 - fg_color.c.a) / (255 * 255));
+  out.c.g = fg_color.c.g * fg_color.c.a / 255 + (bg_color.c.g * bg_color.c.a * (255 - fg_color.c.a) / (255 * 255));
+  out.c.b = fg_color.c.b * fg_color.c.a / 255 + (bg_color.c.b * bg_color.c.a * (255 - fg_color.c.a) / (255 * 255));
+  out.c.a = fg_color.c.a + (bg_color.c.a * (255 - fg_color.c.a) / 255);
+
+  return out;
+}
+
 // callback function for drawing the glyphs of the text.
+// NOTE: we're creating full 32-bit bitmap
 void span_writer_callback(int y, int count, const FT_Span* spans, void *user) {
   TextData *textdata = (TextData *) user;
   int row = -y - textdata->bounds_top;
@@ -697,7 +761,7 @@ void span_writer_callback(int y, int count, const FT_Span* spans, void *user) {
   int total_length = 0;
   for (i = 0; i < count; i++) {
     uint8_t opacity = spans[i].coverage;
-    uint8_t *start = scanline + spans[i].x * BYTES_PER_PIXEL;
+    uint32_t* start = (uint32_t*)(scanline + spans[i].x * BYTES_PER_PIXEL);
 
     int x;
     for (x = 0; x < spans[i].len; x++) {
@@ -705,29 +769,17 @@ void span_writer_callback(int y, int count, const FT_Span* spans, void *user) {
         return;
       }
       if (opacity == 0) {
-        start += BYTES_PER_PIXEL;
+        ++start;
       } else {
-        uint8_t orig_opacity = *start;
-        float intensity;
-        if (opacity > 0) {
-          intensity = opacity / 255.0f;
-        } else {
-          intensity = 0.0f;
-        }
-        if (opacity > orig_opacity) {
-          *start = opacity;
-        }
-        start++;
-        if (textdata->is_stroke) { // this is pass 1 (outline)
-          *start = *start * (1 - intensity) + ((textdata->stroke_color >> 4) & 0xff) * intensity;
-          start += 3;
-          // TODO: map green and blue to UV
-        } else { // this is pass 2 (fill)
-          // red
-          *start = *start * (1 - intensity) + ((textdata->color >> 4) & 0xff) * intensity;
-          start += 3;
-          // TODO: map green and blue to UV
-        }
+        color_argb_t fg_color, bg_color, new_color;
+        bg_color.x = *start;
+        fg_color.x = opacity << 24 | ((textdata->is_stroke) ? textdata->stroke_color : textdata->color);
+        new_color = blend_colors_argb(bg_color, fg_color, BLEND_MODE_NORMAL);
+
+        *start = new_color.x;
+        //printf("0x%08x + 0x%08x = 0x%08x\n", prev_color.x, curr_color.x, new_color.x);
+
+        ++start;
       }
     }
     total_length = spans[i].x + spans[i].len;
@@ -963,6 +1015,7 @@ static int draw_glyphs(TextData *textdata) {
   if (textdata->is_bitmap_ready) {
     // queue next textdata
     tmp_textdata->is_bitmap_ready = 1;
+    tmp_textdata->has_changed = 1;
     textdata->next_textdata = tmp_textdata;
   } else {
     // use existing textdata
@@ -974,6 +1027,7 @@ static int draw_glyphs(TextData *textdata) {
     textdata->width = tmp_textdata->width;
     textdata->height = tmp_textdata->height;
     textdata->is_bitmap_ready = 1;
+    textdata->has_changed = 1;
     free(tmp_textdata);
   }
 
@@ -1011,6 +1065,7 @@ int text_clear(int text_id) {
   }
   TextData *textdata = textdata_list[text_id-1];
   textdata->is_bitmap_ready = 0;
+  textdata->has_changed = 1;
   return 0;
 }
 
@@ -1051,9 +1106,15 @@ int text_get_position(int text_id, int canvas_width, int canvas_height, int *x, 
 
 /**
  * Draw all text objects to the canvas.
+ *
+ * returns: nonzero if the canvas content has been changed
  */
-void text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height) {
+int text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height, int is_video) {
   int i;
+  int has_anything_changed = 0;
+  int canvas_bytes_per_pixel = (is_video) ? 1 : BYTES_PER_PIXEL; // note: in YUV we're poinig to Y planar pixel
+  //clock_t start_time = clock();
+
   for (i = 0; i < max_text_id; i++) {
     TextData *textdata = textdata_list[i];
     if (textdata != NULL) {
@@ -1063,8 +1124,19 @@ void text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height) {
         TextData *next_textdata = textdata->next_textdata;
         memcpy(textdata, next_textdata, sizeof(TextData));
         free(next_textdata);
+        has_anything_changed = 1; // we're replacing old textdata with new one
+      }
+      has_anything_changed |= textdata->has_changed;
+      textdata->has_changed = 0;
+      if (textdata->will_dispose_bitmap) {
+        text_destroy_real(textdata->id);
+        continue;
       }
       if (textdata->is_bitmap_ready) {
+        if ((is_video && !textdata->in_video)
+            || (!is_video && !textdata->in_preview)) {
+          continue; // skip this textdata if we don't want to show it on this medium
+        }
         int pen_x, pen_y;
         text_get_position(textdata->id, canvas_width, canvas_height, &pen_x, &pen_y);
         int row, col;
@@ -1083,40 +1155,56 @@ void text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height) {
               break;
             }
             int offset = (row * textdata->width + col) * BYTES_PER_PIXEL;
-            uint8_t opacity = textdata->bitmap[offset];
-            uint8_t red = textdata->bitmap[offset + 1];
-            // TODO: map colors to UV
-//            uint8_t green = textdata->bitmap[offset + 2];
-//            uint8_t blue = textdata->bitmap[offset + 3];
-            if (opacity == 255) {
-              if (textdata->blend_mode == BLEND_MODE_NORMAL) {
-                canvas[(pen_y + row) * canvas_width + (pen_x + col)] = red;
-              } else {
-                // TODO: Implement other blending modes
-                fprintf(stderr, "blending mode not implemented: %d\n",
-                    textdata->blend_mode);
+            color_argb_t color;
+            color.x = *((uint32_t*) (textdata->bitmap + offset));
+            uint8_t* canvas_pixel = canvas + ((pen_y + row) * canvas_width + (pen_x + col)) * canvas_bytes_per_pixel;
+
+            if (is_video) { // YUV420PackedPlanar video frame
+              uint8_t opacity = color.c.a;
+              uint8_t y = ( (  66 * color.c.r + 129 * color.c.g +  25 * color.c.b + 128) >> 8) + 16;
+#if 0
+              uint8_t u = ( ( -38 * color.c.r -  74 * color.c.g + 112 * color.c.b + 128) >> 8) + 128;
+              uint8_t v = ( ( 112 * color.c.r -  94 * color.c.g -  18 * color.c.b + 128) >> 8) + 128;
+              (void)u; (void)v;
+#endif
+              if (opacity == 255) {
+                if (textdata->blend_mode == BLEND_MODE_NORMAL) {
+                  *canvas_pixel = y;
+                  // TODO: update U and V
+                } else {
+                  // TODO: Implement other blending modes
+                  fprintf(stderr, "blending mode not implemented: %d\n",
+                      textdata->blend_mode);
+                }
+              } else if (opacity > 0) {
+                // Blend colors
+                uint8_t orig_color_y = *canvas_pixel;
+                float intensity = opacity / 255.0f;
+                if (textdata->blend_mode == BLEND_MODE_NORMAL) {
+                  *canvas_pixel = orig_color_y * (1 - intensity) + y * intensity;
+                } else {
+                  // TODO: Implement other blending modes
+                  fprintf(stderr, "blending mode not implemented: %d\n",
+                      textdata->blend_mode);
+                }
               }
-            } else if (opacity > 0) {
-              // Blend colors
-              uint8_t orig_color = canvas[(pen_y + row) * canvas_width + (pen_x + col)];
-              float intensity = opacity / 255.0f;
-              if (textdata->blend_mode == BLEND_MODE_NORMAL) {
-                canvas[(pen_y + row) * canvas_width + (pen_x + col)] =
-                  orig_color * (1 - intensity) + red * intensity;
-              } else {
-                // TODO: Implement other blending modes
-                fprintf(stderr, "blending mode not implemented: %d\n",
-                    textdata->blend_mode);
-              }
+            } else { // ARGB preview canvas
+#ifdef USE_ARGB_PIXEL_BLENDING
+              color_argb_t bg_color, new_color;
+              bg_color.x = *((uint32_t*) canvas_pixel);
+              new_color = blend_colors_argb(bg_color, color, textdata->blend_mode);
+              *((uint32_t*) canvas_pixel) = new_color.x;
+#else
+              *((uint32_t*) canvas_pixel) = color.x;
+#endif
             }
           }
         }
       }
-      if (textdata->will_dispose_bitmap) {
-        text_destroy_real(textdata->id);
-      }
     }
   }
+  //log_debug("\n\ntext_draw_all(is_video=%d) took %d ms, has_changed=%d\n", is_video, (clock() - start_time) * 1000 / CLOCKS_PER_SEC, has_anything_changed);
+  return has_anything_changed;
 }
 
 /**
