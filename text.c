@@ -604,6 +604,10 @@ int text_get_bounds(int text_id, const char *text, size_t text_len, text_bounds 
           fprintf(stderr, "FT_Outline_Render() failed; err=%d\n", fterr);
         }
 
+        // Tidy up
+        FT_Stroker_Done(stroker);
+        FT_Done_Glyph(glyph);
+
         if (sizer_data.min_span_x != INT_MAX) {
           if (min_x > sizer_data.min_span_x + (int)gx) {
             min_x = sizer_data.min_span_x + (int)gx;
@@ -936,6 +940,10 @@ static int draw_glyphs(TextData *textdata) {
             if (fterr) {
               fprintf(stderr, "FT_Outline_Render() failed; err=%d\n", fterr);
             }
+
+            // Tidy up
+            FT_Stroker_Done(stroker);
+            FT_Done_Glyph(glyph);
           }
 
           tmp_textdata->is_stroke = 0;
