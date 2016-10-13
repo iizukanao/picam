@@ -257,6 +257,30 @@ static const white_balance_option white_balance_options[] = {
   { .name = "horizon",      .control = OMX_WhiteBalControlHorizon },
 };
 
+static char exposure_control[14];
+static const char *exposure_control_default = "auto";
+typedef struct exposure_control_option {
+  char *name;
+  OMX_EXPOSURECONTROLTYPE control;
+} exposure_control_option;
+static const exposure_control_option exposure_control_options[] = {
+  { .name = "off",           .control = OMX_ExposureControlOff },
+  { .name = "auto",          .control = OMX_ExposureControlAuto },
+  { .name = "night",         .control = OMX_ExposureControlNight },
+  { .name = "nightpreview",  .control = OMX_ExposureControlNightWithPreview },
+  { .name = "backlight",     .control = OMX_ExposureControlBackLight },
+  { .name = "spotlight",     .control = OMX_ExposureControlSpotLight },
+  { .name = "sports",        .control = OMX_ExposureControlSports },
+  { .name = "snow",          .control = OMX_ExposureControlSnow },
+  { .name = "beach",         .control = OMX_ExposureControlBeach },
+  { .name = "verylong",      .control = OMX_ExposureControlVeryLong },
+  { .name = "fixedfps",      .control = OMX_ExposureControlFixedFps },
+  { .name = "antishake",     .control = OMX_ExposureControlAntishake },
+  { .name = "fireworks",     .control = OMX_ExposureControlFireworks },
+  { .name = "largeaperture", .control = OMX_ExposureControlLargeAperture },
+  { .name = "smallaperture", .control = OMX_ExposureControlSmallAperture },
+};
+
 // Red gain used when AWB is off
 static float awb_red_gain;
 static const float awb_red_gain_default = 0.0f;
@@ -391,6 +415,7 @@ static int fr_q16;
 
 // Function prototypes
 static int camera_set_white_balance(char *wb);
+static int camera_set_exposure_control(char *ex);
 static int camera_set_custom_awb_gains();
 static void encode_and_send_image();
 static void encode_and_send_audio();
@@ -1339,6 +1364,42 @@ void on_file_create(char *filename, char *content) {
       int size = sizeof(white_balance_options) / sizeof(white_balance_option);
       for (i = 0; i < size; i++) {
         log_error("%s", white_balance_options[i].name);
+        if (i + 1 == size) { // the last item
+          log_error(")\n");
+        } else {
+          log_error("/");
+        }
+      }
+    }
+  } else if (strncmp(filename, "ex_", 3) == 0) { // e.g. ex_night
+    char *ex_mode = filename + 3;
+    int matched = 0;
+    int i;
+
+    if (!is_vfr_enabled) {
+      log_warn("warn: Use --vfr or --ex in order to ex_* hook to properly take effect\n");
+    }
+
+    for (i = 0; i < sizeof(exposure_control_options) / sizeof(exposure_control_option); i++) {
+      if (strcmp(exposure_control_options[i].name, ex_mode) == 0) {
+        strncpy(exposure_control, ex_mode, sizeof(exposure_control) - 1);
+        exposure_control[sizeof(exposure_control) - 1] = '\0';
+        matched = 1;
+        break;
+      }
+    }
+    if (matched) {
+      if (camera_set_exposure_control(exposure_control) == 0) {
+        log_info("changed the exposure control to %s\n", exposure_control);
+      } else {
+        log_error("error: failed to set the exposure control to %s\n", exposure_control);
+      }
+    } else {
+      log_error("hook error: invalid exposure control: %s\n", ex_mode);
+      log_error("(valid values: ");
+      int size = sizeof(exposure_control_options) / sizeof(exposure_control_option);
+      for (i = 0; i < size; i++) {
+        log_error("%s", exposure_control_options[i].name);
         if (i + 1 == size) { // the last item
           log_error(")\n");
         } else {
@@ -3151,6 +3212,47 @@ static int camera_set_white_balance(char *wb) {
   return 0;
 }
 
+static int camera_set_exposure_control(char *ex) {
+  OMX_CONFIG_EXPOSURECONTROLTYPE exposure_control_type;
+  OMX_ERRORTYPE error;
+  int i;
+
+  memset(&exposure_control_type, 0, sizeof(OMX_CONFIG_EXPOSURECONTROLTYPE));
+  exposure_control_type.nSize = sizeof(OMX_CONFIG_EXPOSURECONTROLTYPE);
+  exposure_control_type.nVersion.nVersion = OMX_VERSION;
+  exposure_control_type.nPortIndex = OMX_ALL;
+
+  // Find out the value of eExposureControl
+  OMX_EXPOSURECONTROLTYPE control = OMX_ExposureControlMax;
+  for (i = 0; i < sizeof(exposure_control_options) / sizeof(exposure_control_option); i++) {
+    if (strcmp(exposure_control_options[i].name, ex) == 0) {
+      control = exposure_control_options[i].control;
+      break;
+    }
+  }
+  if (control == OMX_ExposureControlMax) {
+    log_error("error: invalid exposure control value: %s\n", ex);
+    return -1;
+  }
+  exposure_control_type.eExposureControl = control;
+
+  log_debug("exposure control: %s\n", ex);
+  error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
+      OMX_IndexConfigCommonExposure, &exposure_control_type);
+  if (error != OMX_ErrorNone) {
+    log_error("error: failed to set camera exposure control: 0x%x\n", error);
+    return -1;
+  }
+
+  if (control == OMX_ExposureControlAuto) {
+    current_exposure_mode = EXPOSURE_AUTO;
+  } else if (control == OMX_ExposureControlNight) {
+    current_exposure_mode = EXPOSURE_NIGHT;
+  }
+
+  return 0;
+}
+
 static int openmax_cam_open() {
   OMX_PARAM_PORTDEFINITIONTYPE cam_def;
   OMX_ERRORTYPE error;
@@ -3268,7 +3370,9 @@ static int openmax_cam_open() {
     exit(EXIT_FAILURE);
   }
 
-  set_exposure_to_auto();
+  if (camera_set_exposure_control(exposure_control) != 0) {
+    exit(EXIT_FAILURE);
+  }
 
   if (camera_set_exposure_value() != 0) {
     exit(EXIT_FAILURE);
@@ -4519,6 +4623,10 @@ static void print_usage() {
   log_info("                      (default: %.1f)\n", auto_exposure_threshold_default);
   log_info("                      If --verbose option is enabled as well, average value of\n");
   log_info("                      Y is printed like y=28.0.\n");
+  log_info("  --ex <value>        Set camera exposure. Implies --vfr. <value> is one of:\n");
+  log_info("                        off auto night nightpreview backlight spotlight sports\n");
+  log_info("                        snow beach verylong fixedfps antishake fireworks\n");
+  log_info("                        largeaperture smallaperture\n");
   log_info("  --wb <value>        Set white balance. <value> is one of:\n");
   log_info("                        off: Disable exposure control\n");
   log_info("                        auto: Automatic white balance control (default)\n");
@@ -4623,6 +4731,7 @@ int main(int argc, char **argv) {
     { "maxfps", required_argument, NULL, 0 },
     { "autoex", no_argument, NULL, 0 },
     { "autoexthreshold", required_argument, NULL, 0 },
+    { "ex", required_argument, NULL, 0 },
     { "wb", required_argument, NULL, 0 },
     { "wbred", required_argument, NULL, 0 },
     { "wbblue", required_argument, NULL, 0 },
@@ -4721,8 +4830,13 @@ int main(int argc, char **argv) {
   is_auto_exposure_enabled = is_auto_exposure_enabled_default;
   is_vfr_enabled = is_vfr_enabled_default;
   auto_exposure_threshold = auto_exposure_threshold_default;
+
   strncpy(white_balance, white_balance_default, sizeof(white_balance) - 1);
   white_balance[sizeof(white_balance) - 1] = '\0';
+
+  strncpy(exposure_control, exposure_control_default, sizeof(exposure_control) - 1);
+  exposure_control[sizeof(exposure_control) - 1] = '\0';
+
   awb_red_gain = awb_red_gain_default;
   awb_blue_gain = awb_blue_gain_default;
   strncpy(exposure_metering, exposure_metering_default, sizeof(exposure_metering) - 1);
@@ -4918,6 +5032,22 @@ int main(int argc, char **argv) {
             log_fatal("error: invalid white balance: %s\n", optarg);
             return EXIT_FAILURE;
           }
+        } else if (strcmp(long_options[option_index].name, "ex") == 0) {
+          strncpy(exposure_control, optarg, sizeof(exposure_control) - 1);
+          exposure_control[sizeof(exposure_control) - 1] = '\0';
+          int matched = 0;
+          int i;
+          for (i = 0; i < sizeof(exposure_control_options) / sizeof(exposure_control_option); i++) {
+            if (strcmp(exposure_control_options[i].name, exposure_control) == 0) {
+              matched = 1;
+              break;
+            }
+          }
+          if (!matched) {
+            log_fatal("error: invalid --ex: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          is_vfr_enabled = 1;
         } else if (strcmp(long_options[option_index].name, "wbred") == 0) {
           char *end;
           double value = strtod(optarg, &end);
@@ -5585,6 +5715,7 @@ int main(int argc, char **argv) {
   log_debug("auto_exposure_threshold=%f\n", auto_exposure_threshold);
   log_debug("is_vfr_enabled=%d\n", is_vfr_enabled);
   log_debug("white_balance=%s\n", white_balance);
+  log_debug("exposure_control=%s\n", exposure_control);
   log_debug("awb_red_gain=%f\n", awb_red_gain);
   log_debug("awb_blue_gain=%f\n", awb_blue_gain);
   log_debug("metering=%s\n", exposure_metering);
