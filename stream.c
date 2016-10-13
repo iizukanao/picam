@@ -4628,7 +4628,7 @@ static void print_usage() {
   log_info("                        snow beach verylong fixedfps antishake fireworks\n");
   log_info("                        largeaperture smallaperture\n");
   log_info("  --wb <value>        Set white balance. <value> is one of:\n");
-  log_info("                        off: Disable exposure control\n");
+  log_info("                        off: Disable white balance control\n");
   log_info("                        auto: Automatic white balance control (default)\n");
   log_info("                        sun: The sun provides the light source\n");
   log_info("                        cloudy: The sun provides the light source through clouds\n");
