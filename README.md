@@ -321,13 +321,43 @@ Options:
 
 #### White balance
 
-The white balance can be set either via command line option (e.g. `--wb sun`) or hooks. To change the white balance while picam is running, create `hooks/wb_<wbname>`, where `<wbname>` is the white balance name.
+Camera white balance can be set either via command line option (e.g. `--wb sun`) or hooks. To change the white balance while picam is running, create `hooks/wb_<value>`, where `<value>` is the name of white balance.
 
-For example, the following command dynamically changes the white balance to **sun**.
+For example, the following command will dynamically change the white balance to **sun**.
 
     $ touch hooks/wb_sun
 
 Available white balance modes are: **off**, **auto**, **sun**, **cloudy**, **shade**, **tungsten**, **fluorescent**, **incandescent**, **flash**, and **horizon**.
+
+
+#### Exposure Control
+
+Camera exposure control can be set either via command line option (e.g. `--ex night`) or hooks. To change the exposure control while picam is running, start picam with `--vfr` or `--ex` option, then create `hooks/ex_<value>`, where `<value>` is the name of exposure control.
+
+For example, the following command will dynamically change the exposure control to **night**.
+
+    $ touch hooks/ex_night
+
+For the list of available exposure control values, see `picam --help`.
+
+| Value | Description |
+| ----- | ----------- |
+| `off` | Disable exposure control |
+| `auto` | Automatic exposure |
+| `night` | Exposure at night |
+| `nightpreview` | Shorter exposure than `night` |
+| `backlight` | Exposure with backlight illuminating the subject |
+| `spotlight` | Exposure with a spotlight illuminating the subject |
+| `sports` | Exposure for sports |
+| `snow` | Exposure for the subject in snow |
+| `beach` | Exposure for the subject at a beach |
+| `verylong` | Long exposure |
+| `fixedfps` | Constrain FPS to a fixed value |
+| `antishake` | Antishake mode |
+| `fireworks` | Optimized for fireworks |
+| `largeaperture` | Exposure when using a large aperture on the camera |
+| `smallaperture` | Exposure when using a small aperture on the camera |
+
 
 #### Recordbuf
 
