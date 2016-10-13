@@ -183,7 +183,7 @@ To unmute microphone, create a file named `hooks/unmute`.
 
 ```
 $ ./picam --help
-picam version 1.4.3
+picam version 1.4.4
 Usage: picam [options]
 
 Options:
@@ -254,8 +254,12 @@ Options:
                       (default: 5.0)
                       If --verbose option is enabled as well, average value of
                       Y is printed like y=28.0.
+  --ex <value>        Set camera exposure. Implies --vfr. <value> is one of:
+                        off auto night nightpreview backlight spotlight sports
+                        snow beach verylong fixedfps antishake fireworks
+                        largeaperture smallaperture
   --wb <value>        Set white balance. <value> is one of:
-                        off: Disable exposure control
+                        off: Disable white balance control
                         auto: Automatic white balance control (default)
                         sun: The sun provides the light source
                         cloudy: The sun provides the light source through clouds
