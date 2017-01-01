@@ -83,9 +83,9 @@ $ ./make_dirs.sh
 $ alsamixer
 
 (Install picam binary)
-$ wget https://github.com/iizukanao/picam/releases/download/v1.4.4/picam-1.4.4-binary.tar.xz
-$ tar xvf picam-1.4.4-binary.tar.xz
-$ cp picam-1.4.4-binary/picam ~/picam/
+$ wget https://github.com/iizukanao/picam/releases/download/v1.4.5/picam-1.4.5-binary.tar.xz
+$ tar xvf picam-1.4.5-binary.tar.xz
+$ cp picam-1.4.5-binary/picam ~/picam/
 
 (Run picam)
 $ cd ~/picam
@@ -182,8 +182,7 @@ To unmute microphone, create a file named `hooks/unmute`.
 #### Command options
 
 ```
-$ ./picam --help
-picam version 1.4.4
+picam version 1.4.5
 Usage: picam [options]
 
 Options:
@@ -276,7 +275,7 @@ Options:
                         spot: Spot (partial) metering
                         matrix: Matrix or evaluative metering
                         backlit: Assume a backlit image
-  --evcomp <num>      Set Exposure Value compensation (-10..10) (default: 0)
+  --evcomp <num>      Set Exposure Value compensation (-24..24) (default: 0)
   --shutter <num>     Set shutter speed in microseconds (default: auto).
                       Implies --vfr.
   --iso <num>         Set ISO sensitivity (100..800) (default: auto)
