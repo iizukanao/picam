@@ -3133,7 +3133,7 @@ static int camera_set_exposure_value() {
 
   if (manual_exposure_compensation) {
     // OMX_S32 Q16; default: 0
-    exposure_value.xEVCompensation = round(exposure_compensation * 65536);
+    exposure_value.xEVCompensation = round(exposure_compensation * 65536 / 6.0f);
   }
 
   if (manual_exposure_aperture) {
@@ -4645,7 +4645,7 @@ static void print_usage() {
   log_info("                        spot: Spot (partial) metering\n");
   log_info("                        matrix: Matrix or evaluative metering\n");
   log_info("                        backlit: Assume a backlit image\n");
-  log_info("  --evcomp <num>      Set Exposure Value compensation (-10..10) (default: 0)\n");
+  log_info("  --evcomp <num>      Set Exposure Value compensation (-24..24) (default: 0)\n");
 //  log_info("  --aperture <num>    Set aperture f-stop. Use 2 for f/2. (default: not set)\n");
 //  log_info("                      * Not sure if this has practical effect.\n");
   log_info("  --shutter <num>     Set shutter speed in microseconds (default: auto).\n");
