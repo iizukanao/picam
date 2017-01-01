@@ -1,6 +1,11 @@
 Change Log
 ==========
 
+Version 1.4.5 *(2017-01-01)*
+-----------------------------
+
+- Fixed bug where `--evcomp` does not work properly.
+
 Version 1.4.4 *(2016-10-13)*
 -----------------------------
 
