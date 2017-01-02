@@ -487,13 +487,25 @@ The file state/*recorded_filename* has some info about the recording.
 You can remove state/*.ts files if you do not need them.
 
 
-### HTTP Live Streaming
+### HTTP Live Streaming (HLS)
 
 HTTP Live Streaming is disabled by default. To enable HTTP Live Streaming and generate files in /run/shm/hls, run:
 
     $ ./picam -o /run/shm/hls
 
-#### Encryption
+#### Serving HLS
+
+[Set up nginx](https://www.raspberrypi.org/documentation/remote-access/web-server/nginx.md) (ignore "Additional - Install PHP" step), then open */etc/nginx/sites-available/default* with a text editor and add the following code inside `server { ... }` block.
+
+```
+	location /hls/ {
+		root /run/shm;
+	}
+```
+
+Restart the nginx server with `sudo service nginx restart` then run picam with `-o /run/shm/hls` option. The HLS will be available at http://YOUR-PI-IP/hls/index.m3u8
+
+#### Enabling encryption
 
 Optionally you can enable encryption for HTTP Live Streaming. We will use the following settings as an example.
 
