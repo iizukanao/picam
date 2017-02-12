@@ -5192,10 +5192,6 @@ int main(int argc, char **argv) {
               log_fatal("error: invalid --roi: %f (must be in the range of 0.0-1.0)\n", values[i]);
               return EXIT_FAILURE;
             }
-            if (values[i] == 0.0f) {
-              log_fatal("error: invalid --roi: %f (must be > 0.0)\n", values[i]);
-              return EXIT_FAILURE;
-            }
             str_ptr = end + 1;
           }
           if (*end != '\0') {
