@@ -238,6 +238,15 @@ static const int is_vfr_enabled_default = 0;
 static float auto_exposure_threshold;
 static const float auto_exposure_threshold_default = 5.0f;
 
+static float roi_left;
+static const float roi_left_default = 0.0f;
+static float roi_top;
+static const float roi_top_default = 0.0f;
+static float roi_width;
+static const float roi_width_default = 1.0f;
+static float roi_height;
+static const float roi_height_default = 1.0f;
+
 static char white_balance[13];
 static const char *white_balance_default = "auto";
 typedef struct white_balance_option {
@@ -3253,6 +3262,31 @@ static int camera_set_exposure_control(char *ex) {
   return 0;
 }
 
+/* Set region of interest */
+static int camera_set_input_crop(float left, float top, float width, float height) {
+  OMX_CONFIG_INPUTCROPTYPE input_crop_type;
+  OMX_ERRORTYPE error;
+
+  memset(&input_crop_type, 0, sizeof(OMX_CONFIG_INPUTCROPTYPE));
+  input_crop_type.nSize = sizeof(OMX_CONFIG_INPUTCROPTYPE);
+  input_crop_type.nVersion.nVersion = OMX_VERSION;
+  input_crop_type.nPortIndex = OMX_ALL;
+  input_crop_type.xLeft = round(left * 0x10000);
+  input_crop_type.xTop = round(top * 0x10000);
+  input_crop_type.xWidth = round(width * 0x10000);
+  input_crop_type.xHeight = round(height * 0x10000);
+
+  error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
+      OMX_IndexConfigInputCropPercentages, &input_crop_type);
+  if (error != OMX_ErrorNone) {
+    log_fatal("error: failed to set camera input crop type: 0x%x\n", error);
+    log_fatal("hint: maybe --roi value is not acceptable to camera\n");
+    return -1;
+  }
+
+  return 0;
+}
+
 static int openmax_cam_open() {
   OMX_PARAM_PORTDEFINITIONTYPE cam_def;
   OMX_ERRORTYPE error;
@@ -3375,6 +3409,11 @@ static int openmax_cam_open() {
   }
 
   if (camera_set_exposure_value() != 0) {
+    exit(EXIT_FAILURE);
+  }
+
+  // Set region of interest (--roi)
+  if (camera_set_input_crop(roi_left, roi_top, roi_width, roi_height) != 0) {
     exit(EXIT_FAILURE);
   }
 
@@ -4651,6 +4690,9 @@ static void print_usage() {
   log_info("  --shutter <num>     Set shutter speed in microseconds (default: auto).\n");
   log_info("                      Implies --vfr.\n");
   log_info("  --iso <num>         Set ISO sensitivity (100..800) (default: auto)\n");
+  log_info("  --roi <x,y,w,h>     Set region of interest (crop rect) in ratio (0.0-1.0)\n");
+  log_info("                      (default: %.0f,%.0f,%.0f,%.0f)\n",
+      roi_left_default, roi_top_default, roi_width_default, roi_height_default);
   log_info("  -p, --preview       Display fullscreen preview\n");
   log_info("  --previewrect <x,y,width,height>\n");
   log_info("                      Display preview window at specified position\n");
@@ -4740,6 +4782,7 @@ int main(int argc, char **argv) {
     { "aperture", required_argument, NULL, 0 },
     { "shutter", required_argument, NULL, 0 },
     { "iso", required_argument, NULL, 0 },
+    { "roi", required_argument, NULL, 0 },
     { "query", no_argument, NULL, 0 },
     { "time", no_argument, NULL, 0 },
     { "timeformat", required_argument, NULL, 0 },
@@ -4830,6 +4873,10 @@ int main(int argc, char **argv) {
   is_auto_exposure_enabled = is_auto_exposure_enabled_default;
   is_vfr_enabled = is_vfr_enabled_default;
   auto_exposure_threshold = auto_exposure_threshold_default;
+  roi_left = roi_left_default;
+  roi_top = roi_top_default;
+  roi_width = roi_width_default;
+  roi_height = roi_height_default;
 
   strncpy(white_balance, white_balance_default, sizeof(white_balance) - 1);
   white_balance[sizeof(white_balance) - 1] = '\0';
@@ -5130,6 +5177,35 @@ int main(int argc, char **argv) {
           }
           manual_exposure_sensitivity = 1;
           exposure_sensitivity = value;
+        } else if (strcmp(long_options[option_index].name, "roi") == 0) {
+          char *end;
+          int i;
+          float values[4];
+          char *str_ptr = optarg;
+          for (i = 0; i < 4; i++) {
+            values[i] = strtof(str_ptr, &end);
+            if (end == str_ptr || errno == ERANGE) { // parse error
+              log_fatal("error: invalid --roi: value must be in x,y,width,height format\n");
+              return EXIT_FAILURE;
+            }
+            if (values[i] < 0.0f || values[i] > 1.0f) {
+              log_fatal("error: invalid --roi: %f (must be in the range of 0.0-1.0)\n", values[i]);
+              return EXIT_FAILURE;
+            }
+            if (values[i] == 0.0f) {
+              log_fatal("error: invalid --roi: %f (must be > 0.0)\n", values[i]);
+              return EXIT_FAILURE;
+            }
+            str_ptr = end + 1;
+          }
+          if (*end != '\0') {
+            log_fatal("error: invalid --roi: value must be in x,y,width,height format\n");
+            return EXIT_FAILURE;
+          }
+          roi_left = values[0];
+          roi_top = values[1];
+          roi_width = values[2];
+          roi_height = values[3];
         } else if (strcmp(long_options[option_index].name, "minfps") == 0) {
           char *end;
           double value = strtod(optarg, &end);
@@ -5727,6 +5803,10 @@ int main(int argc, char **argv) {
   log_debug("exposure_shutter_speed=%u\n", exposure_shutter_speed);
   log_debug("manual_exposure_sensitivity=%d\n", manual_exposure_sensitivity);
   log_debug("exposure_sensitivity=%u\n", exposure_sensitivity);
+  log_debug("roi_left=%f\n", roi_left);
+  log_debug("roi_top=%f\n", roi_top);
+  log_debug("roi_width=%f\n", roi_width);
+  log_debug("roi_height=%f\n", roi_height);
   log_debug("min_fps=%f\n", min_fps);
   log_debug("max_fps=%f\n", max_fps);
   log_debug("is_timestamp_enabled=%d\n", is_timestamp_enabled);
