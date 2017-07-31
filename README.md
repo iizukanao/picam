@@ -56,15 +56,15 @@ If you want to build picam yourself, see [INSTALL.md](INSTALL.md).
 The fastest way to use picam is to use a binary release. To set up and use it, run the following commands on your Raspberry Pi (Raspbian). It will set up picam in ~/picam/.
 
 ```
-(If you have not enabled camera, enable it with raspi-config then reboot)
-$ sudo raspi-config
+# If you have not enabled camera, enable it with raspi-config then reboot
+sudo raspi-config
 
-(Install dependencies)
-$ sudo apt-get update
-$ sudo apt-get install libharfbuzz0b libfontconfig1
+# Install dependencies
+sudo apt-get update
+sudo apt-get install libharfbuzz0b libfontconfig1
 
-(Create directories and symbolic links)
-$ cat > make_dirs.sh <<'EOF'
+# Create directories and symbolic links
+cat > make_dirs.sh <<'EOF'
 DEST_DIR=~/picam
 SHM_DIR=/run/shm
 mkdir -p $SHM_DIR/rec
@@ -76,20 +76,21 @@ ln -sfn $SHM_DIR/rec $DEST_DIR/rec
 ln -sfn $SHM_DIR/hooks $DEST_DIR/hooks
 ln -sfn $SHM_DIR/state $DEST_DIR/state
 EOF
-$ chmod +x make_dirs.sh
-$ ./make_dirs.sh
 
-(Optionally, increase microphone volume with alsamixer)
-$ alsamixer
+chmod +x make_dirs.sh
+./make_dirs.sh
 
-(Install picam binary)
-$ wget https://github.com/iizukanao/picam/releases/download/v1.4.6/picam-1.4.6-binary.tar.xz
-$ tar xvf picam-1.4.6-binary.tar.xz
-$ cp picam-1.4.6-binary/picam ~/picam/
+# Optionally, increase microphone volume with alsamixer
+alsamixer
 
-(Run picam)
-$ cd ~/picam
-$ ./picam --alsadev hw:1,0
+# Install picam binary
+wget https://github.com/iizukanao/picam/releases/download/v1.4.6/picam-1.4.6-binary.tar.xz
+tar xvf picam-1.4.6-binary.tar.xz
+cp picam-1.4.6-binary/picam ~/picam/
+
+# Run picam
+cd ~/picam
+./picam --alsadev hw:1,0
 ```
 
 
