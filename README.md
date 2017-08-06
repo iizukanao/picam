@@ -53,9 +53,9 @@ If you want to build picam yourself, see [INSTALL.md](INSTALL.md).
 
 ### Using a binary release
 
-The fastest way to use picam is to use a binary release. To set up and use it, run the following commands on your Raspberry Pi (Raspbian). It will set up picam in ~/picam/.
+The fastest way to use picam is to use a binary release. To set up and use it, run the following commands on your Raspberry Pi (Raspbian). It will set up picam in `~/picam/`.
 
-```
+```bash
 # If you have not enabled camera, enable it with raspi-config then reboot
 sudo raspi-config
 
@@ -65,12 +65,15 @@ sudo apt-get install libharfbuzz0b libfontconfig1
 
 # Create directories and symbolic links
 cat > make_dirs.sh <<'EOF'
+#!/bin/bash
 DEST_DIR=~/picam
 SHM_DIR=/run/shm
+
 mkdir -p $SHM_DIR/rec
 mkdir -p $SHM_DIR/hooks
 mkdir -p $SHM_DIR/state
 mkdir -p $DEST_DIR/archive
+
 ln -sfn $DEST_DIR/archive $SHM_DIR/rec/archive
 ln -sfn $SHM_DIR/rec $DEST_DIR/rec
 ln -sfn $SHM_DIR/hooks $DEST_DIR/hooks
@@ -98,9 +101,9 @@ cd ~/picam
 
 #### Create symbolic links (optional, but strongly recommended)
 
-You can take advantage of RAM drive (/run/shm/) and reduce access to SD card. It also provides better quality of recording.
+You can take advantage of RAM drive (`/run/shm/`) and reduce access to SD card. It also provides better quality of recording.
 
-First, stop picam if it is running. Create **rec**, **hooks**, and **state** directories in /run/shm/, then change directories with the same name in picam to symbolic links. Create another symbolic link from /run/shm/rec/archive to somewhere on SD card.
+First, stop picam if it is running. Create **rec**, **hooks**, and **state** directories in `/run/shm/`, then change directories with the same name in picam to symbolic links. Create another symbolic link from `/run/shm/rec/archive` to somewhere on SD card.
 
 Result:
 
@@ -136,7 +139,7 @@ If you got `no soundcards found` error, try `sudo arecord -l`. If that output lo
     $ sudo usermod -a -G audio $USER
     (once logout, then login)
     $ groups
-    wheel audio pi  <-- (make sure that audio is in the list)
+    wheel audio pi  <-- (make sure that 'audio' is in the list)
     $ arecord -l
     **** List of CAPTURE Hardware Devices ****
     card 1: Device [USB PnP Sound Device], device 0: USB Audio [USB Audio]
@@ -158,17 +161,23 @@ To start recording, create a file named `hooks/start_record` while picam command
 
     $ touch hooks/start_record
 
-You will see `start rec` in the picam command output.
+You will see smth like `disk_usage=23% start rec to rec/archive/2017-08-05_16-41-52.ts` in the picam command output.
 
 To stop recording, create a file named `hooks/stop_record`.
 
     $ touch hooks/stop_record
 
-The recorded MPEG-TS file is in rec/archive/ directory.
+You will see `stop rec` in the picam command output.
+
+The recorded MPEG-TS file is in `rec/archive/` directory.
 
 To convert MPEG-TS to MP4, run:
 
-    $ ffmpeg -i test.ts -c:v copy -c:a copy -bsf:a aac_adtstoasc test.mp4
+```bash
+ffmpeg -i test.ts -c:v copy -c:a copy -bsf:a aac_adtstoasc test.mp4
+# or
+avconv -i test.ts -c:v copy -c:a copy -bsf:a aac_adtstoasc test.mp4
+```
 
 #### Mute/Unmute
 
@@ -368,7 +377,7 @@ For the list of available exposure control values, see `picam --help`.
 
 #### Recordbuf
 
-Recordbuf is a parameter which controls how many past keyframes should be included at the start of a recording. For example, recordbuf=1 means that a recording will start from the last keyframe, and recordbuf=2 means that a recording will start from the second last keyframe relative to when hooks/start_record is created. The minimum value of recordbuf is 1.
+`recordbuf` is a parameter which controls how many past keyframes should be included at the start of a recording. For example, `recordbuf=1` means that a recording will start from the last keyframe, and `recordbuf=2` means that a recording will start from the second last keyframe relative to when `hooks/start_record` is created. The minimum value of `recordbuf` is 1.
 
 ##### Global and per-recording recordbuf
 
@@ -380,12 +389,14 @@ There are two types of recordbuf; global and per-recording. Global recordbuf is 
 
 Global recordbuf can be specified by either `--recordbuf` option or hooks/set_recordbuf.
 
-    # Set global recordbuf to 30
-    $ echo 30 > hooks/set_recordbuf
+```bash
+# Set global recordbuf to 30
+echo 30 > hooks/set_recordbuf
+```
 
 ##### Setting per-recording recordbuf
 
-Per-recording recordbuf has a default value which is the same value as global recordbuf. Per-recording recordbuf can be specified via hooks/start_record.
+Per-recording recordbuf has a default value which is the same value as global recordbuf. Per-recording recordbuf can be specified via `hooks/start_record`.
 
     # Start recording with per-recording recordbuf set to 2
     $ echo recordbuf=2 > hooks/start_record
@@ -473,7 +484,7 @@ NOTE: On the first generation models of Raspberry Pi (before Pi 2), subtitles ca
 
 *Added in version 1.4.0*
 
-To change the directory and/or filename for the recorded file, specify `dir` and/or `filename` parameters in hooks/start_record.
+To change the directory and/or filename for the recorded file, specify `dir` and/or `filename` parameters in `hooks/start_record`.
 
     # Start recording to /tmp/myout.ts
     $ echo -e "dir=/tmp\nfilename=myout.ts" > hooks/start_record
@@ -488,7 +499,7 @@ The file state/*recorded_filename* has some info about the recording.
     duration_pts=2083530
     duration_sec=23.150333
 
-You can remove state/*.ts files if you do not need them.
+You can remove `state/*.ts` files if you do not need them.
 
 
 ### HTTP Live Streaming (HLS)
@@ -513,27 +524,27 @@ Restart the nginx server with `sudo service nginx restart` then run picam with `
 
 Optionally you can enable encryption for HTTP Live Streaming. We will use the following settings as an example.
 
-- **HTTP Live Streaming output directory**: /run/shm/hls/
-- **Encryption key**: 0xf0f1f2f3f4f5f6f7f8f9fafbfcfdfeff
-- **Encryption IV**:  0x000102030405060708090a0b0c0d0e0f
-- **Encryption key file**: enc.key
+- **HTTP Live Streaming output directory**: `/run/shm/hls/`
+- **Encryption key**: `0xf0f1f2f3f4f5f6f7f8f9fafbfcfdfeff`
+- **Encryption IV**:  `0x000102030405060708090a0b0c0d0e0f`
+- **Encryption key file**: `enc.key`
 
-First you have to create a file named "enc.key" which contains 16-byte encryption key. To create such file, run:
+First you have to create a file named `enc.key` which contains 16-byte encryption key. To create such file, run:
 
     $ echo -n $'\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff' > enc.key
 
-Put enc.key in /run/shm/hls/ directory. Then, run picam with the following options:
+Put `enc.key` in `/run/shm/hls/` directory. Then, run picam with the following options:
 
     $ ./picam -o /run/shm/hls --hlsenc --hlsenckeyuri enc.key \
       --hlsenckey f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff \
       --hlsenciv 000102030405060708090a0b0c0d0e0f
 
-You can watch the HTTP Live Streaming by accessing /run/shm/hls/index.m3u8 via HTTP or HTTPS with QuickTime Player.
+You can watch the HTTP Live Streaming by accessing `/run/shm/hls/index.m3u8` via HTTP or HTTPS with QuickTime Player.
 
 
 ### Using picam in combination with nginx-rtmp-module
 
-To use picam with [nginx-rtmp-module](https://github.com/arut/nginx-rtmp-module), add the following lines to nginx.conf:
+To use picam with [nginx-rtmp-module](https://github.com/arut/nginx-rtmp-module), add the following lines to `nginx.conf`:
 
     rtmp {
         server {
