@@ -99,17 +99,22 @@ void encrypt_most_recent_file(HTTPLiveStreaming *hls) {
   uint8_t *input_data;
   uint8_t *encrypted_data;
   int input_size;
-  EVP_CIPHER_CTX enc_ctx;
+  EVP_CIPHER_CTX *enc_ctx;
 
   // init cipher context
-  EVP_CIPHER_CTX_init(&enc_ctx);
+  enc_ctx = EVP_CIPHER_CTX_new();
+  if (enc_ctx == NULL) {
+    fprintf(stderr, "Error: encrypt_most_recent_file: EVP_CIPHER_CTX_new failed\n");
+    return;
+  }
+
   if (hls->encryption_key == NULL) {
     fprintf(stderr, "Warning: encryption_key is not set\n");
   }
   if (hls->encryption_iv == NULL) {
     fprintf(stderr, "Warning: encryption_iv is not set\n");
   }
-  EVP_EncryptInit_ex(&enc_ctx, EVP_aes_128_cbc(), NULL, hls->encryption_key, hls->encryption_iv);
+  EVP_EncryptInit_ex(enc_ctx, EVP_aes_128_cbc(), NULL, hls->encryption_key, hls->encryption_iv);
 
   // read original data
   snprintf(filepath, 1024, "%s/%d.ts", hls->dir, hls->most_recent_number);
@@ -137,8 +142,8 @@ void encrypt_most_recent_file(HTTPLiveStreaming *hls) {
     perror("Can't malloc for encrypted_data");
     return;
   }
-  EVP_EncryptUpdate(&enc_ctx, encrypted_data, &c_len, input_data, input_size);
-  EVP_EncryptFinal_ex(&enc_ctx, encrypted_data+c_len, &f_len);
+  EVP_EncryptUpdate(enc_ctx, encrypted_data, &c_len, input_data, input_size);
+  EVP_EncryptFinal_ex(enc_ctx, encrypted_data+c_len, &f_len);
   encrypted_size = c_len + f_len;
 
   // write data to the same file
@@ -150,7 +155,7 @@ void encrypt_most_recent_file(HTTPLiveStreaming *hls) {
   // free up variables
   free(encrypted_data);
   free(input_data);
-  EVP_CIPHER_CTX_cleanup(&enc_ctx);
+  EVP_CIPHER_CTX_free(enc_ctx);
 }
 
 // Write m3u8 file
