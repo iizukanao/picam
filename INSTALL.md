@@ -121,10 +121,10 @@ We will use $HOME/pi/ as a working directory and put compiled binaries and heade
     $ mkdir $PIBUILD
     $ cd ~/pi
 
-Download fdk-aac-0.1.4.tar.gz (or the latest version) from http://sourceforge.net/projects/opencore-amr/.
+Download fdk-aac-0.1.5.tar.gz (or the latest version) from https://sourceforge.net/projects/opencore-amr/files/fdk-aac/ and run the following commands.
 
-    $ tar zxvf fdk-aac-0.1.4.tar.gz
-    $ cd fdk-aac-0.1.4
+    $ tar zxvf fdk-aac-0.1.5.tar.gz
+    $ cd fdk-aac-0.1.5
     $ CC=${CCPREFIX}gcc CXX=${CCPREFIX}g++ ./configure --host=arm-rpi-linux-gnueabi --prefix=$PIBUILD
     $ make
     $ make install
