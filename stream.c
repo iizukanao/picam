@@ -135,6 +135,8 @@ typedef struct EncodedPacket {
 } EncodedPacket;
 
 static const int log_level_default = LOG_LEVEL_INFO;
+static int sensor_mode;
+static const int sensor_mode_default = -1;
 static int video_width;
 static const int video_width_default = 1280;
 static int video_width_32;
@@ -3316,6 +3318,7 @@ static int openmax_cam_open() {
   }
   component_list[n_component_list++] = camera_component;
 
+
   memset(&cam_def, 0, sizeof(OMX_PARAM_PORTDEFINITIONTYPE));
   cam_def.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
   cam_def.nVersion.nVersion = OMX_VERSION;
@@ -3326,6 +3329,22 @@ static int openmax_cam_open() {
   if (error != OMX_ErrorNone) {
     log_fatal("error: failed to get camera %d port definition: 0x%x\n", CAMERA_CAPTURE_PORT, error);
     exit(EXIT_FAILURE);
+  }
+  
+  if(sensor_mode != sensor_mode_default) {
+    OMX_PARAM_U32TYPE sensorMode;
+    memset(&sensorMode, 0, sizeof(OMX_PARAM_U32TYPE));
+    sensorMode.nSize = sizeof(OMX_PARAM_U32TYPE);
+    sensorMode.nVersion.nVersion = OMX_VERSION;
+    sensorMode.nPortIndex = OMX_ALL;
+    sensorMode.nU32 = sensor_mode;
+    error = OMX_SetParameter( ILC_GET_HANDLE(camera_component), 
+      OMX_IndexParamCameraCustomSensorConfig, &sensorMode);
+    
+    if (error != OMX_ErrorNone) {
+      log_fatal("error: failed to set camera sensor mode: 0x%x\n", error);
+      exit(EXIT_FAILURE);
+    }
   }
 
   // Configure port 71 (camera capture output)
@@ -4700,6 +4719,7 @@ static void print_usage() {
   log_info("                      (0=transparent..255=opaque; default=%d)\n", preview_opacity_default);
   log_info("  --blank[=0xAARRGGBB]  Set the video background color to black (or optional ARGB value)\n");
   log_info("  --query             Query camera capabilities then exit\n");
+  log_info("  --mode             Specify the camera sensor mode (values depend on the camera hardware)\n");
   log_info(" [timestamp] (may be a bit heavy on Raspberry Pi 1)\n");
   log_info("  --time              Enable timestamp\n");
   log_info("  --timeformat <spec>  Timestamp format (see \"man strftime\" for spec)\n");
@@ -4742,6 +4762,7 @@ int main(int argc, char **argv) {
   int ret;
 
   static struct option long_options[] = {
+    { "mode", required_argument, NULL, 0},
     { "width", required_argument, NULL, 'w' },
     { "height", required_argument, NULL, 'h' },
     { "fps", required_argument, NULL, 'f' },
@@ -4831,6 +4852,7 @@ int main(int argc, char **argv) {
   log_set_stream(stdout);
 
   // Set default values of options
+  sensor_mode = sensor_mode_default;
   video_width = video_width_default;
   video_height = video_height_default;
   video_fps = video_fps_default;
@@ -4923,7 +4945,15 @@ int main(int argc, char **argv) {
         if (long_options[option_index].flag != 0) {
           break;
         }
-        if (strcmp(long_options[option_index].name, "ptsstep") == 0) {
+        if (strcmp(long_options[option_index].name, "mode") == 0) {
+          char* end;
+          int value = strtol(optarg, &end, 10);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid sensor mode: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          sensor_mode = value;
+        } else if (strcmp(long_options[option_index].name, "ptsstep") == 0) {
           char *end;
           int value = strtol(optarg, &end, 10);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
