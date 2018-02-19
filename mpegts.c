@@ -43,7 +43,7 @@ void setup_video_stream(AVFormatContext *format_ctx) {
   video_codec_ctx->width         = video_width;
   video_codec_ctx->height        = video_height;
   video_codec_ctx->has_b_frames  = 0;
-  video_codec_ctx->flags         |= CODEC_FLAG_GLOBAL_HEADER;
+  video_codec_ctx->flags         |= AV_CODEC_FLAG_GLOBAL_HEADER;
 }
 
 static int is_sample_fmt_supported(AVCodec *codec, enum AVSampleFormat sample_fmt) {
