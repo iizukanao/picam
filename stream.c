@@ -4867,7 +4867,7 @@ int main(int argc, char **argv) {
   // Turn off buffering for stdout
   setvbuf(stdout, NULL, _IONBF, 0);
 
-  log_set_level(LOG_LEVEL_INFO);
+  log_set_level(log_level_default);
   log_set_stream(stdout);
 
   // Set default values of options
@@ -4877,6 +4877,9 @@ int main(int argc, char **argv) {
   video_fps = video_fps_default;
   video_pts_step = video_pts_step_default;
   video_gop_size = video_gop_size_default;
+  video_rotation = video_rotation_default;
+  video_hflip = video_hflip_default;
+  video_vflip = video_vflip_default;
   video_bitrate = video_bitrate_default;
   strncpy(video_avc_profile, video_avc_profile_default, sizeof(video_avc_profile) - 1);
   video_avc_profile[sizeof(video_avc_profile) - 1] = '\0';
