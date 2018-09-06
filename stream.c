@@ -4079,31 +4079,43 @@ static void encode_and_send_image() {
 #endif
   buf->nFilledLen = last_video_buffer_size;
 
+  // Feed the raw image buffer to encoder
   // OMX_EmptyThisBuffer takes 22000-27000 usec at 1920x1080
   error = OMX_EmptyThisBuffer(ILC_GET_HANDLE(video_encode), buf);
   if (error != OMX_ErrorNone) {
     log_error("error emptying buffer: 0x%x\n", error);
   }
 
-  out = ilclient_get_output_buffer(video_encode, VIDEO_ENCODE_OUTPUT_PORT, 1);
-
+  // Provide me a buffer for encode result
   while (1) {
+    out = ilclient_get_output_buffer(video_encode, VIDEO_ENCODE_OUTPUT_PORT, 1);
+    int do_break = 0;
+    if (out != NULL) {
+      if (out->nFilledLen > 0) {
+        video_encode_fill_buffer_done(out);
+        out->nFilledLen = 0;
+      } else {
+        log_debug("E(0x%x)", out->nFlags);
+        do_break = 1;
+      }
+
+      // If out->nFlags doesn't have ENDOFFRAME,
+      // there is remaining buffer for this frame.
+      if (out->nFlags & OMX_BUFFERFLAG_ENDOFFRAME) {
+        do_break = 1;
+      }
+    } else {
+      do_break = 1;
+    }
+
+    // Return the buffer
     error = OMX_FillThisBuffer(ILC_GET_HANDLE(video_encode), out);
     if (error != OMX_ErrorNone) {
       log_error("error filling video_encode buffer: 0x%x\n", error);
     }
 
-    if (out->nFilledLen > 0) {
-      video_encode_fill_buffer_done(out);
-    } else {
-      log_debug("E(0x%x)", out->nFlags);
+    if (do_break) {
       break;
-    }
-
-    if (out->nFlags & OMX_BUFFERFLAG_ENDOFFRAME) {
-      break;
-      // If out->nFlags doesn't have ENDOFFRAME,
-      // there is remaining buffer for this frame.
     }
   }
 }
