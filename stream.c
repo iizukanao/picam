@@ -73,6 +73,12 @@ extern "C" {
 // If this value is increased, audio gets faster than video
 #define N_BUFFER_COUNT_ACTUAL 1
 
+// The number of buffers that are required on video_encode input port
+#define VIDEO_ENCODE_INPUT_BUFFER_COUNT 2
+
+// The number of buffers that are required on video_encode output port
+#define VIDEO_ENCODE_OUTPUT_BUFFER_COUNT 2
+
 // If this value is increased, video gets faster than audio
 #define AUDIO_BUFFER_CHUNKS 0
 
@@ -93,7 +99,7 @@ extern "C" {
 #define FILL_COLOR_V 128
 
 // Whether or not to pass pBuffer from camera to video_encode directly
-#define ENABLE_PBUFFER_OPTIMIZATION_HACK 1
+#define ENABLE_PBUFFER_OPTIMIZATION_HACK 0
 
 #if ENABLE_PBUFFER_OPTIMIZATION_HACK
 static OMX_BUFFERHEADERTYPE *video_encode_input_buf = NULL;
@@ -3816,7 +3822,7 @@ static int video_encode_startup() {
   portdef.format.video.nBitrate = 0x0;
   portdef.format.video.nSliceHeight = (video_height+15)&~15;
   portdef.format.video.nStride = (video_width+31)&~31;
-  portdef.nBufferCountActual = N_BUFFER_COUNT_ACTUAL;
+  portdef.nBufferCountActual = VIDEO_ENCODE_INPUT_BUFFER_COUNT;
 
   // This specifies the input pixel format.
   // See http://www.khronos.org/files/openmax_il_spec_1_0.pdf for details.
@@ -3844,7 +3850,7 @@ static int video_encode_startup() {
   }
 
   // Configure port 201 (video_encode output)
-  portdef_encode_output.nBufferCountActual = N_BUFFER_COUNT_ACTUAL;
+  portdef_encode_output.nBufferCountActual = VIDEO_ENCODE_OUTPUT_BUFFER_COUNT;
 
   error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
       OMX_IndexParamPortDefinition, &portdef_encode_output);
@@ -4058,6 +4064,7 @@ static void encode_and_send_image() {
   OMX_BUFFERHEADERTYPE *out;
   OMX_ERRORTYPE error;
 
+  // Get a buffer that we feed raw camera image into
   buf = ilclient_get_input_buffer(video_encode, VIDEO_ENCODE_INPUT_PORT, 1);
   if (buf == NULL) {
     log_error("error: cannot get input buffer from video_encode\n");
@@ -4079,31 +4086,43 @@ static void encode_and_send_image() {
 #endif
   buf->nFilledLen = last_video_buffer_size;
 
+  // Feed the raw camera image into video_encode
   // OMX_EmptyThisBuffer takes 22000-27000 usec at 1920x1080
   error = OMX_EmptyThisBuffer(ILC_GET_HANDLE(video_encode), buf);
   if (error != OMX_ErrorNone) {
     log_error("error emptying buffer: 0x%x\n", error);
   }
 
-  out = ilclient_get_output_buffer(video_encode, VIDEO_ENCODE_OUTPUT_PORT, 1);
-
   while (1) {
+    // Get H.264 encoded frame from video_encode
+    out = ilclient_get_output_buffer(video_encode, VIDEO_ENCODE_OUTPUT_PORT, 1);
+    int do_break = 0;
+    if (out != NULL) {
+      if (out->nFilledLen > 0) {
+        video_encode_fill_buffer_done(out);
+        out->nFilledLen = 0;
+      } else {
+        log_debug("E(0x%x)", out->nFlags);
+        do_break = 1;
+      }
+
+      // If out->nFlags doesn't have ENDOFFRAME,
+      // there is remaining buffer for this frame.
+      if (out->nFlags & OMX_BUFFERFLAG_ENDOFFRAME) {
+        do_break = 1;
+      }
+    } else {
+      do_break = 1;
+    }
+
+    // Return the buffer
     error = OMX_FillThisBuffer(ILC_GET_HANDLE(video_encode), out);
     if (error != OMX_ErrorNone) {
       log_error("error filling video_encode buffer: 0x%x\n", error);
     }
 
-    if (out->nFilledLen > 0) {
-      video_encode_fill_buffer_done(out);
-    } else {
-      log_debug("E(0x%x)", out->nFlags);
+    if (do_break) {
       break;
-    }
-
-    if (out->nFlags & OMX_BUFFERFLAG_ENDOFFRAME) {
-      break;
-      // If out->nFlags doesn't have ENDOFFRAME,
-      // there is remaining buffer for this frame.
     }
   }
 }
