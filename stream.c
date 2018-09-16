@@ -4102,7 +4102,7 @@ static void encode_and_send_image() {
         video_encode_fill_buffer_done(out);
         out->nFilledLen = 0;
       } else {
-        log_debug("E(0x%x)", out->nFlags);
+        log_debug("e(0x%x)", out->nFlags);
         do_break = 1;
       }
 
@@ -6105,6 +6105,7 @@ int main(int argc, char **argv) {
     // Wait for the camera to finish
     while (!is_camera_finished) {
       log_debug("waiting for the camera to finish\n");
+      log_debug("hit Ctrl-\\ to force stop\n");
       pthread_cond_wait(&camera_finish_cond, &camera_finish_mutex);
     }
     pthread_mutex_unlock(&camera_finish_mutex);
