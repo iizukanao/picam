@@ -3,7 +3,7 @@ CFLAGS=-DSTANDALONE -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DTARGET_POSI
 #LDFLAGS=-g -Wl,--whole-archive -lilclient -L/opt/vc/lib/ -L/usr/local/lib -lbrcmGLESv2 -lbrcmEGL -lopenmaxil -lbcm_host -lvcos -lvchiq_arm -lpthread -lrt -L/opt/vc/src/hello_pi/libs/ilclient -Wl,--no-whole-archive -rdynamic -lm -lcrypto -lasound `pkg-config --libs freetype2` `pkg-config --libs harfbuzz fontconfig libavformat libavcodec`
 
 # For distribution
-LDFLAGS=-g -Wl,--whole-archive -lilclient -L/opt/vc/lib/ -L/usr/local/lib -lbrcmGLESv2 -lbrcmEGL -lopenmaxil -lbcm_host -lvcos -lvchiq_arm -lpthread -lrt -L/opt/vc/src/hello_pi/libs/ilclient -Wl,--no-whole-archive -rdynamic -lavformat -lavcodec -ldl -lasound -lavutil -lm -lfdk-aac -lcrypto -lswresample -lz -llzma `pkg-config --libs freetype2` `pkg-config --libs harfbuzz fontconfig` -pipe
+LDFLAGS=-g -Wl,--whole-archive -lilclient -L/opt/vc/lib/ -L/usr/local/lib -lbrcmGLESv2 -lbrcmEGL -lopenmaxil -lbcm_host -lvcos -lvchiq_arm -lpthread -lrt -L/opt/vc/src/hello_pi/libs/ilclient -Wl,--no-whole-archive -rdynamic -lm -lcrypto -lasound `pkg-config --libs freetype2` `pkg-config --libs harfbuzz fontconfig libavformat libavcodec | sed 's/-lfdk-aac//'` -l:libfdk-aac.a -pipe
 CFLAGS += -mfpu=vfp -mfloat-abi=hard -march=armv6zk -mtune=arm1176jzf-s
 
 DEP_LIBS=/opt/vc/src/hello_pi/libs/ilclient/libilclient.a
