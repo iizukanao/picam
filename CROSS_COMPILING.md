@@ -1,12 +1,10 @@
-# picam Compilation Guide
+# picam cross-compiling guide
 
-This document describes how to build picam. The whole process takes about 2-3 hours with a standard Linux box.
+This file explains how to build picam on low-performance models such as Raspberry Pi 1 or Zero. The whole process takes about 2-3 hours on a standard Linux box.
 
-## Binary releases are also available
+## For Raspberry Pi 2 or 3 users
 
-For those who don't want to build picam themselves, the standalone binary is available at https://github.com/iizukanao/picam/releases/latest
-
-To build picam yourself, continue reading.
+If you have Raspberry Pi 2 or 3, you can build picam without additional machine. Please refer to [BUILDING.md](BUILDING.md) which is much easier than cross compiling.
 
 ## Prerequisites
 
