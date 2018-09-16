@@ -87,9 +87,9 @@ chmod +x make_dirs.sh
 alsamixer
 
 # Install picam binary
-wget https://github.com/iizukanao/picam/releases/download/v1.4.6/picam-1.4.6-binary.tar.xz
-tar xvf picam-1.4.6-binary.tar.xz
-cp picam-1.4.6-binary/picam ~/picam/
+wget https://github.com/iizukanao/picam/releases/download/v1.4.7/picam-1.4.7-binary.tar.xz
+tar xvf picam-1.4.7-binary.tar.xz
+cp picam-1.4.7-binary/picam ~/picam/
 
 # Run picam
 cd ~/picam
@@ -192,8 +192,7 @@ To unmute microphone, create a file named `hooks/unmute`.
 #### Command options
 
 ```
-$ picam --help
-picam version 1.4.6
+picam version 1.4.7
 Usage: picam [options]
 
 Options:
@@ -299,6 +298,7 @@ Options:
                       (0=transparent..255=opaque; default=255)
   --blank[=0xAARRGGBB]  Set the video background color to black (or optional ARGB value)
   --query             Query camera capabilities then exit
+  --mode             Specify the camera sensor mode (values depend on the camera hardware)
  [timestamp] (may be a bit heavy on Raspberry Pi 1)
   --time              Enable timestamp
   --timeformat <spec>  Timestamp format (see "man strftime" for spec)
