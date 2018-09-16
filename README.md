@@ -48,7 +48,7 @@ Binary release is available at https://github.com/iizukanao/picam/releases/lates
 
 Also, out-of-the-box SD card image for live streaming (picam + Raspbian + live streaming server) is available at https://github.com/iizukanao/picam-streamer
 
-If you want to build picam yourself, see [INSTALL.md](INSTALL.md).
+If you want to build picam yourself, see [BUILDING.md](BUILDING.md).
 
 
 ### Using a binary release
