@@ -1,6 +1,12 @@
 Change Log
 ==========
 
+Version 1.4.7 *(2018-09-17)*
+-----------------------------
+
+- Fixed issue with the latest firmware.
+- Fixed compile error (#97).
+
 Version 1.4.6 *(2017-02-13)*
 -----------------------------
 
