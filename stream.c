@@ -2552,12 +2552,15 @@ static void preconfigure_microphone() {
         log_debug("cannot use mono audio; trying stereo\n");
       }
       audio_channels = 2;
-    } else {
+    } else if (audio_channels == 2) {
       if (is_audio_channels_specified) {
         log_info("cannot use stereo audio; trying mono\n");
       } else {
         log_debug("cannot use stereo audio; trying mono\n");
       }
+      audio_channels = 1;
+    } else { // user has specified audio channels
+      log_info("cannot use %d channels audio; trying mono\n", audio_channels);
       audio_channels = 1;
     }
     err = snd_pcm_hw_params_set_channels(capture_handle, alsa_hw_params, audio_channels);
@@ -5713,10 +5716,6 @@ int main(int argc, char **argv) {
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
             log_fatal("error: invalid channels: %s\n", optarg);
             print_usage();
-            return EXIT_FAILURE;
-          }
-          if (value != 1 && value != 2) {
-            log_fatal("error: invalid channels: %ld (must be 1 or 2)\n", value);
             return EXIT_FAILURE;
           }
           audio_channels = value;
