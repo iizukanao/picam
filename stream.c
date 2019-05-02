@@ -2208,17 +2208,18 @@ static int send_keyframe(uint8_t *data, size_t data_len, int consume_time) {
     pthread_mutex_lock(&mutex_writing);
     int split;
 
-    log_error("\n--------------\n");
-    log_error("Split: %d\n", split);
-    log_error("video_frame_count: %ll\n", video_frame_count);
-    log_error("video_keyframe_count: %ll\n", video_keyframe_count);
-    log_error("--------------\n");
-
     if (video_frame_count == 1) {
       split = 0;
     } else {
       split = 1;
     }
+
+    log_error("\n--------------\n");
+    log_error("Split: %d\n", split);
+    log_error("video_frame_count: %lld\n", video_frame_count);
+    log_error("video_keyframe_count: %llu\n", video_keyframe_count);
+    log_error("--------------\n");
+
     ret = hls_write_packet(hls, &pkt, split);
     pthread_mutex_unlock(&mutex_writing);
     if (ret < 0) {
