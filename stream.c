@@ -2208,11 +2208,13 @@ static int send_keyframe(uint8_t *data, size_t data_len, int consume_time) {
     pthread_mutex_lock(&mutex_writing);
     int split;
 
-    if (video_send_keyframe_count % hls_keyframes_per_segment == 0 && video_frame_count != 0) {
+    if (video_send_keyframe_count % hls_keyframes_per_segment == 0 && video_frame_count != 1) {
       split = 1;
     } else {
       split = 0;
     }
+
+    video_send_keyframe_count = video_send_keyframe_count % hls_keyframes_per_segment_default;    
 
     // Update counter 
     video_send_keyframe_count++;
