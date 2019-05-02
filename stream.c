@@ -4672,8 +4672,8 @@ static void print_usage() {
   log_info("  --audiopreviewdev <dev>  Audio preview output device (default: %s)\n", audio_preview_dev_default);
   log_info(" [HTTP Live Streaming (HLS)]\n");
   log_info("  -o, --hlsdir <dir>  Generate HTTP Live Streaming files in <dir>\n");
-  log_info("  --hlsnumberofsegments <num>  Set the number of segments in the m3u8 playlist (default: %s)\n", hls_number_of_segments);
-  log_info("  --hlskeyframespersegment <num>  Set the number of keyframes per video segment (default: %s)\n", hls_keyframes_per_segment_default);
+  log_info("  --hlsnumberofsegments <num>  Set the number of segments in the m3u8 playlist (default: %d)\n", hls_number_of_segments);
+  log_info("  --hlskeyframespersegment <num>  Set the number of keyframes per video segment (default: %d)\n", hls_keyframes_per_segment_default);
   log_info("  --hlsenc            Enable HLS encryption\n");
   log_info("  --hlsenckeyuri <uri>  Set HLS encryption key URI (default: %s)\n", hls_encryption_key_uri_default);
   log_info("  --hlsenckey <hex>   Set HLS encryption key in hex string\n");
