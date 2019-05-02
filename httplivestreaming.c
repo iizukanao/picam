@@ -161,6 +161,7 @@ void encrypt_most_recent_file(HTTPLiveStreaming *hls) {
 int calc_target_duration(HTTPLiveStreaming *hls) {
   float num = 0;
   float den = 0;
+  int i;
 
   // segments
   int from_seq = hls->most_recent_number - hls->num_recent_files + 1;
@@ -177,7 +178,7 @@ int calc_target_duration(HTTPLiveStreaming *hls) {
     den += 1.0f;
   }
 
-  if(den == 0f) {
+  if(den == 0.0f) {
     //No segments found. Return 0 as answer
     return 0;
   } else {

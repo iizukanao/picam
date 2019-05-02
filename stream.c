@@ -6038,7 +6038,6 @@ int main(int argc, char **argv) {
 
     if (is_hlsout_enabled) {
       hls->dir = hls_output_dir;
-      hls->target_duration = 1;
       hls->num_retained_old_files = 10;
       if (is_hls_encryption_enabled) {
         hls->use_encryption = 1;
