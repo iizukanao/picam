@@ -446,6 +446,7 @@ void stop_record();
 static void set_gop_size(int gop_size);
 #endif
 
+static unsigned long long video_keyframe_count = 0;
 static long long video_frame_count = 0;
 static long long audio_frame_count = 0;
 static int64_t video_start_time;
@@ -2206,6 +2207,13 @@ static int send_keyframe(uint8_t *data, size_t data_len, int consume_time) {
   if (is_hlsout_enabled) {
     pthread_mutex_lock(&mutex_writing);
     int split;
+
+    log_error("\n--------------\n");
+    log_error("Split: %d\n", split);
+    log_error("video_frame_count: %ll\n", video_frame_count);
+    log_error("video_keyframe_count: %ll\n", video_keyframe_count);
+    log_error("--------------\n");
+
     if (video_frame_count == 1) {
       split = 0;
     } else {
