@@ -2219,12 +2219,6 @@ static int send_keyframe(uint8_t *data, size_t data_len, int consume_time) {
     // Update counter 
     video_send_keyframe_count++;
 
-    log_error("\n--------------\n");
-    log_error("Split: %d\n", split);
-    log_error("video_frame_count: %lld\n", video_frame_count);
-    log_error("video_keyframe_count: %d\n", video_send_keyframe_count);
-    log_error("--------------\n");
-
     ret = hls_write_packet(hls, &pkt, split);
     pthread_mutex_unlock(&mutex_writing);
     if (ret < 0) {
