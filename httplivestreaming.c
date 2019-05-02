@@ -158,6 +158,35 @@ void encrypt_most_recent_file(HTTPLiveStreaming *hls) {
   EVP_CIPHER_CTX_free(enc_ctx);
 }
 
+int calc_target_duration(HTTPLiveStreaming *hls) {
+  float num = 0;
+  float den = 0;
+
+  // segments
+  int from_seq = hls->most_recent_number - hls->num_recent_files + 1;
+  if (from_seq < 1) {
+    from_seq = 1;
+  }
+  int num_segments = hls->most_recent_number - from_seq + 1;
+  int segment_durations_idx = hls->segment_durations_idx - num_segments + 1;
+  if (segment_durations_idx < 0) {
+    segment_durations_idx += hls->num_recent_files;
+  }
+  for (i = 0; i < num_segments; i++) {
+    num += hls->segment_durations[segment_durations_idx];
+    den += 1.0f;
+  }
+
+  if(den == 0f) {
+    //No segments found. Return 0 as answer
+    return 0;
+  } else {
+    // Round target duration to nearest integer
+    return (int) ((num / den) + 0.5f); 
+  }
+  
+}
+
 // Write m3u8 file
 int write_index(HTTPLiveStreaming *hls, int is_end) {
   FILE *file;
@@ -173,11 +202,12 @@ int write_index(HTTPLiveStreaming *hls, int is_end) {
     return -1;
   }
 
+  int target_duration = calc_target_duration(hls);
   // header
   // What features are available in each version can be found on:
   // https://developer.apple.com/library/ios/qa/qa1752/_index.html
   snprintf(buf, 128, "#EXTM3U\n#EXT-X-VERSION:3\n#EXT-X-TARGETDURATION:%d\n#EXT-X-MEDIA-SEQUENCE:%d\n#EXT-X-ALLOW-CACHE:NO\n",
-      hls->target_duration, hls->most_recent_number);
+      target_duration, hls->most_recent_number);
   fwrite(buf, 1, strlen(buf), file);
 
   // insert encryption header if needed
@@ -370,7 +400,6 @@ HTTPLiveStreaming *_hls_create(int num_recent_files, int is_audio_only, MpegTSCo
   hls->num_recent_files = num_recent_files;
   hls->num_retained_old_files = 10;
   hls->most_recent_number = 0;
-  hls->target_duration = 1;
   hls->dir = ".";
   hls->is_started = 0;
   hls->use_encryption = 0;
