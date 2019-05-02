@@ -2208,14 +2208,14 @@ static int send_keyframe(uint8_t *data, size_t data_len, int consume_time) {
     pthread_mutex_lock(&mutex_writing);
     int split;
 
-    // Update counter 
-    video_send_keyframe_count++;
-
-    if (video_send_keyframe_count % hls_keyframes_per_segment == 0) {
+    if (video_send_keyframe_count % hls_keyframes_per_segment == 0 && video_frame_count != 0) {
       split = 1;
     } else {
       split = 0;
     }
+
+    // Update counter 
+    video_send_keyframe_count++;
 
     log_error("\n--------------\n");
     log_error("Split: %d\n", split);
