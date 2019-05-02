@@ -19,7 +19,6 @@ extern "C" {
 #include <fcntl.h>
 #include <errno.h>
 #include <math.h>
-#include <limits.h>
 #include <pthread.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -5528,10 +5527,6 @@ int main(int argc, char **argv) {
             log_fatal("error: invalid hlskeyframespersegment: %ld (must be > 0)\n", value);
             return EXIT_FAILURE;
           }
-          if (value > INT_MAX) {
-            log_fatal("error: invalid hlskeyframespersegment: %ld (must be < %d)\n", value, INT_MAX);
-            return EXIT_FAILURE;
-          }
           hls_keyframes_per_segment = (int) value;
         } else if (strcmp(long_options[option_index].name, "hlsnumberofsegments") == 0) {
           char *end;
@@ -5543,10 +5538,6 @@ int main(int argc, char **argv) {
           }
           if (value <= 0) {
             log_fatal("error: invalid hlsnumberofsegments: %ld (must be > 0)\n", value);
-            return EXIT_FAILURE;
-          }
-          if (value > INT_MAX) {
-            log_fatal("error: invalid hlsnumberofsegments: %ld (must be < %d)\n", value, INT_MAX);
             return EXIT_FAILURE;
           }
           hls_number_of_segments = (int) value;
