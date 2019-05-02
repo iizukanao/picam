@@ -6031,9 +6031,9 @@ int main(int argc, char **argv) {
     //
     // So, num_recent_files should be 3 at the minimum.
 #if AUDIO_ONLY
-    hls = hls_create_audio_only(2, &codec_settings); // 2 == num_recent_files
+    hls = hls_create_audio_only(hls_number_of_segments-1, &codec_settings); // 2 == num_recent_files
 #else
-    hls = hls_create(2, &codec_settings); // 2 == num_recent_files
+    hls = hls_create(hls_number_of_segments-1, &codec_settings); // 2 == num_recent_files
 #endif
 
     if (is_hlsout_enabled) {
