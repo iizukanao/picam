@@ -2214,7 +2214,7 @@ static int send_keyframe(uint8_t *data, size_t data_len, int consume_time) {
       split = 0;
     }
 
-    video_send_keyframe_count = video_send_keyframe_count % hls_keyframes_per_segment_default;    
+    video_send_keyframe_count = video_send_keyframe_count % hls_keyframes_per_segment;    
 
     // Update counter 
     video_send_keyframe_count++;
