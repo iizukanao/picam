@@ -14,7 +14,6 @@ typedef struct HTTPLiveStreaming {
   int num_recent_files;
   int num_retained_old_files;
   int most_recent_number;
-  int target_duration;
   char *dir;
   int is_started;
   int use_encryption;

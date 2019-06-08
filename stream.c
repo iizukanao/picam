@@ -226,6 +226,10 @@ static int is_hlsout_enabled;
 static const int is_hlsout_enabled_default = 0;
 static char hls_output_dir[256];
 static const char *hls_output_dir_default = "/run/shm/video";
+static int hls_keyframes_per_segment;
+static const int hls_keyframes_per_segment_default = 1;
+static int hls_number_of_segments;
+static const int hls_number_of_segments_default = 3;
 static int is_rtspout_enabled;
 static const int is_rtspout_enabled_default = 0;
 static char rtsp_video_control_path[256];
@@ -442,6 +446,7 @@ void stop_record();
 static void set_gop_size(int gop_size);
 #endif
 
+static int video_send_keyframe_count = 0;
 static long long video_frame_count = 0;
 static long long audio_frame_count = 0;
 static int64_t video_start_time;
@@ -2202,11 +2207,18 @@ static int send_keyframe(uint8_t *data, size_t data_len, int consume_time) {
   if (is_hlsout_enabled) {
     pthread_mutex_lock(&mutex_writing);
     int split;
-    if (video_frame_count == 1) {
-      split = 0;
-    } else {
+
+    if (video_send_keyframe_count % hls_keyframes_per_segment == 0 && video_frame_count != 1) {
       split = 1;
+    } else {
+      split = 0;
     }
+
+    video_send_keyframe_count = video_send_keyframe_count % hls_keyframes_per_segment;    
+
+    // Update counter 
+    video_send_keyframe_count++;
+
     ret = hls_write_packet(hls, &pkt, split);
     pthread_mutex_unlock(&mutex_writing);
     if (ret < 0) {
@@ -4667,6 +4679,8 @@ static void print_usage() {
   log_info("  --audiopreviewdev <dev>  Audio preview output device (default: %s)\n", audio_preview_dev_default);
   log_info(" [HTTP Live Streaming (HLS)]\n");
   log_info("  -o, --hlsdir <dir>  Generate HTTP Live Streaming files in <dir>\n");
+  log_info("  --hlsnumberofsegments <num>  Set the number of segments in the m3u8 playlist (default: %d)\n", hls_number_of_segments);
+  log_info("  --hlskeyframespersegment <num>  Set the number of keyframes per video segment (default: %d)\n", hls_keyframes_per_segment_default);
   log_info("  --hlsenc            Enable HLS encryption\n");
   log_info("  --hlsenckeyuri <uri>  Set HLS encryption key URI (default: %s)\n", hls_encryption_key_uri_default);
   log_info("  --hlsenckey <hex>   Set HLS encryption key in hex string\n");
@@ -4802,6 +4816,8 @@ int main(int argc, char **argv) {
     { "channels", required_argument, NULL, 'c' },
     { "samplerate", required_argument, NULL, 'r' },
     { "hlsdir", required_argument, NULL, 'o' },
+    { "hlskeyframespersegment", required_argument, NULL, 0 },
+    { "hlsnumberofsegments", required_argument, NULL, 0 },
     { "rtspout", no_argument, NULL, 0 },
     { "rtspvideocontrol", required_argument, NULL, 0 },
     { "rtspvideodata", required_argument, NULL, 0 },
@@ -4938,6 +4954,8 @@ int main(int argc, char **argv) {
   hooks_dir[sizeof(hooks_dir) - 1] = '\0';
   audio_volume_multiply = audio_volume_multiply_default;
   is_hls_encryption_enabled = is_hls_encryption_enabled_default;
+  hls_keyframes_per_segment = hls_keyframes_per_segment_default;
+  hls_number_of_segments = hls_number_of_segments_default;
   strncpy(hls_encryption_key_uri, hls_encryption_key_uri_default,
       sizeof(hls_encryption_key_uri) - 1);
   hls_encryption_key_uri[sizeof(hls_encryption_key_uri) - 1] = '\0';
@@ -5505,6 +5523,32 @@ int main(int argc, char **argv) {
           strncpy(audio_preview_dev, optarg, sizeof(audio_preview_dev) - 1);
           audio_preview_dev[sizeof(audio_preview_dev) - 1] = '\0';
           break;
+        } else if (strcmp(long_options[option_index].name, "hlskeyframespersegment") == 0) { 
+          char *end;
+          long value = strtol(optarg, &end, 10);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid hlskeyframespersegment: %s\n", optarg);
+            print_usage();
+            return EXIT_FAILURE;
+          }
+          if (value <= 0) {
+            log_fatal("error: invalid hlskeyframespersegment: %ld (must be > 0)\n", value);
+            return EXIT_FAILURE;
+          }
+          hls_keyframes_per_segment = (int) value;
+        } else if (strcmp(long_options[option_index].name, "hlsnumberofsegments") == 0) {
+          char *end;
+          long value = strtol(optarg, &end, 10);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid hlsnumberofsegments: %s\n", optarg);
+            print_usage();
+            return EXIT_FAILURE;
+          }
+          if (value <= 0) {
+            log_fatal("error: invalid hlsnumberofsegments: %ld (must be > 0)\n", value);
+            return EXIT_FAILURE;
+          }
+          hls_number_of_segments = (int) value;
         } else if (strcmp(long_options[option_index].name, "hlsenc") == 0) {
           is_hls_encryption_enabled = 1;
         } else if (strcmp(long_options[option_index].name, "hlsenckeyuri") == 0) {
@@ -5820,6 +5864,8 @@ int main(int argc, char **argv) {
   log_debug("audio_volume_multiply=%f\n", audio_volume_multiply);
   log_debug("is_hlsout_enabled=%d\n", is_hlsout_enabled);
   log_debug("is_hls_encryption_enabled=%d\n", is_hls_encryption_enabled);
+  log_debug("hls_keyframes_per_segment=%d\n", hls_keyframes_per_segment);
+  log_debug("hls_number_of_segments=%d\n", hls_number_of_segments);
   log_debug("hls_encryption_key_uri=%s\n", hls_encryption_key_uri);
   log_debug("hls_encryption_key=0x");
   log_hex(LOG_LEVEL_DEBUG, hls_encryption_key, sizeof(hls_encryption_key));
@@ -5993,14 +6039,13 @@ int main(int argc, char **argv) {
     //
     // So, num_recent_files should be 3 at the minimum.
 #if AUDIO_ONLY
-    hls = hls_create_audio_only(2, &codec_settings); // 2 == num_recent_files
+    hls = hls_create_audio_only(hls_number_of_segments, &codec_settings); // 2 == num_recent_files
 #else
-    hls = hls_create(2, &codec_settings); // 2 == num_recent_files
+    hls = hls_create(hls_number_of_segments, &codec_settings); // 2 == num_recent_files
 #endif
 
     if (is_hlsout_enabled) {
       hls->dir = hls_output_dir;
-      hls->target_duration = 1;
       hls->num_retained_old_files = 10;
       if (is_hls_encryption_enabled) {
         hls->use_encryption = 1;

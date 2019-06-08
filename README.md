@@ -234,6 +234,8 @@ Options:
   --audiopreviewdev <dev>  Audio preview output device (default: plughw:0,0)
  [HTTP Live Streaming (HLS)]
   -o, --hlsdir <dir>  Generate HTTP Live Streaming files in <dir>
+  --hlsnumberofsegments <num>  Set the number of segments in the m3u8 playlist (default: 3)
+  --hlskeyframespersegment <num>  Set the number of keyframes per video segment (default: 1)
   --hlsenc            Enable HLS encryption
   --hlsenckeyuri <uri>  Set HLS encryption key URI (default: stream.key)
   --hlsenckey <hex>   Set HLS encryption key in hex string
