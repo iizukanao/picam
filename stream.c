@@ -422,7 +422,7 @@ static int speed_down_count = 0;
 static int audio_pts_step_base;
 
 #if AUDIO_BUFFER_CHUNKS > 0
-uint16_t *audio_buffer[AUDIO_BUFFER_CHUNKS];
+uint16_t *audio_buffer[AUDIO_BUFFER_CHUNKS]; // circular buffer
 int audio_buffer_index = 0;
 int is_audio_buffer_filled = 0;
 #endif
@@ -534,12 +534,19 @@ static int rec_thread_needs_exit = 0;
 static int rec_thread_frame = 0;
 static int rec_thread_needs_flush = 0;
 
-EncodedPacket **encoded_packets; // circular buffer
-static int current_encoded_packet = -1;
-static int *keyframe_pointers;
-static int current_keyframe_pointer = -1;
-static int is_keyframe_pointers_filled = 0;
-static int encoded_packets_size;
+// encoded_packets: [ pframe1, keyframe1, audio1, pframe2, keyframe2, pframe3, ... ]
+//                                                                    ^ last stored EncodedPacket
+// current_encoded_packet: 5 (index of last stored EncodedPacket in encoded_packets)
+// encoded_packets_size == len(encoded_packets)
+// keyframe_pointers: [ 1, 4, 0, ... ] (holds keyframe indexes of encoded_packets)
+//                         ^ last stored item
+// current_keyframe_pointer: 1 (index of last stored item in keyframe_pointers)
+EncodedPacket **encoded_packets; // circular buffer that stores encoded audio and video
+static int encoded_packets_size; // the number of EncodedPacket that can be stored in encoded_packets
+static int current_encoded_packet = -1; // write pointer of encoded_packets array that holds latest encoded audio or video
+static int *keyframe_pointers; // circular buffer that stores where keyframe occurs within encoded_packets
+static int current_keyframe_pointer = -1; // write pointer of keyframe_pointers array
+static int is_keyframe_pointers_filled = 0; // will be changed to 1 once encoded_packets is fully filled
 
 // hooks
 static pthread_t hooks_thread;
@@ -596,7 +603,10 @@ static int is_disk_almost_full() {
   }
 }
 
+// Remember the point where keyframe occurs within encoded_packets
 static void mark_keyframe_packet() {
+  // keyframe_pointers is a circular buffer and
+  // current_keyframe_pointer holds the index of last written item.
   current_keyframe_pointer++;
   if (current_keyframe_pointer >= record_buffer_keyframes) {
     current_keyframe_pointer = 0;
@@ -3375,6 +3385,7 @@ static int openmax_cam_open() {
   // nSliceHeight must be a multiple of 16.
   cam_def.format.video.nSliceHeight = (video_height+15)&~15;
 
+  // camera should output raw video
   cam_def.format.video.eCompressionFormat = OMX_VIDEO_CodingUnused;
   if (is_vfr_enabled) {
     log_debug("using variable frame rate\n");
