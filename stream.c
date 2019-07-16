@@ -48,7 +48,7 @@ extern "C" {
 #include "subtitle.h"
 
 #define PROGRAM_NAME     "picam"
-#define PROGRAM_VERSION  "1.4.7"
+#define PROGRAM_VERSION  "1.4.8"
 
 // Audio-only stream is created if this is 1 (for debugging)
 #define AUDIO_ONLY 0

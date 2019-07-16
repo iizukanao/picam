@@ -1,6 +1,11 @@
 Change Log
 ==========
 
+Version 1.4.8 *(2019-07-17)*
+-----------------------------
+
+- Fixed bug where picam hangs up when large difference in video image occurs (#128).
+
 Version 1.4.7 *(2018-09-17)*
 -----------------------------
 
