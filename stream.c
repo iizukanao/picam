@@ -456,6 +456,7 @@ static int is_audio_recording_started = 0;
 static uint8_t *last_video_buffer = NULL;
 static size_t last_video_buffer_size = 0;
 static int keyframes_count = 0;
+static int is_first_encode = 1;
 
 static int video_pending_drop_frames = 0;
 static int audio_pending_drop_frames = 0;
@@ -4116,36 +4117,50 @@ static void encode_and_send_image() {
     log_error("error emptying buffer: 0x%x\n", error);
   }
 
-  while (1) {
-    // Get H.264 encoded frame from video_encode
-    out = ilclient_get_output_buffer(video_encode, VIDEO_ENCODE_OUTPUT_PORT, 1);
-    int do_break = 0;
-    if (out != NULL) {
-      if (out->nFilledLen > 0) {
-        video_encode_fill_buffer_done(out);
-        out->nFilledLen = 0;
+  // At the very first cycle of encoding, we have to consume empty
+  // output buffers in order to get latest video image on the next cycle.
+  if (is_first_encode) {
+    is_first_encode = 0;
+    for (int i = 0; i < VIDEO_ENCODE_OUTPUT_BUFFER_COUNT - 1; i++) {
+      out = ilclient_get_output_buffer(video_encode, VIDEO_ENCODE_OUTPUT_PORT, 1);
+      assert(out->nFilledLen == 0);
+      error = OMX_FillThisBuffer(ILC_GET_HANDLE(video_encode), out);
+      if (error != OMX_ErrorNone) {
+        log_error("OMX_FillThisBuffer error when consuming empty video_encode output buffers: 0x%x\n", error);
+      }
+    }
+  } else {
+    while (1) {
+      // Get H.264 encoded frame from video_encode
+      out = ilclient_get_output_buffer(video_encode, VIDEO_ENCODE_OUTPUT_PORT, 1);
+      int do_break = 0;
+      if (out != NULL) { // If we get a buffer
+        if (out->nFilledLen > 0) {
+          video_encode_fill_buffer_done(out);
+          out->nFilledLen = 0;
+        } else { // Buffer is empty
+          log_debug("e(0x%x)", out->nFlags);
+          do_break = 1;
+        }
+
+        // If out->nFlags doesn't have ENDOFFRAME,
+        // there is remaining buffer for this frame.
+        if (out->nFlags & OMX_BUFFERFLAG_ENDOFFRAME) {
+          do_break = 1;
+        }
+
+        // Return the buffer to video_encode
+        error = OMX_FillThisBuffer(ILC_GET_HANDLE(video_encode), out);
+        if (error != OMX_ErrorNone) {
+          log_error("error filling video_encode buffer: 0x%x\n", error);
+        }
       } else {
-        log_debug("e(0x%x)", out->nFlags);
         do_break = 1;
       }
 
-      // If out->nFlags doesn't have ENDOFFRAME,
-      // there is remaining buffer for this frame.
-      if (out->nFlags & OMX_BUFFERFLAG_ENDOFFRAME) {
-        do_break = 1;
+      if (do_break) {
+        break;
       }
-    } else {
-      do_break = 1;
-    }
-
-    // Return the buffer
-    error = OMX_FillThisBuffer(ILC_GET_HANDLE(video_encode), out);
-    if (error != OMX_ErrorNone) {
-      log_error("error filling video_encode buffer: 0x%x\n", error);
-    }
-
-    if (do_break) {
-      break;
     }
   }
 }
