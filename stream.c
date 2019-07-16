@@ -74,10 +74,10 @@ extern "C" {
 #define N_BUFFER_COUNT_ACTUAL 1
 
 // The number of buffers that are required on video_encode input port
-#define VIDEO_ENCODE_INPUT_BUFFER_COUNT 2
+#define VIDEO_ENCODE_INPUT_BUFFER_COUNT 10
 
 // The number of buffers that are required on video_encode output port
-#define VIDEO_ENCODE_OUTPUT_BUFFER_COUNT 2
+#define VIDEO_ENCODE_OUTPUT_BUFFER_COUNT 10
 
 // If this value is increased, video gets faster than audio
 #define AUDIO_BUFFER_CHUNKS 0
