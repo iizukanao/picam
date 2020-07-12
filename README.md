@@ -192,7 +192,7 @@ To unmute microphone, create a file named `hooks/unmute`.
 #### Command options
 
 ```
-picam version 1.4.8
+picam version 1.4.9
 Usage: picam [options]
 
 Options:
@@ -280,6 +280,7 @@ Options:
                         incandescent: Light source is incandescent
                         flash: Light source is a flash
                         horizon: Light source is the sun on the horizon
+                        greyworld: AWB for NoIR camera
   --wbred <num>       Red gain. Implies "--wb off". (0.0 .. 8.0)
   --wbblue <num>      Blue gain. Implies "--wb off". (0.0 .. 8.0)
   --metering <value>  Set metering type. <value> is one of:
