@@ -276,6 +276,7 @@ static const white_balance_option white_balance_options[] = {
   { .name = "incandescent", .control = OMX_WhiteBalControlIncandescent },
   { .name = "flash",        .control = OMX_WhiteBalControlFlash },
   { .name = "horizon",      .control = OMX_WhiteBalControlHorizon },
+  { .name = "greyworld",    .control = OMX_WhiteBalControlGreyWorld },
 };
 
 static char exposure_control[14];
@@ -4755,6 +4756,7 @@ static void print_usage() {
   log_info("                        incandescent: Light source is incandescent\n");
   log_info("                        flash: Light source is a flash\n");
   log_info("                        horizon: Light source is the sun on the horizon\n");
+  log_info("                        greyworld: AWB for NoIR camera\n");
   log_info("  --wbred <num>       Red gain. Implies \"--wb off\". (0.0 .. 8.0)\n");
   log_info("  --wbblue <num>      Blue gain. Implies \"--wb off\". (0.0 .. 8.0)\n");
   log_info("  --metering <value>  Set metering type. <value> is one of:\n");
