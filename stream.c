@@ -742,6 +742,7 @@ void setup_av_frame(AVFormatContext *format_ctx) {
   av_frame->channel_layout = audio_codec_ctx->channel_layout;
   log_debug("audio_codec_ctx->channel_layout: %" PRIu64 "\n", audio_codec_ctx->channel_layout);
   log_debug("av_frame->channel_layout: %" PRIu64 "\n", av_frame->channel_layout);
+  av_frame->channels = audio_codec_ctx->channels;
   log_debug("audio_codec_ctx->channels: %d\n", audio_codec_ctx->channels);
   log_debug("av_frame->channels: %d\n", av_frame->channels);
 
