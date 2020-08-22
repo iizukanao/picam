@@ -99,6 +99,10 @@ cd ~/picam
 
 ### Usage
 
+#### For High Quality Camera users
+
+Please make sure that at least 160 MB is assigned to GPU.
+
 #### Create symbolic links (optional, but strongly recommended)
 
 You can take advantage of RAM drive (`/run/shm/`) and reduce access to SD card. It also provides better quality of recording.
