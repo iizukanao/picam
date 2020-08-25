@@ -16,11 +16,11 @@ $ sudo apt-get install git libasound2-dev libssl-dev libfontconfig1-dev libharfb
 
 ## Build and install fdk-aac
 
-Download [fdk-aac-0.1.6.tar.gz](https://sourceforge.net/projects/opencore-amr/files/fdk-aac/) (or the latest version) and run the following commands.
+Download [fdk-aac-2.0.1.tar.gz](https://sourceforge.net/projects/opencore-amr/files/fdk-aac/) (or the latest version) and run the following commands.
 
 ```sh
-$ tar zxvf fdk-aac-0.1.6.tar.gz
-$ cd fdk-aac-0.1.6
+$ tar zxvf fdk-aac-2.0.1.tar.gz
+$ cd fdk-aac-2.0.1
 $ ./configure
 $ make -j4
 (takes 3-4 minutes)
