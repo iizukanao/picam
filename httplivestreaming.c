@@ -31,65 +31,35 @@
 typedef struct MpegTSSection {
     int pid;
     int cc;
+#if LIBAVFORMAT_VERSION_INT >= AV_VERSION_INT(57, 57, 100)
+    int discontinuity;
+#endif
     void (*write_packet)(struct MpegTSSection *s, const uint8_t *packet);
     void *opaque;
 } MpegTSSection;
 
 typedef struct MpegTSService {
     MpegTSSection pmt; /* MPEG2 pmt table context */
-    int sid;           /* service ID */
-    char *name;
-    char *provider_name;
-    int pcr_pid;
-    int pcr_packet_count;
-    int pcr_packet_period;
+    //
+    // NOTE: there are more fields but we don't need them
+    //
 } MpegTSService;
 
 typedef struct MpegTSWrite {
     const AVClass *av_class;
     MpegTSSection pat; /* MPEG2 pat table */
     MpegTSSection sdt; /* MPEG2 sdt table context */
-    MpegTSService **services;
-    int sdt_packet_count;
-    int sdt_packet_period;
-    int pat_packet_count;
-    int pat_packet_period;
-    int nb_services;
-    int onid;
-    int tsid;
-    int64_t first_pcr;
-    int mux_rate; ///< set to 1 when VBR
-    int pes_payload_size;
-
-    int transport_stream_id;
-    int original_network_id;
-    int service_id;
-
-    int pmt_start_pid;
-    int start_pid;
-    int m2ts_mode;
-
-    int reemit_pat_pmt; // backward compatibility
-
-    int flags;
-    int copyts;
-    int tables_version;
-
-    int omit_video_pes_length;
+    //
+    // NOTE: there are more fields but we don't need them
+    //
 } MpegTSWrite;
 
 typedef struct MpegTSWriteStream {
-    struct MpegTSService *service;
     int pid; /* stream associated pid */
     int cc;
-    int payload_size;
-    int first_pts_check; ///< first pts check needed
-    int prev_payload_key;
-    int64_t payload_pts;
-    int64_t payload_dts;
-    int payload_flags;
-    uint8_t *payload;
-    AVFormatContext *amux;
+    //
+    // NOTE: there are more fields but we don't need them
+    //
 } MpegTSWriteStream;
 /** END OF COPY **/
 
@@ -308,7 +278,6 @@ int hls_write_packet(HTTPLiveStreaming *hls, AVPacket *pkt, int split) {
   MpegTSWriteStream *ts_st;
   uint8_t pat_cc;
   uint8_t sdt_cc;
-  uint8_t pmt_cc;
   int *stream_cc;
   int nb_streams;
   int i;
@@ -336,7 +305,6 @@ int hls_write_packet(HTTPLiveStreaming *hls, AVPacket *pkt, int split) {
     ts = hls->format_ctx->priv_data;
     pat_cc = ts->pat.cc;
     sdt_cc = ts->sdt.cc;
-    pmt_cc = 15;
 
     nb_streams = hls->format_ctx->nb_streams;
     stream_cc = malloc(sizeof(int) * nb_streams);
@@ -347,9 +315,6 @@ int hls_write_packet(HTTPLiveStreaming *hls, AVPacket *pkt, int split) {
     for (i = 0; i < nb_streams; i++) {
       ts_st = hls->format_ctx->streams[i]->priv_data;
       stream_cc[i] = ts_st->cc;
-      if (i == 0) {
-        pmt_cc = ts_st->service->pmt.cc;
-      }
     }
 
     mpegts_close_stream(hls->format_ctx);
@@ -366,9 +331,6 @@ int hls_write_packet(HTTPLiveStreaming *hls, AVPacket *pkt, int split) {
     for (i = 0; i < nb_streams; i++) {
       ts_st = hls->format_ctx->streams[i]->priv_data;
       ts_st->cc = stream_cc[i];
-      if (i == 0) {
-        ts_st->service->pmt.cc = pmt_cc;
-      }
     }
     free(stream_cc);
   }
