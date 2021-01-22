@@ -158,9 +158,12 @@ void encrypt_most_recent_file(HTTPLiveStreaming *hls) {
   EVP_CIPHER_CTX_free(enc_ctx);
 }
 
+static float max_float(float a, float b) {
+  return (a >= b) ? a : b;
+}
+
 int calc_target_duration(HTTPLiveStreaming *hls) {
-  float num = 0;
-  float den = 0;
+  float max = 0;
   int i;
 
   // segments
@@ -174,18 +177,14 @@ int calc_target_duration(HTTPLiveStreaming *hls) {
     segment_durations_idx += hls->num_recent_files;
   }
   for (i = 0; i < num_segments; i++) {
-    num += hls->segment_durations[segment_durations_idx];
-    den += 1.0f;
+    max = max_float(max, hls->segment_durations[segment_durations_idx]);
+    if (++segment_durations_idx == hls->num_recent_files) {
+      segment_durations_idx = 0;
+    }
   }
 
-  if(den == 0.0f) {
-    //No segments found. Return 0 as answer
-    return 0;
-  } else {
-    // Round target duration to nearest integer
-    return (int) ((num / den) + 0.5f); 
-  }
-  
+  // Round target duration to nearest integer
+  return (int) (max + 0.5f);
 }
 
 // Write m3u8 file
