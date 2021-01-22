@@ -37,6 +37,11 @@ Download ffmpeg source and configure it:
 ```sh
 $ git clone https://git.ffmpeg.org/ffmpeg.git
 $ cd ffmpeg
+$ git checkout n4.3 -b n4.3
+# NOTE: for extra hw acceleration, include these flags in your ./configure below:
+#         --enable-mmal
+#         --enable-omx
+#         --enable-omx-rpi
 $ ./configure --enable-libfdk-aac
 (takes about one minute)
 ```
