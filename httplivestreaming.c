@@ -39,7 +39,7 @@ typedef struct MpegTSSection {
 } MpegTSSection;
 
 typedef struct MpegTSService {
-    MpegTSSection pmt; /* MPEG2 pmt table context */
+    MpegTSSection pmt; /* MPEG-2 PMT table context */
     //
     // NOTE: there are more fields but we don't need them
     //
@@ -47,8 +47,12 @@ typedef struct MpegTSService {
 
 typedef struct MpegTSWrite {
     const AVClass *av_class;
-    MpegTSSection pat; /* MPEG2 pat table */
-    MpegTSSection sdt; /* MPEG2 sdt table context */
+    MpegTSSection pat; /* MPEG-2 PAT table */
+    MpegTSSection sdt; /* MPEG-2 SDT table context */
+    MpegTSService **services;
+    int64_t sdt_period; /* SDT period in PCR time base */
+    int64_t pat_period; /* PAT/PMT period in PCR time base */
+    int nb_services;
     //
     // NOTE: there are more fields but we don't need them
     //
@@ -275,10 +279,12 @@ void create_new_ts(HTTPLiveStreaming *hls) {
 int hls_write_packet(HTTPLiveStreaming *hls, AVPacket *pkt, int split) {
   MpegTSWrite *ts;
   MpegTSWriteStream *ts_st;
-  uint8_t pat_cc;
-  uint8_t sdt_cc;
-  int *stream_cc;
-  int nb_streams;
+  uint8_t pat_cc; // holds continuity counter for program association table
+  uint8_t sdt_cc; // holds continuity counter for service description table
+  int *stream_cc; // holds continuity counter for streams
+  int nb_streams; // holds the number of streams
+  int *service_cc; // holds continuity counter for services
+  int nb_services; // holds the number of services
   int i;
 
   if ( ! hls->is_started ) {
@@ -302,9 +308,10 @@ int hls_write_packet(HTTPLiveStreaming *hls, AVPacket *pkt, int split) {
 
     // Retain continuity counters
     ts = hls->format_ctx->priv_data;
-    pat_cc = ts->pat.cc;
-    sdt_cc = ts->sdt.cc;
+    pat_cc = ts->pat.cc; // Get the continuity counter for Program Association Table
+    sdt_cc = ts->sdt.cc; // Get the continuity counter for Service Description Table
 
+    // Get the continuity counters for audio/video
     nb_streams = hls->format_ctx->nb_streams;
     stream_cc = malloc(sizeof(int) * nb_streams);
     if (stream_cc == NULL) {
@@ -316,6 +323,17 @@ int hls_write_packet(HTTPLiveStreaming *hls, AVPacket *pkt, int split) {
       stream_cc[i] = ts_st->cc;
     }
 
+    // Get the continuity counter for Program Map Table
+    nb_services = ts->nb_services;
+    service_cc = malloc(sizeof(int) * nb_services);
+    if (service_cc == NULL) {
+      perror("malloc failed for service_cc");
+      exit(EXIT_FAILURE);
+    }
+    for (i = 0; i < nb_services; i++) {
+      service_cc[i] = ts->services[i]->pmt.cc;
+    }
+
     mpegts_close_stream(hls->format_ctx);
     if (hls->use_encryption) {
       encrypt_most_recent_file(hls);
@@ -325,13 +343,24 @@ int hls_write_packet(HTTPLiveStreaming *hls, AVPacket *pkt, int split) {
 
     // Restore continuity counters
     ts = hls->format_ctx->priv_data;
-    ts->pat.cc = pat_cc;
-    ts->sdt.cc = sdt_cc;
+    ts->pat.cc = pat_cc; // Set the continuity counter for Program Association Table
+    ts->sdt.cc = sdt_cc; // Set the continuity counter for Service Description Table
+
+    // Set the continuity counters for audio/video
     for (i = 0; i < nb_streams; i++) {
       ts_st = hls->format_ctx->streams[i]->priv_data;
       ts_st->cc = stream_cc[i];
     }
     free(stream_cc);
+
+    // Set the continuity counter for Program Map Table
+    if (ts->nb_services != nb_services) {
+      fprintf(stderr, "warn: ts->nb_services (%d) != nb_services (%d)", ts->nb_services, nb_services);
+    }
+    for (i = 0; i < ts->nb_services && i < nb_services; i++) {
+      ts->services[i]->pmt.cc = service_cc[i];
+    }
+    free(service_cc);
   }
 
   if (hls->is_audio_only) {
