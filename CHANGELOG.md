@@ -1,6 +1,17 @@
 Change Log
 ==========
 
+Version 1.4.11 *(2021-04-29)*
+-----------------------------
+
+- Fixed flicker between subtitle changes (#159)
+
+Version 1.4.10 *(2021-02-04)*
+-----------------------------
+
+- Fixed HLS issue (#152) (by @marler8997)
+- Fixed build issues with the latest ffmpeg (by @marler8997)
+
 Version 1.4.9 *(2020-07-13)*
 -----------------------------
 
