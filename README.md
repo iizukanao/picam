@@ -87,9 +87,9 @@ chmod +x make_dirs.sh
 alsamixer
 
 # Install picam binary
-wget https://github.com/iizukanao/picam/releases/download/v1.4.9/picam-1.4.9-binary.tar.xz
-tar xvf picam-1.4.9-binary.tar.xz
-cp picam-1.4.9-binary/picam ~/picam/
+wget https://github.com/iizukanao/picam/releases/download/v1.4.11/picam-1.4.11-binary.tar.xz
+tar xvf picam-1.4.11-binary.tar.xz
+cp picam-1.4.11-binary/picam ~/picam/
 
 # Run picam
 cd ~/picam
@@ -196,7 +196,7 @@ To unmute microphone, create a file named `hooks/unmute`.
 #### Command options
 
 ```
-picam version 1.4.9
+picam version 1.4.11
 Usage: picam [options]
 
 Options:
