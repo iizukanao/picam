@@ -31,9 +31,7 @@ void subtitle_init_with_font_name(const char *font_name, int points, int dpi) {
  * Initializes the timestamp library with a font file and face index.
  */
 void subtitle_init(const char *font_file, long face_index, int points, int dpi) {
-  if (text_id != -1) {
-    text_destroy(text_id);
-  }
+  int old_text_id = text_id;
 
   text_id = text_create(
     font_file, face_index,
@@ -48,6 +46,11 @@ void subtitle_init(const char *font_file, long face_index, int points, int dpi) 
       0, // horizontal margin from the right edge
       30); // vertical margin from the bottom edge
   text_set_align(text_id, TEXT_ALIGN_CENTER); // text alignment inside the box
+
+  if (old_text_id != -1) {
+    // Queue old_text_id to be destroyed when text_id will appear on screen
+    text_destroy_on_appear(old_text_id, text_id);
+  }
 }
 
 /**

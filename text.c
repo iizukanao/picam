@@ -75,6 +75,10 @@ typedef struct TextData {
 
   int is_bitmap_ready;
   int will_dispose_bitmap;
+
+  // if this is > 0, target text_id will be destroyed when this bitmap appears on screen.
+  int will_destroy_text_id;
+
   int has_changed; // do we need to redraw the overlay
   int width;
   int height;
@@ -223,6 +227,7 @@ int text_create(const char *font_file, long face_index, float point, int dpi) {
   textdata->is_bitmap_ready = 0;
   textdata->has_changed = 0;
   textdata->will_dispose_bitmap = 0;
+  textdata->will_destroy_text_id = -1;
   textdata->width = 0;
   textdata->height = 0;
   textdata->color = 0xffffff;
@@ -1115,6 +1120,23 @@ int text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height, int is_v
   int canvas_bytes_per_pixel = (is_video) ? 1 : BYTES_PER_PIXEL; // note: in YUV we're poinig to Y planar pixel
   //clock_t start_time = clock();
 
+  // Check if any of textdata_list should be destroyed by will_destroy_text_id
+  for (i = 0; i < max_text_id; i++) {
+    TextData *textdata = textdata_list[i];
+    if (textdata != NULL &&
+        textdata->is_bitmap_ready &&
+        textdata->will_destroy_text_id != -1 &&
+        textdata->will_destroy_text_id <= max_text_id) {
+      TextData *destroy_textdata = textdata_list[textdata->will_destroy_text_id-1];
+      if (destroy_textdata != NULL &&
+          destroy_textdata->will_dispose_bitmap != 1) {
+        text_destroy(destroy_textdata->id);
+      }
+
+      textdata->will_destroy_text_id = -1; // No need to destroy again
+    }
+  }
+
   for (i = 0; i < max_text_id; i++) {
     TextData *textdata = textdata_list[i];
     if (textdata != NULL) {
@@ -1243,5 +1265,19 @@ int text_select_font_file(const char *name, char **font_file, int *face_index) {
 
   FcFini();
 
+  return 0;
+}
+
+/**
+ * Will destroy a text that is currently being displayed by old_text_id
+ * once new_text_id starts to appear on screen.
+ *
+ * new_text_id must already exist.
+ */
+int text_destroy_on_appear(int old_text_id, int new_text_id) {
+  if (textdata_list[new_text_id-1] == NULL) {
+    return -1;
+  }
+  textdata_list[new_text_id-1]->will_destroy_text_id = old_text_id;
   return 0;
 }

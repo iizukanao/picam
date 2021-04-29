@@ -164,4 +164,9 @@ int text_get_position(int text_id, int canvas_width, int canvas_height, int *x, 
  */
 int text_select_font_file(const char *name, char **font_file, int *face_index);
 
+/**
+ * Destroys a text that is currently being displayed with old_text_id when new_text_id is drawn on screen.
+ */
+int text_destroy_on_appear(int old_text_id, int new_text_id);
+
 #endif // PICAM_TEXT_H
