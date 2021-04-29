@@ -12,7 +12,7 @@ static int text_id = -1;
 static int64_t hide_time = 0;
 
 /**
- * Initializes the timestamp library with a font name.
+ * Initializes the subtitle library with a font name.
  */
 void subtitle_init_with_font_name(const char *font_name, int points, int dpi) {
   char *font_file;
@@ -28,7 +28,9 @@ void subtitle_init_with_font_name(const char *font_name, int points, int dpi) {
 }
 
 /**
- * Initializes the timestamp library with a font file and face index.
+ * Initializes the subtitle library with a font file and face index.
+ *
+ * Previous text created by subtitle_init() will be destroyed.
  */
 void subtitle_init(const char *font_file, long face_index, int points, int dpi) {
   int old_text_id = text_id;
@@ -54,7 +56,7 @@ void subtitle_init(const char *font_file, long face_index, int points, int dpi) 
 }
 
 /**
- * Destroys the resources used by timestamp library.
+ * Destroys the resources used by subtitle library.
  */
 void subtitle_shutdown() {
   if (text_id != -1) {
@@ -115,7 +117,7 @@ void subtitle_set_tab_scale(float multiply) {
 }
 
 /**
- * Sets the absolute position for the timestamp.
+ * Sets the absolute position for the subtitle.
  */
 void subtitle_set_position(int x, int y) {
   text_set_position(text_id, x, y);
@@ -174,6 +176,9 @@ void subtitle_show(const char *text, size_t text_len, float duration_sec) {
 
 /**
  * Hide the subtitle.
+ *
+ * This will not destroy the resources used by the text.
+ * To destroy the resources, call subtitle_shutdown().
  */
 void subtitle_clear() {
   if (text_id != -1) {
