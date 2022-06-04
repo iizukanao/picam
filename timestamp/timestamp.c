@@ -3,11 +3,11 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "text.h"
+#include "text/text.h"
 #include "timestamp.h"
 
-const static char *default_time_format = "%Y-%m-%d %H:%M:%S";
-const static char *default_font_name = "Nimbus Mono L,monospace";
+static const char *default_time_format = "%Y-%m-%d %H:%M:%S";
+static const char *default_font_name = "Nimbus Mono L,monospace";
 
 static int text_id = -1;
 static char time_format[128];

@@ -3,10 +3,10 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "text.h"
+#include "../text/text.h"
 #include "subtitle.h"
 
-const static char *default_font_name = "sans";
+static const char *default_font_name = "sans";
 
 static int text_id = -1;
 static int64_t hide_time = 0;

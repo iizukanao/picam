@@ -1,3 +1,7 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef PICAM_SUBTITLE_H
 #define PICAM_SUBTITLE_H
 
@@ -84,3 +88,7 @@ void subtitle_show(const char *text, size_t text_len, float duration_sec);
 void subtitle_clear();
 
 #endif // PICAM_SUBTITLE_H
+
+#ifdef __cplusplus
+}
+#endif

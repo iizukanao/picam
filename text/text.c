@@ -591,7 +591,7 @@ int text_get_bounds(int text_id, const char *text, size_t text_len, text_bounds 
   float total_advance_y = 0.0f;
 
   int tab_width = -1;
-  int j;
+  unsigned int j;
   for (j = 0; j < glyph_count; j++) {
     char current_char = *(text + glyph_info[j].cluster);
     if (current_char == '\t') { // Tab character found
@@ -956,7 +956,7 @@ static int draw_glyphs(TextData *textdata) {
 
     x += 0 - min_left; // XXX: OK?
 
-    int j;
+    unsigned int j;
     for (j = 0; j < glyph_count; j++) {
       // glyph_info.cluster indicates the index of the character in the input text
       char current_char = *(tmp_textdata->text +

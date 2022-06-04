@@ -1,7 +1,12 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef PICAM_TIMESTAMP_H
 #define PICAM_TIMESTAMP_H
 
 #include <stdint.h>
+#include "text/text.h"
 
 /**
  * Initializes the timestamp library with a font name.
@@ -76,3 +81,7 @@ void timestamp_fix_position(int canvas_width, int canvas_height);
 void timestamp_update();
 
 #endif // PICAM_TIMESTAMP_H
+
+#ifdef __cplusplus
+}
+#endif

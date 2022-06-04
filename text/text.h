@@ -1,3 +1,7 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef PICAM_TEXT_H
 #define PICAM_TEXT_H
 
@@ -170,3 +174,7 @@ int text_select_font_file(const char *name, char **font_file, int *face_index);
 int text_destroy_on_appear(int old_text_id, int new_text_id);
 
 #endif // PICAM_TEXT_H
+
+#ifdef __cplusplus
+}
+#endif
