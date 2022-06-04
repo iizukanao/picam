@@ -4,9 +4,9 @@ cmake_minimum_required(VERSION 3.6)
 #add_executable(libcamera-still libcamera_still.cpp)
 #target_link_libraries(libcamera-still libcamera_app images)
 #
-#project(libcamera-vid)
-#add_executable(libcamera-vid libcamera_vid.cpp)
-#target_link_libraries(libcamera-vid libcamera_app encoders outputs)
+project(libcamera-vid)
+add_executable(libcamera-vid libcamera_vid.cpp)
+target_link_libraries(libcamera-vid libcamera_app encoders outputs)
 
 # project(libcamera-hello)
 # add_executable(libcamera-hello libcamera_hello.cpp)

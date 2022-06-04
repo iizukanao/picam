@@ -83,7 +83,7 @@ static void event_loop(LibcameraEncoder &app)
 	signal(SIGUSR1, default_signal_handler);
 	signal(SIGUSR2, default_signal_handler);
 	pollfd p[1] = { { STDIN_FILENO, POLLIN, 0 } };
-	uint64_t lastTimestamp = 0;
+	// uint64_t lastTimestamp = 0;
 
 	for (unsigned int count = 0; ; count++)
 	{
@@ -105,8 +105,8 @@ static void event_loop(LibcameraEncoder &app)
 		if (key == '\n')
 			output->Signal();
 
-		// if (options->verbose)
-		// 	std::cerr << "Viewfinder frame " << count << std::endl;
+		if (options->verbose)
+			std::cerr << "Viewfinder frame " << count << std::endl;
 		auto now = std::chrono::high_resolution_clock::now();
 		bool timeout = !options->frames && options->timeout &&
 					   (now - start_time > std::chrono::milliseconds(options->timeout));
@@ -148,27 +148,29 @@ static void event_loop(LibcameraEncoder &app)
 		timestamp_fix_position(video_width_32, video_height_16);
 
 		CompletedRequestPtr &completed_request = std::get<CompletedRequestPtr>(msg.payload);
-		std::cout << " sequence=" << completed_request->sequence << " framerate=" << completed_request->framerate << std::endl;
-		// std::cout << " buffers:" << std::endl;
-		for (const auto& elem : completed_request->buffers)
-		{
-		// 	auto config = elem.first->configuration();
-		// 	std::cout << "  pixelformat=" << config.pixelFormat.toString()
-		// 		<< " width=" << config.size.width << " height=" << config.size.height
-		// 		<< " frameSize=" << config.frameSize << " bufferCount=" << config.bufferCount
-		// 		<< " second=" << elem.second << std::endl;
-			auto frameBuffer = elem.second;
-		// 	auto planes = frameBuffer->planes();
-		// 	for (const libcamera::FrameBuffer::Plane plane : elem.second->planes()) {
-		// 		std::cout << "  plane length=" << plane.length << std::endl;
+
+		// // std::cout << " sequence=" << completed_request->sequence << " framerate=" << completed_request->framerate << std::endl;
+		// // std::cout << " buffers:" << std::endl;
+		// for (const auto& elem : completed_request->buffers)
+		// {
+		// // 	auto config = elem.first->configuration();
+		// // 	std::cout << "  pixelformat=" << config.pixelFormat.toString()
+		// // 		<< " width=" << config.size.width << " height=" << config.size.height
+		// // 		<< " frameSize=" << config.frameSize << " bufferCount=" << config.bufferCount
+		// // 		<< " second=" << elem.second << std::endl;
+		// 	auto frameBuffer = elem.second;
+		// // 	auto planes = frameBuffer->planes();
+		// // 	for (const libcamera::FrameBuffer::Plane plane : elem.second->planes()) {
+		// // 		std::cout << "  plane length=" << plane.length << std::endl;
+		// // 	}
+		// 	auto metadata = frameBuffer->metadata();
+		// 	// std::cout << " timestamp=" << metadata.timestamp << std::endl;
+		// 	if (lastTimestamp != 0) {
+		// 		std::cout << " diff=" << ((metadata.timestamp - lastTimestamp) / 1000000.0f) << std::endl;
 		// 	}
-			auto metadata = frameBuffer->metadata();
-			// std::cout << " timestamp=" << metadata.timestamp << std::endl;
-			if (lastTimestamp != 0) {
-				std::cout << " diff=" << ((metadata.timestamp - lastTimestamp) / 1000000.0f) << std::endl;
-			}
-			lastTimestamp = metadata.timestamp;
-		}
+		// 	lastTimestamp = metadata.timestamp;
+		// }
+
 		app.EncodeBuffer(completed_request, app.VideoStream());
 		app.ShowPreview(completed_request, app.VideoStream());
 		// std::cout << "showPreview" << std::endl;

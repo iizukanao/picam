@@ -19,7 +19,7 @@ FileOutput::~FileOutput()
 
 void FileOutput::outputBuffer(void *mem, size_t size, int64_t timestamp_us, uint32_t flags)
 {
-	std::cout << "FileOutput::outputBuffer" << std::endl;
+	// std::cout << "FileOutput::outputBuffer" << std::endl;
 	// We need to open a new file if we're in "segment" mode and our segment is full
 	// (though we have to wait for the next I frame), or if we're in "split" mode
 	// and recording is being restarted (this is necessarily an I-frame already).

@@ -410,7 +410,7 @@ void LibcameraApp::StartCamera()
 		controls_.set(controls::ScalerCrop, crop);
 	}
 
-	controls_.set(controls::FrameDuration, INT64_C(16666));
+	// controls_.set(controls::FrameDuration, INT64_C(16666));
 
 	// Framerate is a bit weird. If it was set programmatically, we go with that, but
 	// otherwise it applies only to preview/video modes. For stills capture we set it
