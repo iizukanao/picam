@@ -1,6 +1,6 @@
 #include "dispmanx.h"
-#include "log.h"
-#include "text.h"
+#include "log/log.h"
+#include "text/text.h"
 
 #include <stdint.h>
 #include <assert.h>

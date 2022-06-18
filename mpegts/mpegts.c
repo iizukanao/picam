@@ -1,4 +1,5 @@
 #include <libavutil/avutil.h>
+#include <libavcodec/avcodec.h>
 
 #include "mpegts.h"
 
@@ -13,7 +14,7 @@ void mpegts_set_config(long bitrate, int width, int height) {
   video_height = height;
 }
 
-void setup_video_stream(AVFormatContext *format_ctx) {
+AVCodecContext *setup_video_stream(AVFormatContext *format_ctx) {
   AVStream *video_stream;
   AVCodecContext *video_codec_ctx;
 
@@ -24,7 +25,10 @@ void setup_video_stream(AVFormatContext *format_ctx) {
   }
   video_stream->id = format_ctx->nb_streams - 1;
 
-  video_codec_ctx                = video_stream->codec;
+  const AVCodec *codec = avcodec_find_decoder(video_stream->codecpar->codec_id);
+  video_codec_ctx = avcodec_alloc_context3(codec);
+
+  // video_codec_ctx                = video_stream->codec;
   video_codec_ctx->codec_id      = AV_CODEC_ID_H264;
   video_codec_ctx->codec_type    = AVMEDIA_TYPE_VIDEO;
   video_codec_ctx->codec_tag     = 0;
@@ -44,9 +48,13 @@ void setup_video_stream(AVFormatContext *format_ctx) {
   video_codec_ctx->height        = video_height;
   video_codec_ctx->has_b_frames  = 0;
   video_codec_ctx->flags         |= AV_CODEC_FLAG_GLOBAL_HEADER;
+
+  avcodec_parameters_from_context(video_stream->codecpar, video_codec_ctx);
+  // avcodec_free_context(&video_codec_ctx);
+  return video_codec_ctx;
 }
 
-static int is_sample_fmt_supported(AVCodec *codec, enum AVSampleFormat sample_fmt) {
+static int is_sample_fmt_supported(const AVCodec *codec, enum AVSampleFormat sample_fmt) {
   const enum AVSampleFormat *p = codec->sample_fmts;
 
   while (*p != AV_SAMPLE_FMT_NONE) {
@@ -59,13 +67,14 @@ static int is_sample_fmt_supported(AVCodec *codec, enum AVSampleFormat sample_fm
   return 0;
 }
 
-void setup_audio_stream(AVFormatContext *format_ctx, MpegTSCodecSettings *settings) {
-  AVCodec *aac_codec;
+AVCodecContext *setup_audio_stream(AVFormatContext *format_ctx, MpegTSCodecSettings *settings) {
+  const AVCodec *aac_codec;
   AVCodecContext *audio_codec_ctx = NULL;
   AVStream *audio_stream;
   int ret;
 
   aac_codec = avcodec_find_encoder_by_name("libfdk_aac");
+  // aac_codec = avcodec_find_encoder_by_name("aac");
   if (!aac_codec) {
     fprintf(stderr, "codec not found\n");
     exit(EXIT_FAILURE);
@@ -77,11 +86,12 @@ void setup_audio_stream(AVFormatContext *format_ctx, MpegTSCodecSettings *settin
     exit(EXIT_FAILURE);
   }
   audio_stream->id = format_ctx->nb_streams - 1;
-  audio_codec_ctx = audio_stream->codec;
+  // audio_codec_ctx = audio_stream->codec;
+  audio_codec_ctx = avcodec_alloc_context3(aac_codec);
 
   audio_codec_ctx->sample_fmt = AV_SAMPLE_FMT_S16;
   if ( ! is_sample_fmt_supported(aac_codec, audio_codec_ctx->sample_fmt) ) {
-    fprintf(stderr, "Sample format %s is not supported",
+    fprintf(stderr, "Sample format %s is not supported\n",
         av_get_sample_fmt_name(audio_codec_ctx->sample_fmt));
     exit(EXIT_FAILURE);
   }
@@ -96,11 +106,13 @@ void setup_audio_stream(AVFormatContext *format_ctx, MpegTSCodecSettings *settin
   audio_codec_ctx->profile = settings->audio_profile;
   audio_codec_ctx->sample_rate = settings->audio_sample_rate;
   if (settings->audio_channels == 2) {
-    audio_codec_ctx->channel_layout = AV_CH_LAYOUT_STEREO;
+    AVChannelLayout ch_layout = AV_CHANNEL_LAYOUT_STEREO;
+    audio_codec_ctx->ch_layout = ch_layout;
   } else {
-    audio_codec_ctx->channel_layout = AV_CH_LAYOUT_MONO;
+    AVChannelLayout ch_layout = AV_CHANNEL_LAYOUT_MONO;
+    audio_codec_ctx->ch_layout = ch_layout;
   }
-  audio_codec_ctx->channels = av_get_channel_layout_nb_channels(audio_codec_ctx->channel_layout);
+  // audio_codec_ctx->channels = av_get_channel_layout_nb_channels(audio_codec_ctx->channel_layout);
 
   ret = avcodec_open2(audio_codec_ctx, aac_codec, NULL);
   if (ret < 0) {
@@ -108,13 +120,19 @@ void setup_audio_stream(AVFormatContext *format_ctx, MpegTSCodecSettings *settin
     fprintf(stderr, "avcodec_open2 failed: %s\n", errbuf);
     exit(EXIT_FAILURE);
   }
+
+  // This must be called after avcodec_open2()
+  avcodec_parameters_from_context(audio_stream->codecpar, audio_codec_ctx);
+
+  // avcodec_free_context(&audio_codec_ctx);
+  return audio_codec_ctx;
 }
 
 void mpegts_destroy_context(AVFormatContext *format_ctx) {
-  int i;
-  for (i = 0; i < format_ctx->nb_streams; i++) {
-    avcodec_close(format_ctx->streams[i]->codec);
-  }
+  // unsigned int i;
+  // for (i = 0; i < format_ctx->nb_streams; i++) {
+  //   avcodec_close(format_ctx->streams[i]->codec);
+  // }
   avformat_free_context(format_ctx);
 }
 
@@ -170,19 +188,31 @@ void mpegts_open_stream_without_header(AVFormatContext *format_ctx, char *output
   }
 }
 
-AVFormatContext *_mpegts_create_context(int use_video, int use_audio, MpegTSCodecSettings *settings) {
+MpegTSContext _mpegts_create_context(int use_video, int use_audio, MpegTSCodecSettings *settings) {
   AVFormatContext *format_ctx;
   AVOutputFormat *out_fmt;
+  const AVOutputFormat *guessed_fmt;
+  AVCodecContext *codec_context_video;
+  AVCodecContext *codec_context_audio;
 
-  av_register_all();
-
-  out_fmt = av_guess_format("mpegts", NULL, NULL);
-  out_fmt->flags |= ~AVFMT_GLOBALHEADER;
-  if (!out_fmt) {
+  printf("av_guess_format\n");
+  guessed_fmt = av_guess_format("mpegts", NULL, NULL);
+  if (!guessed_fmt) {
     fprintf(stderr, "av_guess_format failed\n");
     exit(EXIT_FAILURE);
   }
+  printf("malloc for out_fmt\n");
+  out_fmt = malloc(sizeof(AVOutputFormat));
+  if (out_fmt == NULL) {
+    fprintf(stderr, "out_fmt malloc failed\n");
+    exit(EXIT_FAILURE);
+  }
+  printf("memcpy in mpegts\n");
+  memcpy(out_fmt, guessed_fmt, sizeof(AVOutputFormat));
 
+  out_fmt->flags |= ~AVFMT_GLOBALHEADER;
+
+  printf("avformat_alloc_context\n");
   format_ctx = avformat_alloc_context();
   if (!format_ctx) {
     fprintf(stderr, "avformat_alloc_context failed\n");
@@ -192,24 +222,30 @@ AVFormatContext *_mpegts_create_context(int use_video, int use_audio, MpegTSCode
 
 #if !(AUDIO_ONLY)
   if (use_video) {
-    setup_video_stream(format_ctx);
+    printf("setup_video_stream\n");
+    codec_context_video = setup_video_stream(format_ctx);
   }
 #endif
   if (use_audio) {
-    setup_audio_stream(format_ctx, settings);
+    printf("setup_audio_stream\n");
+    codec_context_audio = setup_audio_stream(format_ctx, settings);
   }
 
-  return format_ctx;
+  return (MpegTSContext){
+    format_ctx,
+    codec_context_video,
+    codec_context_audio,
+  };
 }
 
-AVFormatContext *mpegts_create_context(MpegTSCodecSettings *settings) {
+MpegTSContext mpegts_create_context(MpegTSCodecSettings *settings) {
   return _mpegts_create_context(1, 1, settings);
 }
 
-AVFormatContext *mpegts_create_context_video_only(MpegTSCodecSettings *settings) {
+MpegTSContext mpegts_create_context_video_only(MpegTSCodecSettings *settings) {
   return _mpegts_create_context(1, 0, settings);
 }
 
-AVFormatContext *mpegts_create_context_audio_only(MpegTSCodecSettings *settings) {
+MpegTSContext mpegts_create_context_audio_only(MpegTSCodecSettings *settings) {
   return _mpegts_create_context(0, 1, settings);
 }

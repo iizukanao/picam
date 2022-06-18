@@ -7,6 +7,8 @@
 
 #include "state.h"
 
+char *default_dir;
+
 // Create state dir if it does not exist
 int state_create_dir(char *dir) {
   struct stat st;
@@ -44,12 +46,20 @@ int state_create_dir(char *dir) {
   return 0;
 }
 
-void state_set(char *dir, char *name, char *value) {
+void state_default_dir(const char *dir) {
+  default_dir = (char *)dir;
+}
+
+void state_set(const char *dir, const char *name, const char *value) {
   FILE *fp;
   char *path;
   int path_len;
   struct stat st;
   int err;
+
+  if (dir == NULL) {
+    dir = default_dir;
+  }
 
   err = stat(dir, &st);
   if (err == -1) {
@@ -83,13 +93,17 @@ void state_set(char *dir, char *name, char *value) {
   free(path);
 }
 
-void state_get(char *dir, char *name, char **buf) {
+void state_get(const char *dir, const char *name, char **buf) {
   FILE *fp;
   char *path;
   int path_len;
   int size;
   struct stat st;
   int err;
+
+  if (dir == NULL) {
+    dir = default_dir;
+  }
 
   err = stat(dir, &st);
   if (err == -1) {

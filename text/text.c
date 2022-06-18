@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <time.h> // clock()
-#include "log.h"
+#include "log/log.h"
 
 // FreeType
 #include <ft2build.h>

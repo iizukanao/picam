@@ -48,7 +48,7 @@ public:
 		encoder_->EncodeBuffer(buffer->planes()[0].fd.get(), span.size(), mem, info, timestamp_ns / 1000);
 	}
 	VideoOptions *GetOptions() const { return static_cast<VideoOptions *>(options_.get()); }
-	void StopEncoder() { encoder_.reset(); }
+	void StopEncoder() { printf("StopEncoder\n"); encoder_.reset(); }
 
 protected:
 	virtual void createEncoder()

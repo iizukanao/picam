@@ -1,3 +1,7 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef _LOG_H_
 #define _LOG_H_
 
@@ -25,4 +29,8 @@ void log_warn(const char *format, ...);
 void log_error(const char *format, ...);
 void log_fatal(const char *format, ...);
 
+#endif
+
+#ifdef __cplusplus
+}
 #endif

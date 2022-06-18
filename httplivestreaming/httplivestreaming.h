@@ -1,15 +1,17 @@
-#ifndef _CLIB_HTTPLIVESTREAMING_H_
-#define _CLIB_HTTPLIVESTREAMING_H_
-
-#if defined(__cplusplus)
+#ifdef __cplusplus
 extern "C" {
 #endif
 
+#ifndef _CLIB_HTTPLIVESTREAMING_H_
+#define _CLIB_HTTPLIVESTREAMING_H_
+
 #include <libavformat/avformat.h>
-#include "mpegts.h"
+#include "mpegts/mpegts.h"
 
 typedef struct HTTPLiveStreaming {
   AVFormatContext *format_ctx;
+  AVCodecContext *audio_ctx;
+  AVCodecContext *video_ctx;
   char *index_filename;
   int num_recent_files;
   int num_retained_old_files;
@@ -32,8 +34,8 @@ HTTPLiveStreaming *hls_create_audio_only(int num_recent_files, MpegTSCodecSettin
 int hls_write_packet(HTTPLiveStreaming *hls, AVPacket *pkt, int split);
 void hls_destroy(HTTPLiveStreaming *hls);
 
-#if defined(__cplusplus)
-}
 #endif
 
+#ifdef __cplusplus
+}
 #endif

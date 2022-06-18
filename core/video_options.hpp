@@ -22,6 +22,8 @@ struct VideoOptions : public Options
 		// codec's default behaviour.
 		// clang-format off
 		options_.add_options()
+			("flag,z", bool_switch(&flag), "flag1 description")
+			("flag2,y", bool_switch(&flag2), "flag2 description")
 			("bitrate,b", value<uint32_t>(&bitrate)->default_value(0),
 			 "Set the bitrate for encoding, in bits/second (h264 only)")
 			("profile", value<std::string>(&profile),
@@ -58,6 +60,8 @@ struct VideoOptions : public Options
 		// clang-format on
 	}
 
+	bool flag = false;
+	bool flag2 = false;
 	uint32_t bitrate;
 	std::string profile;
 	std::string level;
@@ -81,6 +85,8 @@ struct VideoOptions : public Options
 		if (Options::Parse(argc, argv) == false)
 			return false;
 
+		printf("xxx flag1: %d\n", flag);
+		printf("xxx flag2: %d\n", flag2);
 		if (width == 0)
 			width = 640;
 		if (height == 0)

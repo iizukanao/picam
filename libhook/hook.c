@@ -10,7 +10,7 @@
 #include <signal.h>
 #include <dirent.h>
 
-#include "hooks.h"
+#include "hook.h"
 
 #define NUM_EVENT_BUF 10
 #define EVENT_NAME_BUF_LEN 32

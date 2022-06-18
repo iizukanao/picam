@@ -1,0 +1,525 @@
+#include <unistd.h>
+#include <sys/stat.h>
+#include <sys/statvfs.h>
+#include "muxer/muxer.hpp"
+#include "mpegts/mpegts.h"
+#include "libstate/state.h"
+#include "log/log.h"
+
+// Number of packets to chase recording for each cycle
+#define REC_CHASE_PACKETS 10
+
+Muxer::Muxer() {
+}
+
+Muxer::~Muxer() {
+  this->free_encoded_packets();
+}
+
+void Muxer::setup(MpegTSCodecSettings *codec_settings) {
+  this->codec_settings = codec_settings;
+
+	// MpegTSContext rec_ctx = mpegts_create_context(codec_settings);
+	// char recording_tmp_filepath[256];
+  //   time_t rawtime;
+	// struct tm *timeinfo;
+	// time(&rawtime);
+	// timeinfo = localtime(&rawtime);
+	// char recording_basename[256];
+	// char *rec_tmp_dir = "rec/tmp";
+  // strftime(recording_basename, sizeof(recording_basename), "%Y-%m-%d_%H-%M-%S", timeinfo);
+	// snprintf(recording_tmp_filepath, sizeof(recording_tmp_filepath),
+	// 	"%s/%s", rec_tmp_dir, recording_basename);
+	// mpegts_open_stream(rec_ctx.format_context, recording_tmp_filepath, 0);
+}
+
+void Muxer::waitForExit() {
+  if (this->recThread.joinable()) {
+    printf("joining recThread\n");
+    this->recThread.join();
+    printf("joined recThread\n");
+  }
+}
+
+void Muxer::rec_thread_stop(int skip_cleanup) {
+  FILE *fsrc, *fdest;
+  int read_len;
+  uint8_t *copy_buf;
+
+  log_info("stop rec\n");
+  if (!skip_cleanup) {
+    copy_buf = (uint8_t *)malloc(BUFSIZ);
+    if (copy_buf == NULL) {
+      perror("malloc for copy_buf");
+      pthread_exit(0);
+    }
+
+    pthread_mutex_lock(&rec_write_mutex);
+    mpegts_close_stream(rec_format_ctx);
+    mpegts_destroy_context(rec_format_ctx);
+    pthread_mutex_unlock(&rec_write_mutex);
+
+    log_debug("copy ");
+    fsrc = fopen(recording_tmp_filepath, "r");
+    if (fsrc == NULL) {
+      log_error("error: failed to open %s: %s\n",
+          recording_tmp_filepath, strerror(errno));
+    }
+    fdest = fopen(recording_archive_filepath, "a");
+    if (fdest == NULL) {
+      log_error("error: failed to open %s: %s\n",
+          recording_archive_filepath, strerror(errno));
+      fclose(fsrc);
+    }
+    while (1) {
+      read_len = fread(copy_buf, 1, BUFSIZ, fsrc);
+      if (read_len > 0) {
+        fwrite(copy_buf, 1, read_len, fdest);
+      }
+      if (read_len != BUFSIZ) {
+        break;
+      }
+    }
+    if (feof(fsrc)) {
+      fclose(fsrc);
+      fclose(fdest);
+    } else {
+      log_error("error: rec_thread_stop: not an EOF?: %s\n", strerror(errno));
+    }
+
+    // Create a symlink
+    char symlink_dest_path[2048];
+    size_t rec_dir_len = strlen(this->rec_settings.rec_dir);
+    struct stat file_stat;
+
+    // If recording_archive_filepath starts with "rec/", then remove it
+    if (strncmp(recording_archive_filepath, this->rec_settings.rec_dir, rec_dir_len) == 0 &&
+        recording_archive_filepath[rec_dir_len] == '/') {
+      snprintf(symlink_dest_path, sizeof(symlink_dest_path),
+          recording_archive_filepath + rec_dir_len + 1);
+    } else if (recording_archive_filepath[0] == '/') { // absolute path
+      snprintf(symlink_dest_path, sizeof(symlink_dest_path),
+          recording_archive_filepath);
+    } else { // relative path
+      char cwd[1024];
+      if (getcwd(cwd, sizeof(cwd)) == NULL) {
+        log_error("error: failed to get current working directory: %s\n",
+            strerror(errno));
+        cwd[0] = '.';
+        cwd[1] = '.';
+        cwd[2] = '\0';
+      }
+      snprintf(symlink_dest_path, sizeof(symlink_dest_path),
+          "%s/%s", cwd, recording_archive_filepath);
+    }
+
+    log_debug("symlink(%s, %s)\n", symlink_dest_path, recording_filepath);
+    if (lstat(recording_filepath, &file_stat) == 0) { // file (symlink) exists
+      log_info("replacing existing symlink: %s\n", recording_filepath);
+      unlink(recording_filepath);
+    }
+    if (symlink(symlink_dest_path, recording_filepath) != 0) {
+      log_error("error: cannot create symlink from %s to %s: %s\n",
+          symlink_dest_path, recording_filepath, strerror(errno));
+    }
+
+    // unlink tmp file
+    log_debug("unlink");
+    unlink(recording_tmp_filepath);
+
+    state_set(NULL, "last_rec", recording_filepath);
+
+    free(copy_buf);
+  }
+
+  is_recording = 0;
+  state_set(NULL, "record", "false");
+
+  // pthread_exit(0);
+}
+
+void Muxer::flush_record() {
+  this->rec_thread_needs_flush = 1;
+}
+
+void Muxer::stop_record() {
+  this->rec_thread_needs_exit = 1;
+}
+
+void Muxer::prepareForDestroy() {
+  printf("prepareForDestroy: is_recording=%d\n", this->is_recording);
+  if (this->is_recording) {
+    this->rec_thread_needs_write = 1;
+    pthread_cond_signal(&this->rec_cond);
+
+    this->stop_record();
+  }
+}
+
+void Muxer::check_record_duration() {
+  time_t now;
+
+  if (this->is_recording) {
+    now = time(NULL);
+    if (now - this->rec_start_time > this->flush_recording_seconds) {
+      this->flush_record();
+    }
+  }
+}
+
+void Muxer::prepare_encoded_packets(float video_fps, float audio_fps) {
+  encoded_packets_size = (video_fps + 1) * record_buffer_keyframes * 2 +
+    (audio_fps + 1) * record_buffer_keyframes * 2 + 100;
+
+  int malloc_size = sizeof(EncodedPacket *) * encoded_packets_size;
+  encoded_packets = (EncodedPacket **)malloc(malloc_size);
+  if (encoded_packets == NULL) {
+    log_error("error: cannot allocate memory for encoded_packets\n");
+    exit(EXIT_FAILURE);
+  }
+  memset(encoded_packets, 0, malloc_size);
+
+  this->keyframe_pointers = (int *)calloc(sizeof(int) * this->record_buffer_keyframes, 1);
+  if (this->keyframe_pointers == NULL) {
+    log_fatal("error: cannot allocate memory for keyframe_pointers\n");
+    exit(EXIT_FAILURE);
+  }
+}
+
+// Check if disk usage is >= 95%
+int Muxer::is_disk_almost_full() {
+  struct statvfs stat;
+  statvfs("/", &stat);
+  int used_percent = ceil( (stat.f_blocks - stat.f_bfree) * 100.0f / stat.f_blocks);
+  log_info("disk_usage=%d%% ", used_percent);
+  if (used_percent >= 95) {
+    return 1;
+  } else {
+    return 0;
+  }
+}
+
+void start_rec_thread(Muxer *muxer, RecSettings rec_settings) {
+  muxer->rec_start(rec_settings);
+}
+
+void Muxer::start_record() {
+  if (this->is_recording) {
+    log_warn("recording is already started\n");
+    return;
+  }
+
+  if (this->is_disk_almost_full()) {
+    log_error("error: disk is almost full, recording not started\n");
+    return;
+  }
+
+  this->rec_thread_needs_exit = 0;
+  // pthread_create(&rec_thread, NULL, rec_thread_start, NULL);
+  RecSettings settings = {
+    "", // recording_dest_dir
+    "", // recording_basename
+    "rec", // rec_dir
+    "rec/tmp", // rec_tmp_dir
+    "rec/archive", // rec_archive_dir
+  };
+	this->recThread = std::thread(start_rec_thread, this, settings);
+}
+
+void Muxer::onFrameArrive() {
+  if (this->is_recording) {
+    pthread_mutex_lock(&this->rec_mutex);
+    this->rec_thread_needs_write = 1;
+    pthread_cond_signal(&this->rec_cond);
+    pthread_mutex_unlock(&this->rec_mutex);
+  }
+}
+
+void Muxer::rec_start(RecSettings rec_settings) {
+  time_t rawtime;
+  struct tm *timeinfo;
+  AVPacket *av_pkt;
+  int wrote_packets;
+  int is_caught_up = 0;
+  int unique_number = 1;
+  int64_t rec_start_pts, rec_end_pts;
+  char state_buf[256];
+  EncodedPacket *enc_pkt;
+  int filename_decided = 0;
+  uint8_t *copy_buf;
+  FILE *fsrc, *fdest;
+  int read_len;
+  const char *dest_dir;
+  int has_error;
+
+  this->rec_thread_needs_exit = 0;
+  this->rec_settings = rec_settings;
+  has_error = 0;
+  copy_buf = (uint8_t *)malloc(BUFSIZ);
+  if (copy_buf == NULL) {
+    perror("malloc for copy_buf");
+    pthread_exit(0);
+  }
+
+  time(&rawtime);
+  timeinfo = localtime(&rawtime);
+
+  this->rec_start_time = time(NULL);
+  rec_start_pts = -1;
+
+  if (this->rec_settings.recording_dest_dir[0] != 0) {
+    dest_dir = this->rec_settings.recording_dest_dir;
+  } else {
+    dest_dir = this->rec_settings.rec_archive_dir;
+  }
+
+  if (this->rec_settings.recording_basename[0] != 0) { // basename is already decided
+    strncpy(this->recording_basename, this->rec_settings.recording_basename, sizeof(this->recording_basename)-1);
+    this->recording_basename[sizeof(this->recording_basename)-1] = '\0';
+
+    snprintf(this->recording_filepath, sizeof(this->recording_filepath),
+        "%s/%s", this->rec_settings.rec_dir, this->recording_basename);
+    snprintf(recording_archive_filepath, sizeof(recording_archive_filepath),
+        "%s/%s", dest_dir, this->recording_basename);
+    snprintf(recording_tmp_filepath, sizeof(recording_tmp_filepath),
+        "%s/%s", this->rec_settings.rec_tmp_dir, this->recording_basename);
+    filename_decided = 1;
+  } else {
+    strftime(this->recording_basename, sizeof(this->recording_basename), "%Y-%m-%d_%H-%M-%S", timeinfo);
+    snprintf(recording_filepath, sizeof(recording_filepath),
+        "%s/%s.ts", this->rec_settings.rec_dir, this->recording_basename);
+    if (access(recording_filepath, F_OK) != 0) { // filename is decided
+      sprintf(this->recording_basename + strlen(recording_basename), ".ts"); // add ".ts"
+      snprintf(recording_archive_filepath, sizeof(recording_archive_filepath),
+          "%s/%s", dest_dir, this->recording_basename);
+      snprintf(recording_tmp_filepath, sizeof(recording_tmp_filepath),
+          "%s/%s", this->rec_settings.rec_tmp_dir, this->recording_basename);
+      filename_decided = 1;
+    }
+    while (!filename_decided) {
+      unique_number++;
+      snprintf(recording_filepath, sizeof(recording_filepath),
+          "%s/%s-%d.ts", this->rec_settings.rec_dir, recording_basename, unique_number);
+      if (access(recording_filepath, F_OK) != 0) { // filename is decided
+        sprintf(recording_basename + strlen(recording_basename), "-%d.ts", unique_number);
+        snprintf(recording_archive_filepath, sizeof(recording_archive_filepath),
+            "%s/%s", dest_dir, recording_basename);
+        snprintf(recording_tmp_filepath, sizeof(recording_tmp_filepath),
+            "%s/%s", this->rec_settings.rec_tmp_dir, recording_basename);
+        filename_decided = 1;
+      }
+    }
+  }
+
+  // Remove existing file
+  if (unlink(recording_archive_filepath) == 0) {
+    log_info("removed existing file: %s\n", recording_archive_filepath);
+  }
+
+  pthread_mutex_lock(&rec_write_mutex);
+  this->mpegts_ctx = mpegts_create_context(this->codec_settings);
+  this->rec_format_ctx = this->mpegts_ctx.format_context;
+  mpegts_open_stream(this->rec_format_ctx, recording_tmp_filepath, 0);
+  is_recording = 1;
+  log_info("start rec to %s\n", recording_archive_filepath);
+  state_set(NULL, "record", "true");
+  pthread_mutex_unlock(&rec_write_mutex);
+
+  int look_back_keyframes;
+  if (this->recording_look_back_keyframes != -1) {
+    look_back_keyframes = this->recording_look_back_keyframes;
+  } else {
+    look_back_keyframes = record_buffer_keyframes;
+  }
+
+  int start_keyframe_pointer;
+  if (!is_keyframe_pointers_filled) { // first cycle has not been finished
+    if (look_back_keyframes - 1 > current_keyframe_pointer) { // not enough pre-start buffer
+      start_keyframe_pointer = 0;
+    } else {
+      start_keyframe_pointer = current_keyframe_pointer - look_back_keyframes + 1;
+    }
+  } else { // at least one cycle has been passed
+    start_keyframe_pointer = current_keyframe_pointer - look_back_keyframes + 1;
+  }
+
+  // turn negative into positive
+  while (start_keyframe_pointer < 0) {
+    start_keyframe_pointer += record_buffer_keyframes;
+  }
+
+  rec_thread_frame = keyframe_pointers[start_keyframe_pointer];
+  printf("start_keyframe_pointer=%d rec_thread_frame=%d\n", start_keyframe_pointer, rec_thread_frame);
+  enc_pkt = encoded_packets[rec_thread_frame];
+  printf("enc_pkt: %p\n", (void *)enc_pkt);
+  if (enc_pkt) {
+    rec_start_pts = enc_pkt->pts;
+    write_encoded_packets(REC_CHASE_PACKETS, rec_start_pts);
+  } else {
+    rec_start_pts = 0;
+  }
+
+  av_pkt = av_packet_alloc();
+  while (!this->rec_thread_needs_exit) {
+    pthread_mutex_lock(&this->rec_mutex);
+    while (!this->rec_thread_needs_write) {
+      printf("rec_cond wait\n");
+      pthread_cond_wait(&this->rec_cond, &this->rec_mutex);
+      printf("rec_cond waited\n");
+    }
+    pthread_mutex_unlock(&this->rec_mutex);
+
+    if (this->rec_thread_frame != this->current_encoded_packet) {
+      wrote_packets = write_encoded_packets(REC_CHASE_PACKETS, rec_start_pts);
+      if (wrote_packets <= 2) {
+        if (!is_caught_up) {
+          log_debug("caught up");
+          is_caught_up = 1;
+        }
+      }
+    }
+    this->check_record_duration();
+    if (this->rec_thread_needs_flush) {
+      log_debug("F");
+      mpegts_close_stream_without_trailer(rec_format_ctx);
+
+      fsrc = fopen(recording_tmp_filepath, "r");
+      if (fsrc == NULL) {
+        log_error("error: failed to open %s: %s\n",
+            recording_tmp_filepath, strerror(errno));
+        has_error = 1;
+        break;
+      }
+      fdest = fopen(recording_archive_filepath, "a");
+      if (fdest == NULL) {
+        log_error("error: failed to open %s: %s\n",
+            recording_archive_filepath, strerror(errno));
+        has_error = 1;
+        break;
+      }
+      while (1) {
+        read_len = fread(copy_buf, 1, BUFSIZ, fsrc);
+
+        if (read_len > 0) {
+          fwrite(copy_buf, 1, read_len, fdest);
+        }
+        if (read_len != BUFSIZ) {
+          break;
+        }
+      }
+      if (feof(fsrc)) {
+        fclose(fsrc);
+        fclose(fdest);
+      } else {
+        log_error("error: rec_thread_start: not an EOF?: %s\n", strerror(errno));
+      }
+
+      mpegts_open_stream_without_header(rec_format_ctx, recording_tmp_filepath, 0);
+      rec_thread_needs_flush = 0;
+      rec_start_time = time(NULL);
+    }
+    rec_thread_needs_write = 0;
+  }
+  free(copy_buf);
+  av_packet_free(&av_pkt);
+  int prev_frame = rec_thread_frame - 1;
+  if (prev_frame == -1) {
+    prev_frame = encoded_packets_size - 1;
+  }
+  enc_pkt = encoded_packets[prev_frame];
+  rec_end_pts = enc_pkt->pts;
+  snprintf(state_buf, sizeof(state_buf), "duration_pts=%" PRId64 "\nduration_sec=%f\n",
+      rec_end_pts - rec_start_pts,
+      (rec_end_pts - rec_start_pts) / 90000.0f);
+  state_set(NULL, this->recording_basename, state_buf);
+
+  return this->rec_thread_stop(has_error);
+}
+
+int Muxer::write_encoded_packets(int max_packets, int origin_pts) {
+  int ret;
+  AVPacket *avpkt;
+  EncodedPacket *enc_pkt;
+  char errbuf[1024];
+
+  avpkt = av_packet_alloc();
+  int wrote_packets = 0;
+
+  pthread_mutex_lock(&rec_write_mutex);
+  while (1) {
+    wrote_packets++;
+    enc_pkt = this->encoded_packets[this->rec_thread_frame];
+    avpkt->pts = avpkt->dts = enc_pkt->pts - origin_pts;
+    avpkt->data = enc_pkt->data;
+    avpkt->size = enc_pkt->size;
+    avpkt->stream_index = enc_pkt->stream_index;
+    avpkt->flags = enc_pkt->flags;
+    ret = av_write_frame(this->rec_format_ctx, avpkt);
+    if (ret < 0) {
+      av_strerror(ret, errbuf, sizeof(errbuf));
+      log_error("error: write_encoded_packets: av_write_frame: %s\n", errbuf);
+    }
+    if (++this->rec_thread_frame == this->encoded_packets_size) {
+      this->rec_thread_frame = 0;
+    }
+    if (this->rec_thread_frame == this->current_encoded_packet) {
+      break;
+    }
+    if (wrote_packets == max_packets) {
+      break;
+    }
+  }
+  pthread_mutex_unlock(&this->rec_write_mutex);
+  av_packet_free(&avpkt);
+
+  return wrote_packets;
+}
+
+void Muxer::add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_index, int flags) {
+  EncodedPacket *packet;
+
+  printf("add stream=%d pts=%lld size=%d flags=%d\n", stream_index, pts, size, flags);
+
+  if (++current_encoded_packet == encoded_packets_size) {
+    current_encoded_packet = 0;
+  }
+  packet = encoded_packets[current_encoded_packet];
+  if (packet != NULL) {
+    int next_keyframe_pointer = current_keyframe_pointer + 1;
+    if (next_keyframe_pointer >= record_buffer_keyframes) {
+      next_keyframe_pointer = 0;
+    }
+    if (current_encoded_packet == keyframe_pointers[next_keyframe_pointer]) {
+      log_warn("warning: Record buffer is starving. Recorded file may not start from keyframe. Try reducing the value of --gopsize.\n");
+    }
+
+    av_freep(&packet->data);
+  } else {
+    packet = (EncodedPacket *)malloc(sizeof(EncodedPacket));
+    if (packet == NULL) {
+      perror("malloc for EncodedPacket");
+      return;
+    }
+    encoded_packets[current_encoded_packet] = packet;
+  }
+  packet->pts = pts;
+  packet->data = data;
+  packet->size = size;
+  packet->stream_index = stream_index;
+  packet->flags = flags;
+
+  this->onFrameArrive();
+}
+
+void Muxer::free_encoded_packets() {
+  int i;
+  EncodedPacket *packet;
+
+  for (i = 0; i < this->encoded_packets_size; i++) {
+    packet = this->encoded_packets[i];
+    if (packet != NULL) {
+      av_freep(&packet->data);
+      free(packet);
+    }
+  }
+}

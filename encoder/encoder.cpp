@@ -14,7 +14,6 @@
 
 Encoder *Encoder::Create(VideoOptions const *options, const StreamInfo &info)
 {
-	std::cout << "xxx codec: " << options->codec.c_str() << std::endl;
 	if (strcasecmp(options->codec.c_str(), "yuv420") == 0)
 		return new NullEncoder(options);
 	else if (strcasecmp(options->codec.c_str(), "h264") == 0)
