@@ -612,20 +612,20 @@ void Audio::encode_and_send_audio() {
       time_for_last_pts = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
     }
 
-    // We have to copy AVPacket before av_write_frame()
-    // because it changes internal data of the AVPacket.
-    // Otherwise av_write_frame() will fail with the error:
-    // "AAC bitstream not in ADTS format and extradata missing".
-    uint8_t *copied_data = (uint8_t *)av_malloc(pkt->size);
-    memcpy(copied_data, pkt->data, pkt->size);
     if (this->encode_callback) {
       this->encode_callback(
           pkt->pts,
-          copied_data,
+          pkt->data,
           pkt->size,
           pkt->stream_index,
           pkt->flags);
     }
+
+    // We have to copy AVPacket before av_write_frame()
+    // because it changes internal data of the AVPacket.
+    // Otherwise av_write_frame() will fail with the error:
+    // "AAC bitstream not in ADTS format and extradata missing".
+
     // this->my_fp.write((char *)pkt->data, pkt->size);
     // pthread_mutex_lock(&rec_write_mutex);
     // add_encoded_packet(pts, copied_data, pkt->size, pkt->stream_index, pkt->flags);
@@ -745,9 +745,11 @@ int Audio::read_audio_poll_mmap() {
       is_first_audio = 1;
     }
     size_t copy_size = frames * sizeof(short) * this->get_audio_channels();
+    // printf("audio memcpy begin\n");
     memcpy(this_samples + read_size / sizeof(short),
       ((uint16_t *)my_areas[0].addr)+(offset*this->get_audio_channels()), // we don't need to multiply offset by sizeof(short) because of (uint16_t *) type
       copy_size);
+    // printf("audio memcpy end\n");
     read_size += copy_size;
 
     // log_debug("snd_pcm_mmap_commit\n");

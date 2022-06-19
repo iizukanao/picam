@@ -114,6 +114,10 @@ VideoEncoder::VideoEncoder(PicamOption const *options, StreamInfo const &info)
 	// 	if (xioctl(fd_, VIDIOC_S_CTRL, &ctrl) < 0)
 	// 		throw std::runtime_error("failed to set intra period");
 	// }
+	ctrl.id = V4L2_CID_MPEG_VIDEO_H264_I_PERIOD;
+	ctrl.value = (unsigned int)options->video_fps;
+	if (xioctl(fd_, VIDIOC_S_CTRL, &ctrl) < 0)
+		throw std::runtime_error("failed to set intra period");
 
 	// if (options->inline_headers)
 	// {

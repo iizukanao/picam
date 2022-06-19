@@ -370,7 +370,7 @@ void audioLoop(Audio *audio)
 
 void outputReady(void *mem, size_t size, int64_t timestamp_us, bool keyframe)
 {
-	printf("outputReady size=%d timestamp=%lld keyframe=%d\n", size, timestamp_us, keyframe);
+	// printf("outputReady size=%d timestamp=%lld keyframe=%d\n", size, timestamp_us, keyframe);
 	if (video_timestamp_origin_us == -1) {
 		video_timestamp_origin_us = timestamp_us;
 		printf("xxx set video_timestamp_origin_us=%lld\n", video_timestamp_origin_us);
@@ -552,9 +552,9 @@ void Picam::event_loop()
 		// if (key == '\n')
 		// 	output->Signal();
 
-		log_debug("Viewfinder frame %d\n", count);
+		// log_debug("Viewfinder frame %d\n", count);
 		auto now = std::chrono::high_resolution_clock::now();
-    uint64_t timeout_ms = 30000;
+    uint64_t timeout_ms = (6 * 60 + 15) * 1000;
     uint32_t frames = 0;
 		bool timeout = !frames && timeout_ms &&
 					   (now - start_time > std::chrono::milliseconds(timeout_ms));
@@ -617,165 +617,6 @@ void Picam::setOption(PicamOption *option)
 {
   this->option = option;
 }
-
-// void Picam::setupEncoder()
-// {
-// 	// First open the encoder device. Maybe we should double-check its "caps".
-
-// 	const char device_name[] = "/dev/video11";
-// 	fd_ = open(device_name, O_RDWR, 0);
-// 	if (fd_ < 0) {
-// 		throw std::runtime_error("failed to open V4L2 H264 encoder");
-//   }
-//   log_debug("Opened H264Encoder on " << device_name << " as fd " << fd_ << std::endl);
-
-// 	// Apply any options->
-
-// 	v4l2_control ctrl = {};
-// 	if (options->bitrate)
-// 	{
-// 		ctrl.id = V4L2_CID_MPEG_VIDEO_BITRATE;
-// 		ctrl.value = options->bitrate;
-// 		if (xioctl(fd_, VIDIOC_S_CTRL, &ctrl) < 0)
-// 			throw std::runtime_error("failed to set bitrate");
-// 	}
-// 	if (!options->profile.empty())
-// 	{
-// 		static const std::map<std::string, int> profile_map =
-// 			{ { "baseline", V4L2_MPEG_VIDEO_H264_PROFILE_BASELINE },
-// 			  { "main", V4L2_MPEG_VIDEO_H264_PROFILE_MAIN },
-// 			  { "high", V4L2_MPEG_VIDEO_H264_PROFILE_HIGH } };
-// 		auto it = profile_map.find(options->profile);
-// 		if (it == profile_map.end())
-// 			throw std::runtime_error("no such profile " + options->profile);
-// 		ctrl.id = V4L2_CID_MPEG_VIDEO_H264_PROFILE;
-// 		ctrl.value = it->second;
-// 		if (xioctl(fd_, VIDIOC_S_CTRL, &ctrl) < 0)
-// 			throw std::runtime_error("failed to set profile");
-// 	}
-// 	if (!options->level.empty())
-// 	{
-// 		static const std::map<std::string, int> level_map =
-// 			{ { "4", V4L2_MPEG_VIDEO_H264_LEVEL_4_0 },
-// 			  { "4.1", V4L2_MPEG_VIDEO_H264_LEVEL_4_1 },
-// 			  { "4.2", V4L2_MPEG_VIDEO_H264_LEVEL_4_2 } };
-// 		auto it = level_map.find(options->level);
-// 		if (it == level_map.end())
-// 			throw std::runtime_error("no such level " + options->level);
-// 		ctrl.id = V4L2_CID_MPEG_VIDEO_H264_LEVEL;
-// 		ctrl.value = it->second;
-// 		if (xioctl(fd_, VIDIOC_S_CTRL, &ctrl) < 0)
-// 			throw std::runtime_error("failed to set level");
-// 	}
-// 	if (options->intra)
-// 	{
-// 		ctrl.id = V4L2_CID_MPEG_VIDEO_H264_I_PERIOD;
-// 		ctrl.value = options->intra;
-// 		if (xioctl(fd_, VIDIOC_S_CTRL, &ctrl) < 0)
-// 			throw std::runtime_error("failed to set intra period");
-// 	}
-// 	if (options->inline_headers)
-// 	{
-// 		ctrl.id = V4L2_CID_MPEG_VIDEO_REPEAT_SEQ_HEADER;
-// 		ctrl.value = 1;
-// 		if (xioctl(fd_, VIDIOC_S_CTRL, &ctrl) < 0)
-// 			throw std::runtime_error("failed to set inline headers");
-// 	}
-
-// 	// Set the output and capture formats. We know exactly what they will be.
-
-// 	v4l2_format fmt = {};
-// 	fmt.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
-// 	fmt.fmt.pix_mp.width = info.width;
-// 	fmt.fmt.pix_mp.height = info.height;
-// 	// We assume YUV420 here, but it would be nice if we could do something
-// 	// like info.pixel_format.toV4L2Fourcc();
-// 	fmt.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_YUV420;
-// 	fmt.fmt.pix_mp.plane_fmt[0].bytesperline = info.stride;
-// 	fmt.fmt.pix_mp.field = V4L2_FIELD_ANY;
-// 	fmt.fmt.pix_mp.colorspace = get_v4l2_colorspace(info.colour_space);
-// 	fmt.fmt.pix_mp.num_planes = 1;
-// 	if (xioctl(fd_, VIDIOC_S_FMT, &fmt) < 0)
-// 		throw std::runtime_error("failed to set output format");
-
-// 	fmt = {};
-// 	fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-// 	fmt.fmt.pix_mp.width = options->width;
-// 	fmt.fmt.pix_mp.height = options->height;
-// 	fmt.fmt.pix_mp.pixelformat = V4L2_PIX_FMT_H264;
-// 	fmt.fmt.pix_mp.field = V4L2_FIELD_ANY;
-// 	fmt.fmt.pix_mp.colorspace = V4L2_COLORSPACE_DEFAULT;
-// 	fmt.fmt.pix_mp.num_planes = 1;
-// 	fmt.fmt.pix_mp.plane_fmt[0].bytesperline = 0;
-// 	fmt.fmt.pix_mp.plane_fmt[0].sizeimage = 512 << 10;
-// 	if (xioctl(fd_, VIDIOC_S_FMT, &fmt) < 0)
-// 		throw std::runtime_error("failed to set capture format");
-
-// 	// Request that the necessary buffers are allocated. The output queue
-// 	// (input to the encoder) shares buffers from our caller, these must be
-// 	// DMABUFs. Buffers for the encoded bitstream must be allocated and
-// 	// m-mapped.
-
-// 	v4l2_requestbuffers reqbufs = {};
-// 	reqbufs.count = NUM_OUTPUT_BUFFERS;
-// 	reqbufs.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
-// 	reqbufs.memory = V4L2_MEMORY_DMABUF;
-// 	if (xioctl(fd_, VIDIOC_REQBUFS, &reqbufs) < 0)
-// 		throw std::runtime_error("request for output buffers failed");
-// 	if (options->verbose)
-// 		std::cerr << "Got " << reqbufs.count << " output buffers" << std::endl;
-
-// 	// We have to maintain a list of the buffers we can use when our caller gives
-// 	// us another frame to encode.
-// 	for (unsigned int i = 0; i < reqbufs.count; i++)
-// 		input_buffers_available_.push(i);
-
-// 	reqbufs = {};
-// 	reqbufs.count = NUM_CAPTURE_BUFFERS;
-// 	reqbufs.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-// 	reqbufs.memory = V4L2_MEMORY_MMAP;
-// 	if (xioctl(fd_, VIDIOC_REQBUFS, &reqbufs) < 0)
-// 		throw std::runtime_error("request for capture buffers failed");
-// 	if (options->verbose)
-// 		std::cerr << "Got " << reqbufs.count << " capture buffers" << std::endl;
-// 	num_capture_buffers_ = reqbufs.count;
-
-// 	for (unsigned int i = 0; i < reqbufs.count; i++)
-// 	{
-// 		v4l2_plane planes[VIDEO_MAX_PLANES];
-// 		v4l2_buffer buffer = {};
-// 		buffer.type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-// 		buffer.memory = V4L2_MEMORY_MMAP;
-// 		buffer.index = i;
-// 		buffer.length = 1;
-// 		buffer.m.planes = planes;
-// 		if (xioctl(fd_, VIDIOC_QUERYBUF, &buffer) < 0)
-// 			throw std::runtime_error("failed to capture query buffer " + std::to_string(i));
-// 		buffers_[i].mem = mmap(0, buffer.m.planes[0].length, PROT_READ | PROT_WRITE, MAP_SHARED, fd_,
-// 							   buffer.m.planes[0].m.mem_offset);
-// 		if (buffers_[i].mem == MAP_FAILED)
-// 			throw std::runtime_error("failed to mmap capture buffer " + std::to_string(i));
-// 		buffers_[i].size = buffer.m.planes[0].length;
-// 		// Whilst we're going through all the capture buffers, we may as well queue
-// 		// them ready for the encoder to write into.
-// 		if (xioctl(fd_, VIDIOC_QBUF, &buffer) < 0)
-// 			throw std::runtime_error("failed to queue capture buffer " + std::to_string(i));
-// 	}
-
-// 	// Enable streaming and we're done.
-
-// 	v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
-// 	if (xioctl(fd_, VIDIOC_STREAMON, &type) < 0)
-// 		throw std::runtime_error("failed to start output streaming");
-// 	type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
-// 	if (xioctl(fd_, VIDIOC_STREAMON, &type) < 0)
-// 		throw std::runtime_error("failed to start capture streaming");
-// 	if (options->verbose)
-// 		std::cerr << "Codec streaming started" << std::endl;
-
-// 	output_thread_ = std::thread(&H264Encoder::outputThread, this);
-// 	poll_thread_ = std::thread(&H264Encoder::pollThread, this);
-// }
 
 int Picam::run(int argc, char *argv[])
 {

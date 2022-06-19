@@ -48,7 +48,6 @@ class Muxer
     void flush_record();
     HTTPLiveStreaming *hls;
     RecSettings rec_settings;
-    pthread_mutex_t rec_write_mutex = PTHREAD_MUTEX_INITIALIZER;
     EncodedPacket **encoded_packets; // circular buffer that stores encoded audio and video
     int encoded_packets_size; // the number of EncodedPacket that can be stored in encoded_packets
     int current_encoded_packet = -1; // write pointer of encoded_packets array that holds latest encoded audio or video
@@ -72,8 +71,6 @@ class Muxer
     int record_buffer_keyframes = 5;
     int rec_thread_needs_exit = 0;
     int rec_thread_needs_flush = 0;
-    pthread_mutex_t rec_mutex = PTHREAD_MUTEX_INITIALIZER;
     int rec_thread_needs_write = 0;
-    pthread_cond_t rec_cond = PTHREAD_COND_INITIALIZER;
     int flush_recording_seconds = 5; // Flush recording data every 5 seconds
 };

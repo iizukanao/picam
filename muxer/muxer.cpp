@@ -9,6 +9,11 @@
 // Number of packets to chase recording for each cycle
 #define REC_CHASE_PACKETS 10
 
+static pthread_mutex_t rec_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t rec_write_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t rec_cond = PTHREAD_COND_INITIALIZER;
+static pthread_mutex_t encoded_packet_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 Muxer::Muxer() {
 }
 
@@ -150,7 +155,7 @@ void Muxer::prepareForDestroy() {
   printf("prepareForDestroy: is_recording=%d\n", this->is_recording);
   if (this->is_recording) {
     this->rec_thread_needs_write = 1;
-    pthread_cond_signal(&this->rec_cond);
+    pthread_cond_signal(&rec_cond);
 
     this->stop_record();
   }
@@ -228,10 +233,10 @@ void Muxer::start_record() {
 
 void Muxer::onFrameArrive() {
   if (this->is_recording) {
-    pthread_mutex_lock(&this->rec_mutex);
+    pthread_mutex_lock(&rec_mutex);
     this->rec_thread_needs_write = 1;
-    pthread_cond_signal(&this->rec_cond);
-    pthread_mutex_unlock(&this->rec_mutex);
+    pthread_cond_signal(&rec_cond);
+    pthread_mutex_unlock(&rec_mutex);
   }
 }
 
@@ -361,13 +366,13 @@ void Muxer::rec_start(RecSettings rec_settings) {
 
   av_pkt = av_packet_alloc();
   while (!this->rec_thread_needs_exit) {
-    pthread_mutex_lock(&this->rec_mutex);
+    pthread_mutex_lock(&rec_mutex);
     while (!this->rec_thread_needs_write) {
-      printf("rec_cond wait\n");
-      pthread_cond_wait(&this->rec_cond, &this->rec_mutex);
-      printf("rec_cond waited\n");
+      // printf("rec_cond wait\n");
+      pthread_cond_wait(&rec_cond, &rec_mutex);
+      // printf("rec_cond waited\n");
     }
-    pthread_mutex_unlock(&this->rec_mutex);
+    pthread_mutex_unlock(&rec_mutex);
 
     if (this->rec_thread_frame != this->current_encoded_packet) {
       wrote_packets = write_encoded_packets(REC_CHASE_PACKETS, rec_start_pts);
@@ -469,7 +474,7 @@ int Muxer::write_encoded_packets(int max_packets, int origin_pts) {
       break;
     }
   }
-  pthread_mutex_unlock(&this->rec_write_mutex);
+  pthread_mutex_unlock(&rec_write_mutex);
   av_packet_free(&avpkt);
 
   return wrote_packets;
@@ -478,8 +483,13 @@ int Muxer::write_encoded_packets(int max_packets, int origin_pts) {
 void Muxer::add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_index, int flags) {
   EncodedPacket *packet;
 
-  printf("add stream=%d pts=%lld size=%d flags=%d\n", stream_index, pts, size, flags);
+  printf("add stream=%d pts=%lld size=%d flags=%d", stream_index, pts, size, flags);
+  if (stream_index == 0 && flags) {
+    printf(" (keyframe)");
+  }
+  printf("\n");
 
+  pthread_mutex_lock(&encoded_packet_mutex);
   if (++current_encoded_packet == encoded_packets_size) {
     current_encoded_packet = 0;
   }
@@ -502,11 +512,22 @@ void Muxer::add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_
     }
     encoded_packets[current_encoded_packet] = packet;
   }
+
+  uint8_t *copied_data = (uint8_t *)av_malloc(size);
+  if (copied_data == NULL) {
+    perror("av_malloc for copied_data");
+    exit(EXIT_FAILURE);
+  }
+  // If this part is not guarded by mutex, segmentation fault will happen
+  // printf("add_encoded_packet memcpy begin\n");
+  memcpy(copied_data, data, size);
+  // printf("add_encoded_packet memcpy end\n");
   packet->pts = pts;
-  packet->data = data;
+  packet->data = copied_data;
   packet->size = size;
   packet->stream_index = stream_index;
   packet->flags = flags;
+  pthread_mutex_unlock(&encoded_packet_mutex);
 
   this->onFrameArrive();
 }
