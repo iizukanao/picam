@@ -1,10 +1,105 @@
 #pragma once
 
+#include <libcamera/control_ids.h>
+#include <linux/videodev2.h>
+
 #include "log/log.h"
 #include "text/text.h"
 
 #define PROGRAM_NAME     "picam"
 #define PROGRAM_VERSION  "2.0.0"
+
+typedef struct white_balance_option {
+  const char *name;
+  libcamera::controls::AwbModeEnum control;
+} white_balance_option;
+const white_balance_option white_balance_options[] = {
+  { "off",          libcamera::controls::AwbCustom },
+  { "auto",         libcamera::controls::AwbAuto },
+  // { "sun",          OMX_WhiteBalControlSunLight },
+  { "cloudy",       libcamera::controls::AwbCloudy },
+  // { "shade",        OMX_WhiteBalControlShade },
+  { "tungsten",     libcamera::controls::AwbTungsten },
+  { "fluorescent",  libcamera::controls::AwbFluorescent },
+  { "incandescent", libcamera::controls::AwbIncandescent },
+  // { "flash",        OMX_WhiteBalControlFlash },
+  // { "horizon",      OMX_WhiteBalControlHorizon },
+  // { "greyworld",    OMX_WhiteBalControlGreyWorld },
+  { "indoor", libcamera::controls::AwbIndoor },
+  { "daylight", libcamera::controls::AwbDaylight },
+};
+
+typedef struct exposure_control_option {
+  const char *name;
+  libcamera::controls::AeExposureModeEnum control;
+} exposure_control_option;
+const exposure_control_option exposure_control_options[] = {
+  { "off",           libcamera::controls::ExposureCustom },
+  { "normal",           libcamera::controls::ExposureNormal },
+  { "short",           libcamera::controls::ExposureShort },
+  { "long",           libcamera::controls::ExposureLong },
+  // { "auto",          libcamera::controls::ExposureAuto },
+  // { "night",         OMX_ExposureControlNight },
+  // { "nightpreview",  OMX_ExposureControlNightWithPreview },
+  // { "backlight",     OMX_ExposureControlBackLight },
+  // { "spotlight",     OMX_ExposureControlSpotLight },
+  // { "sports",        OMX_ExposureControlSports },
+  // { "snow",          OMX_ExposureControlSnow },
+  // { "beach",         OMX_ExposureControlBeach },
+  // { "verylong",      OMX_ExposureControlVeryLong },
+  // { "fixedfps",      OMX_ExposureControlFixedFps },
+  // { "antishake",     OMX_ExposureControlAntishake },
+  // { "fireworks",     OMX_ExposureControlFireworks },
+  // { "largeaperture", OMX_ExposureControlLargeAperture },
+  // { "smallaperture", OMX_ExposureControlSmallAperture },
+};
+
+typedef struct exposure_metering_option {
+  const char *name;
+  libcamera::controls::AeMeteringModeEnum metering;
+} exposure_metering_option;
+const exposure_metering_option exposure_metering_options[] = {
+  { "centre_weighted", libcamera::controls::MeteringCentreWeighted },
+  // { "average", OMX_MeteringModeAverage },
+  { "spot",    libcamera::controls::MeteringSpot },
+  { "matrix",  libcamera::controls::MeteringMatrix },
+  { "custom",  libcamera::controls::MeteringCustom },
+  // { "backlit", OMX_MeteringModeBacklit },
+};
+
+typedef struct video_avc_profile_option {
+  const char *name;
+  v4l2_mpeg_video_h264_profile profile;
+} video_avc_profile_option;
+const video_avc_profile_option video_avc_profile_options[] = {
+  { "constrained_baseline", V4L2_MPEG_VIDEO_H264_PROFILE_CONSTRAINED_BASELINE },
+  { "baseline",             V4L2_MPEG_VIDEO_H264_PROFILE_BASELINE },
+  { "main",                 V4L2_MPEG_VIDEO_H264_PROFILE_MAIN },
+  { "high",                 V4L2_MPEG_VIDEO_H264_PROFILE_HIGH },
+};
+
+typedef struct video_avc_level_option {
+  const char *name;
+  v4l2_mpeg_video_h264_level level;
+} video_avc_level_option;
+const video_avc_level_option video_avc_level_options[] = {
+  { "1",   V4L2_MPEG_VIDEO_H264_LEVEL_1_0 },
+  { "1b",  V4L2_MPEG_VIDEO_H264_LEVEL_1B },
+  { "1.1", V4L2_MPEG_VIDEO_H264_LEVEL_1_1 },
+  { "1.2", V4L2_MPEG_VIDEO_H264_LEVEL_1_2 },
+  { "1.3", V4L2_MPEG_VIDEO_H264_LEVEL_1_3 },
+  { "2",   V4L2_MPEG_VIDEO_H264_LEVEL_2_0 },
+  { "2.1", V4L2_MPEG_VIDEO_H264_LEVEL_2_1 },
+  { "2.2", V4L2_MPEG_VIDEO_H264_LEVEL_2_2 },
+  { "3",   V4L2_MPEG_VIDEO_H264_LEVEL_3_0 },
+  { "3.1", V4L2_MPEG_VIDEO_H264_LEVEL_3_1 },
+  { "3.2", V4L2_MPEG_VIDEO_H264_LEVEL_3_2 },
+  { "4",   V4L2_MPEG_VIDEO_H264_LEVEL_4_0 },
+  { "4.1", V4L2_MPEG_VIDEO_H264_LEVEL_4_1 },
+  { "4.2", V4L2_MPEG_VIDEO_H264_LEVEL_4_2 },
+  { "5",   V4L2_MPEG_VIDEO_H264_LEVEL_5_0 },
+  { "5.1", V4L2_MPEG_VIDEO_H264_LEVEL_5_1 },
+};
 
 class PicamOption {
 public:
@@ -12,6 +107,11 @@ public:
     ~PicamOption();
     void print_usage();
     int parse(int argc, char **argv);
+
+    // Directory to put recorded MPEG-TS files
+    char *rec_dir = (char *)"rec";
+    char *rec_tmp_dir = (char *)"rec/tmp";
+    char *rec_archive_dir = (char *)"rec/archive";
 
     // If true, query camera capabilities and exit
     int query_and_exit = 0;
@@ -49,6 +149,7 @@ public:
     int audio_channels = 1;
     int audio_preview_channels;
     int audio_sample_rate = 48000;
+    int audio_period_size;
     int is_hlsout_enabled = 0;
     char hls_output_dir[256] = "/run/shm/video";
     int hls_keyframes_per_segment = 1;

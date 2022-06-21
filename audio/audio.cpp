@@ -10,8 +10,8 @@ extern "C" {
 // Internal flag indicates that audio is available for read
 #define AVAIL_AUDIO 2
 
-Audio::Audio(PicamOption const *options)
-	: options_(options)
+Audio::Audio(PicamOption *option)
+	: option(option)
 {
   std::cout << "audio constructor called" << std::endl;
 }
@@ -42,8 +42,6 @@ static int audio_buffer_size;
 // static int is_audio_preview_device_opened = 0;
 
 // static MpegTSCodecSettings codec_settings;
-
-static int audio_pts_step_base;
 
 // TODO: Make these values injectable from options
 // static unsigned int audio_sample_rate = 48000;
@@ -81,6 +79,10 @@ int Audio::get_audio_sample_rate() {
 
 inline int Audio::get_audio_channels() {
   return this->hls->audio_ctx->ch_layout.nb_channels;
+}
+
+int Audio::get_audio_pts_step_base() {
+  return this->audio_pts_step_base;
 }
 
 // Configure the microphone before main setup
@@ -181,9 +183,9 @@ void Audio::setup_av_frame(AVFormatContext *format_ctx) {
   }
 #endif
 
-  this->period_size = buffer_size / this->get_audio_channels() / sizeof(short);
-  audio_pts_step_base = 90000.0f * this->period_size / this->get_audio_sample_rate();
-  log_debug("audio_pts_step_base: %d\n", audio_pts_step_base);
+  this->option->audio_period_size = buffer_size / this->get_audio_channels() / sizeof(short);
+  this->audio_pts_step_base = 90000.0f * this->option->audio_period_size / this->get_audio_sample_rate();
+  log_debug("audio_pts_step_base: %d\n", this->audio_pts_step_base);
 
   ret = avcodec_fill_audio_frame(av_frame, audio_codec_ctx->ch_layout.nb_channels, (AVSampleFormat) audio_codec_ctx->format,
       (const uint8_t*)this->samples, buffer_size, 0);
@@ -288,11 +290,11 @@ int Audio::configure_audio_capture_device() {
 
   audio_buffer_size = buffer_size;
 
-  log_debug("microphone: setting period size to %d\n", this->period_size);
+  log_debug("microphone: setting period size to %d\n", this->option->audio_period_size);
   dir = 0;
   // set the period size
   err = snd_pcm_hw_params_set_period_size_near(capture_handle, alsa_hw_params,
-      (snd_pcm_uframes_t *)&this->period_size, &dir);
+      (snd_pcm_uframes_t *)&this->option->audio_period_size, &dir);
   if (err < 0) {
     log_fatal("error: failed to set period size for microphone (%s)\n", snd_strerror(err));
     exit(EXIT_FAILURE);
@@ -401,10 +403,10 @@ void Audio::stop() {
 // Callback function that is called when an error has occurred
 static int xrun_recovery(snd_pcm_t *handle, int error) {
   switch(error) {
-    case -EPIPE: // Buffer overrun
-      log_error("microphone error: buffer overrun\n");
+    case -EPIPE: // Buffer underrun
+      log_error("microphone error: buffer underrun (data rate from microphone is too slow)\n");
       if ((error = snd_pcm_prepare(handle)) < 0) {
-        log_error("microphone error: buffer overrrun cannot be recovered, "
+        log_error("microphone error: unable to recover from underrun, "
             "snd_pcm_prepare failed: %s\n", snd_strerror(error));
       }
       return 0;
@@ -419,7 +421,7 @@ static int xrun_recovery(snd_pcm_t *handle, int error) {
 
       if (error < 0) {
         if ((error = snd_pcm_prepare(handle)) < 0) {
-          log_error("microphone error: suspend cannot be recovered, "
+          log_error("microphone error: unable to recover from suspend, "
               "snd_pcm_prepare failed: %s\n", snd_strerror(error));
         }
       }
@@ -471,7 +473,7 @@ int64_t Audio::get_next_audio_pts() {
 
   // We use audio timing as the base clock,
   // so we do not modify PTS here.
-  pts = this->audio_current_pts + audio_pts_step_base;
+  pts = this->audio_current_pts + this->audio_pts_step_base;
 
   this->audio_current_pts = pts;
 
@@ -677,7 +679,7 @@ void Audio::encode_and_send_audio() {
 }
 
 float Audio::get_fps() {
-  return this->get_audio_sample_rate() / this->get_audio_channels() / this->period_size;
+  return this->get_audio_sample_rate() / this->get_audio_channels() / this->option->audio_period_size;
 }
 
 int Audio::read_audio_poll_mmap() {
@@ -703,7 +705,7 @@ int Audio::read_audio_poll_mmap() {
     is_first_audio = 1;
     return error;
   }
-  if (avail < this->period_size) { // check if one period is ready to process
+  if (avail < this->option->audio_period_size) { // check if one period is ready to process
     switch (is_first_audio)
     {
       case 1:
@@ -731,7 +733,7 @@ int Audio::read_audio_poll_mmap() {
     return -1;
   }
   int read_size = 0;
-  size = this->period_size;
+  size = this->option->audio_period_size;
   while (size > 0) { // wait until we have period_size frames (in the most cases only one loop is needed)
     frames = size; // expected number of frames to be processed
     // frames is a bidirectional variable, this means that the real number of frames processed is written
@@ -775,7 +777,7 @@ int Audio::read_audio_poll_mmap() {
   //   }
 
   //   ptr = this_samples;
-  //   cptr = this->period_size;
+  //   cptr = this->option->audio_period_size;
   //   while (cptr > 0) {
   //     err = snd_pcm_mmap_writei(audio_preview_handle, ptr, cptr);
   //     if (err == -EAGAIN) {
@@ -794,7 +796,7 @@ int Audio::read_audio_poll_mmap() {
   // }
 
   if (this->audio_volume_multiply != 1.0f) {
-    int total_samples = this->period_size * this->get_audio_channels();
+    int total_samples = this->option->audio_period_size * this->get_audio_channels();
     int i;
     for (i = 0; i < total_samples; i++) {
       int16_t value = (int16_t)this_samples[i];
@@ -862,7 +864,7 @@ void Audio::loop() {
       this->read_audio_poll_mmap();
 #if AUDIO_BUFFER_CHUNKS > 0
       if (AUDIO_BUFFER_CHUNKS == 0 || is_audio_buffer_filled) {
-        memcpy(this->samples, audio_buffer[audio_buffer_index], this->period_size * sizeof(short) * audio_channels);
+        memcpy(this->samples, audio_buffer[audio_buffer_index], this->option->audio_period_size * sizeof(short) * audio_channels);
 #else
       if (1) {
 #endif
@@ -885,7 +887,7 @@ void Audio::loop() {
         //     audio_pending_drop_frames--;
         //   } else {
         //     if (is_audio_muted) {
-        //       memset(this->samples, 0, this->period_size * sizeof(short) * audio_channels);
+        //       memset(this->samples, 0, this->option->audio_period_size * sizeof(short) * audio_channels);
         //     }
         //     encode_and_send_audio();
         //   }
@@ -893,4 +895,12 @@ void Audio::loop() {
       }
     }
   } // end of while loop (keepRunning)
+}
+
+void Audio::mute() {
+  this->is_muted = true;
+}
+
+void Audio::unmute() {
+  this->is_muted = false;
 }

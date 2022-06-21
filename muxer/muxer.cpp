@@ -14,7 +14,8 @@ static pthread_mutex_t rec_write_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t rec_cond = PTHREAD_COND_INITIALIZER;
 static pthread_mutex_t encoded_packet_mutex = PTHREAD_MUTEX_INITIALIZER;
 
-Muxer::Muxer() {
+Muxer::Muxer(PicamOption *option) {
+  this->option = option;
 }
 
 Muxer::~Muxer() {
@@ -208,7 +209,7 @@ void start_rec_thread(Muxer *muxer, RecSettings rec_settings) {
   muxer->rec_start(rec_settings);
 }
 
-void Muxer::start_record() {
+void Muxer::start_record(RecSettings settings) {
   if (this->is_recording) {
     log_warn("recording is already started\n");
     return;
@@ -221,13 +222,6 @@ void Muxer::start_record() {
 
   this->rec_thread_needs_exit = 0;
   // pthread_create(&rec_thread, NULL, rec_thread_start, NULL);
-  RecSettings settings = {
-    "", // recording_dest_dir
-    "", // recording_basename
-    "rec", // rec_dir
-    "rec/tmp", // rec_tmp_dir
-    "rec/archive", // rec_archive_dir
-  };
 	this->recThread = std::thread(start_rec_thread, this, settings);
 }
 
@@ -240,6 +234,7 @@ void Muxer::onFrameArrive() {
   }
 }
 
+// Called from thread
 void Muxer::rec_start(RecSettings rec_settings) {
   time_t rawtime;
   struct tm *timeinfo;
@@ -480,14 +475,28 @@ int Muxer::write_encoded_packets(int max_packets, int origin_pts) {
   return wrote_packets;
 }
 
+// Remember the point where keyframe occurs within encoded_packets
+void Muxer::mark_keyframe_packet() {
+  // keyframe_pointers is a circular buffer and
+  // current_keyframe_pointer holds the index of last written item.
+  current_keyframe_pointer++;
+  if (current_keyframe_pointer >= record_buffer_keyframes) {
+    current_keyframe_pointer = 0;
+    if (!is_keyframe_pointers_filled) {
+      is_keyframe_pointers_filled = 1;
+    }
+  }
+  keyframe_pointers[current_keyframe_pointer] = current_encoded_packet;
+}
+
 void Muxer::add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_index, int flags) {
   EncodedPacket *packet;
 
-  printf("add stream=%d pts=%lld size=%d flags=%d", stream_index, pts, size, flags);
-  if (stream_index == 0 && flags) {
-    printf(" (keyframe)");
-  }
-  printf("\n");
+  // printf("add stream=%d pts=%lld size=%d flags=%d", stream_index, pts, size, flags);
+  // if (stream_index == 0 && flags) {
+  //   printf(" (keyframe)");
+  // }
+  // printf("\n");
 
   pthread_mutex_lock(&encoded_packet_mutex);
   if (++current_encoded_packet == encoded_packets_size) {
@@ -499,6 +508,9 @@ void Muxer::add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_
     if (next_keyframe_pointer >= record_buffer_keyframes) {
       next_keyframe_pointer = 0;
     }
+    // log_debug("current_keyframe_pointer=%d current_encoded_packet=%d next_keyframe_pointer=%d keyframe_pointers[next]=%d\n",
+      // current_keyframe_pointer,
+      // current_encoded_packet, next_keyframe_pointer, keyframe_pointers[next_keyframe_pointer]);
     if (current_encoded_packet == keyframe_pointers[next_keyframe_pointer]) {
       log_warn("warning: Record buffer is starving. Recorded file may not start from keyframe. Try reducing the value of --gopsize.\n");
     }
@@ -543,4 +555,78 @@ void Muxer::free_encoded_packets() {
       free(packet);
     }
   }
+}
+
+// set record_buffer_keyframes to newsize
+int Muxer::set_record_buffer_keyframes(int newsize) {
+  int i;
+  void *result;
+  int malloc_size;
+
+  if (is_recording) {
+    log_error("error: recordbuf cannot be changed while recording\n");
+    return -1;
+  }
+
+  if (newsize < 1) {
+    log_error("error changing recordbuf to %d (must be >= 1)\n", newsize);
+    return -1;
+  }
+
+  if (newsize == record_buffer_keyframes) { // no change
+    log_debug("recordbuf does not change: current=%d new=%d\n",
+        record_buffer_keyframes, newsize);
+    return -1;
+  }
+
+  for (i = 0; i < encoded_packets_size; i++) {
+    EncodedPacket *packet = encoded_packets[i];
+    if (packet != NULL) {
+      av_freep(&packet->data);
+      free(packet);
+    }
+  }
+
+  // reset encoded_packets
+  int audio_fps = this->option->audio_sample_rate / 1 / this->option->audio_period_size;
+  int new_encoded_packets_size = (this->option->video_fps + 1) * newsize * 2 +
+    (audio_fps + 1) * newsize * 2 + 100;
+  malloc_size = sizeof(EncodedPacket *) * new_encoded_packets_size;
+  result = realloc(encoded_packets, malloc_size);
+  int success = 0;
+  if (result == NULL) {
+    log_error("error: failed to set encoded_packets to %d while trying to allocate "
+        "%d bytes of memory\n", newsize, malloc_size);
+    // fallback to old size
+    malloc_size = sizeof(EncodedPacket *) * encoded_packets_size;
+  } else {
+    encoded_packets = (EncodedPacket **)result;
+    encoded_packets_size = new_encoded_packets_size;
+    success = 1;
+  }
+  memset(encoded_packets, 0, malloc_size);
+
+  if (success) {
+    // reset keyframe_pointers
+    malloc_size = sizeof(int) * newsize;
+    result = realloc(keyframe_pointers, malloc_size);
+    if (result == NULL) {
+      log_error("error: failed to set keyframe_pointers to %d while trying to allocate "
+          "%d bytes of memory\n", newsize, malloc_size);
+      // fallback to old size
+      malloc_size = sizeof(int) * record_buffer_keyframes;
+    } else {
+      keyframe_pointers = (int *)result;
+      record_buffer_keyframes = newsize;
+    }
+  } else {
+    malloc_size = sizeof(int) * record_buffer_keyframes;
+  }
+  memset(keyframe_pointers, 0, malloc_size);
+
+  current_encoded_packet = -1;
+  current_keyframe_pointer = -1;
+  is_keyframe_pointers_filled = 0;
+
+  return 0;
 }

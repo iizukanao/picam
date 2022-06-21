@@ -2353,10 +2353,10 @@ static int send_pframe(uint8_t *data, size_t data_len, int consume_time) {
 // Callback function that is called when an error has occurred
 static int xrun_recovery(snd_pcm_t *handle, int error) {
   switch(error) {
-    case -EPIPE: // Buffer overrun
-      log_error("microphone error: buffer overrun\n");
+    case -EPIPE: // Buffer under-run
+      log_error("microphone error: buffer underrun (data rate from microphone is too slow)\n");
       if ((error = snd_pcm_prepare(handle)) < 0) {
-        log_error("microphone error: buffer overrrun cannot be recovered, "
+        log_error("microphone error: unable to recover from underrun, "
             "snd_pcm_prepare failed: %s\n", snd_strerror(error));
       }
       return 0;
@@ -2371,7 +2371,7 @@ static int xrun_recovery(snd_pcm_t *handle, int error) {
 
       if (error < 0) {
         if ((error = snd_pcm_prepare(handle)) < 0) {
-          log_error("microphone error: suspend cannot be recovered, "
+          log_error("microphone error: unable to recover from suspend, "
               "snd_pcm_prepare failed: %s\n", snd_strerror(error));
         }
       }

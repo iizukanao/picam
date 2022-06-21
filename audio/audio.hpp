@@ -12,7 +12,7 @@ extern "C" {
 class Audio
 {
 public:
-	Audio(PicamOption const *options);
+	Audio(PicamOption *option);
   ~Audio();
   void setup(HTTPLiveStreaming *hls);
   void loop();
@@ -21,9 +21,12 @@ public:
   int wait_for_poll(snd_pcm_t *device, struct pollfd *target_fds, unsigned int audio_fd_count);
   void set_encode_callback(std::function<void(int64_t pts, uint8_t *data, int size, int stream_index, int flags)> callback);
   float get_fps();
+  int get_audio_pts_step_base();
+  void mute();
+  void unmute();
 
 protected:
-  PicamOption const *options_;
+  PicamOption *option;
 
 private:
   std::function<void(int64_t pts, uint8_t *data, int size, int stream_index, int flags)> encode_callback;
@@ -33,6 +36,7 @@ private:
   int64_t audio_current_pts = 0;
   int64_t last_pts = 0;
   int64_t time_for_last_pts = 0; // Used in VFR mode
+  int audio_pts_step_base;
   void encode_and_send_audio();
   int64_t get_next_audio_pts();
   void send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts);
@@ -53,5 +57,6 @@ private:
   void setup_av_frame(AVFormatContext *format_ctx);
   std::ofstream my_fp;
   HTTPLiveStreaming *hls;
-  int period_size;
+  // int period_size;
+  bool is_muted = false;
 };

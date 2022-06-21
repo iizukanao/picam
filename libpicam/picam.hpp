@@ -16,16 +16,36 @@
 #include "preview/preview.hpp"
 #include "picam_option/picam_option.hpp"
 #include "core/video_options.hpp"
+#include "muxer/muxer.hpp"
+#include "audio/audio.hpp"
 
 typedef std::function<void(void *, size_t, int64_t, bool)> EncodeOutputReadyCallback;
 
+// Pace of PTS
+typedef enum {
+  PTS_SPEED_NORMAL,
+  PTS_SPEED_UP,
+  PTS_SPEED_DOWN,
+} pts_mode_t;
+
 class Picam {
 public:
+		// Singleton
+		static Picam& getInstance()
+		{
+			static Picam instance;
+			return instance;
+		}
     Picam();
+		Picam(Picam const&) = delete;
+		void operator=(Picam const&) = delete;
+
     ~Picam();
     int run(int argc, char *argv[]);
     void print_program_version();
     int parseOptions(int argc, char **argv);
+		void stop();
+		void handleHook(char *filename, char *content);
 
     // >>> libcamera_app.hpp
 	enum class MsgType
@@ -122,14 +142,59 @@ protected:
 	// <<< libcamera_app.hpp
 
 private:
-    int audio_min_value;
-    int audio_max_value;
-    PicamOption *option;
+	Muxer *muxer;
+	Audio *audio;
+	HTTPLiveStreaming *hls;
+	uint8_t *sps_pps = NULL; // Stores H.264 SPS (NAL unit type 7) and PPS (NAL unit type 8) as a single byte array
+	size_t sps_pps_size; // Byte size of sps_pps
+	int audio_min_value;
+	int audio_max_value;
+	PicamOption *option;
+	int64_t video_current_pts = 0;
+	int64_t audio_current_pts = 0;
+	int64_t last_pts = 0;
+	int64_t time_for_last_pts = 0; // Used in VFR mode
+	pts_mode_t pts_mode = PTS_SPEED_NORMAL;
 
-    void event_loop();
-    void setOption(PicamOption *option);
-    void setupEncoder();
-    void modifyBuffer(CompletedRequestPtr &completed_request);
+	uint64_t video_frame_count = 0;
+	uint64_t audio_frame_count = 0;
+
+	// Counter for PTS speed up/down
+	int speed_up_count = 0;
+	int speed_down_count = 0;
+
+	int keyframes_count = 0;
+	struct timespec tsBegin = {
+		0, // tv_sec
+		0, // tv_nsec
+	};
+	int frame_count_since_keyframe = 0;
+
+	bool is_video_started = false;
+	bool is_audio_started = false;
+	int64_t video_start_time;
+	int64_t audio_start_time;
+	bool keepRunning = true;
+
+	RecSettings rec_settings;
+
+	void event_loop();
+	void setOption(PicamOption *option);
+	void setupEncoder();
+	void modifyBuffer(CompletedRequestPtr &completed_request);
+	int64_t get_next_video_pts_vfr();
+	int64_t get_next_video_pts_cfr();
+	int64_t get_next_video_pts();
+	int64_t get_next_audio_pts();
+	void videoEncodeDoneCallback(void *mem, size_t size, int64_t timestamp_us, bool keyframe);
+	void print_audio_timing();
+	void check_video_and_audio_started();
+	void on_video_and_audio_started();
+	void ensure_hls_dir_exists();
+	void parse_start_record_file(char *full_filename);
+	void stopAllThreads();
+	void stopAudioThread();
+	void stopRecThread();
 
     // >>> libcamera_app.hpp
 	template <typename T>

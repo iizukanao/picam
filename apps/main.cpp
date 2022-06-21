@@ -4,6 +4,6 @@
 
 int main(int argc, char *argv[])
 {
-    Picam picam;
-    return picam.run(argc, argv);
+    Picam* picam;
+    return picam->getInstance().run(argc, argv);
 }
