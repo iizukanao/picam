@@ -82,7 +82,7 @@ Picam::Picam() {
 }
 
 Picam::~Picam() {
-	log_debug("Closing Libcamera application (frames displayed %d, dropped %d\n",
+	log_debug("Closing Libcamera application (preview frames displayed %d, dropped %d\n",
 	preview_frames_displayed_, preview_frames_dropped_);
 	StopCamera();
 	Teardown();
@@ -90,6 +90,7 @@ Picam::~Picam() {
 }
 
 void Picam::stopAudioThread() {
+	printf("stopAudioThread begin\n");
 	if (audioThread.joinable()) {
 		std::cout << "joinable" << std::endl;
 		audio->stop();
@@ -97,12 +98,14 @@ void Picam::stopAudioThread() {
 		std::cout << "joined" << std::endl;
 	}
 	delete audio;
+	printf("stopAudioThread end\n");
 }
 
 void Picam::stopRecThread() {
-	printf("stop_rec_thread\n");
+	printf("stopRecThread begin\n");
 	this->muxer->prepareForDestroy();
 	this->muxer->waitForExit();
+	printf("stopRecThread end\n");
 }
 
 void Picam::stopAllThreads() {
@@ -619,6 +622,31 @@ void Picam::parse_start_record_file(char *full_filename) {
 void on_file_create(char *filename, char *content) {
 	Picam *picam;
 	picam->getInstance().handleHook(filename, content);
+}
+
+static void set_gop_size(int gop_size) {
+	// TODO: Implement this using libcamera
+
+  // OMX_VIDEO_CONFIG_AVCINTRAPERIOD avc_intra_period;
+  // OMX_ERRORTYPE error;
+
+  // memset(&avc_intra_period, 0, sizeof(OMX_VIDEO_CONFIG_AVCINTRAPERIOD));
+  // avc_intra_period.nSize = sizeof(OMX_VIDEO_CONFIG_AVCINTRAPERIOD);
+  // avc_intra_period.nVersion.nVersion = OMX_VERSION;
+  // avc_intra_period.nPortIndex = VIDEO_ENCODE_OUTPUT_PORT;
+
+  // // Distance between two IDR frames
+  // avc_intra_period.nIDRPeriod = gop_size;
+
+  // // It seems this value has no effect for the encoding.
+  // avc_intra_period.nPFrames = gop_size;
+
+  // error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
+  //     OMX_IndexConfigVideoAVCIntraPeriod, &avc_intra_period);
+  // if (error != OMX_ErrorNone) {
+  //   log_fatal("error: failed to set video_encode %d AVC intra period: 0x%x\n", VIDEO_ENCODE_OUTPUT_PORT, error);
+  //   exit(EXIT_FAILURE);
+  // }
 }
 
 void Picam::handleHook(char *filename, char *content) {
@@ -1419,9 +1447,9 @@ void Picam::videoEncodeDoneCallback(void *mem, size_t size, int64_t timestamp_us
 	//   forbidden_zero_bit (1 bit)
 	//   nal_ref_idc (2 bits)
 	//   nal_unit_type (5 bits)
-	uint8_t nalUnitType = bytes[4] & 0b11111; // Lower 5 bits of the 5th byte
 	uint8_t *complete_mem = bytes;
 	size_t complete_mem_size = size;
+	uint8_t nalUnitType = bytes[4] & 0b11111; // Lower 5 bits of the 5th byte
 	if (nalUnitType == 7) {
 		// The structure of the very first frame always comes like this:
 		//   00 00 00 01 27 <..SPS payload..> 00 00 00 01 28 <..PPS payload..> 00 00 00 01 25 <..I-frame payload..>
@@ -1460,6 +1488,7 @@ void Picam::videoEncodeDoneCallback(void *mem, size_t size, int64_t timestamp_us
 		memcpy(complete_mem + access_unit_delimiter_length + this->sps_pps_size, bytes, size);
 	}
 
+	// timestamp_us is not correct
 
 	// printf("outputReady size=%d timestamp=%lld keyframe=%d\n", size, timestamp_us, keyframe);
 	// if (video_timestamp_origin_us == -1) {
@@ -1482,6 +1511,26 @@ void Picam::videoEncodeDoneCallback(void *mem, size_t size, int64_t timestamp_us
 	}
 	// muxer->add_encoded_packet(std::round((timestamp_us - video_timestamp_origin_us) / (1000000 / 90000)), (uint8_t *)mem, size, hls->format_ctx->streams[0]->index, flags);
 	int64_t pts = this->get_next_video_pts();
+
+#if ENABLE_AUTO_GOP_SIZE_CONTROL_FOR_VFR
+  if (this->option->is_vfr_enabled) {
+		printf("controlling vfr\n");
+    int64_t pts_between_keyframes = pts - last_keyframe_pts;
+    if (pts_between_keyframes < 80000) { // < .89 seconds
+      // Frame rate is running faster than we thought
+      int ideal_video_gop_size = (frames_since_last_keyframe + 1)
+        * 90000.0f / pts_between_keyframes;
+      if (ideal_video_gop_size > this->option->video_gop_size) {
+        this->option->video_gop_size = ideal_video_gop_size;
+        log_debug("increase gop_size to %d ", ideal_video_gop_size);
+        set_gop_size(this->option->video_gop_size);
+      }
+    }
+    last_keyframe_pts = pts;
+    frames_since_last_keyframe = 0;
+  }
+#endif
+
 	this->last_pts = pts;
 	this->muxer->add_encoded_packet(pts, complete_mem, complete_mem_size, hls->format_ctx->streams[0]->index, flags);
 
@@ -1520,6 +1569,7 @@ void Picam::videoEncodeDoneCallback(void *mem, size_t size, int64_t timestamp_us
 	}
 
 	if (complete_mem != bytes) {
+		printf("freeing complete_mem\n");
 		free(complete_mem);
 	}
 
@@ -1552,10 +1602,10 @@ void Picam::event_loop()
 {
 	// VideoOptions const *options = this->GetOptions();
 	// std::unique_ptr<Output> output = std::unique_ptr<Output>(Output::Create(options));
+	// this->SetEncodeOutputReadyCallback(std::bind(&Output::OutputReady, output.get(), _1, _2, _3, _4));
+
 	// std::cout << "### SetEncodeOutputReadyCallback ###" << std::endl;
 	this->SetEncodeOutputReadyCallback(std::bind(&Picam::videoEncodeDoneCallback, this, _1, _2, _3, _4));
-	// this->SetEncodeOutputReadyCallback(outputReady);
-	// this->SetEncodeOutputReadyCallback(std::bind(&Output::OutputReady, output.get(), _1, _2, _3, _4));
 
 	int hls_number_of_segments = 3;
 	MpegTSCodecSettings codec_settings;
@@ -1707,12 +1757,14 @@ void Picam::event_loop()
 		{
 			// if (timeout)
 			// 	std::cerr << "Halting: reached timeout of " << timeout_ms << " milliseconds.\n";
+			std::cerr << "Halting" << std::endl;
 			this->StopCamera(); // stop complains if encoder very slow to close
 			this->StopEncoder();
 			this->stopAllThreads();
 			return;
 		}
 
+		// Got a video frame from camera
 		CompletedRequestPtr &completed_request = std::get<CompletedRequestPtr>(msg.payload);
 
 		// std::cout << " sequence=" << completed_request->sequence << "\tframerate=" << completed_request->framerate << std::endl;
@@ -1737,8 +1789,23 @@ void Picam::event_loop()
 		// 	lastTimestamp = metadata.timestamp;
 		// }
 
+		if (this->option->is_vfr_enabled) {
+			// video
+			struct timespec ts;
+			clock_gettime(CLOCK_MONOTONIC, &ts);
+			time_for_last_pts = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
+		}
+
 		this->modifyBuffer(completed_request);
+
+		// NOTE: If Raspberry Pi is connected to a monitor, EncodeBuffer() will
+		// take some time and fps will drop
+		// auto start = std::chrono::high_resolution_clock::now();
 		this->EncodeBuffer(completed_request, this->VideoStream());
+    // auto stop = std::chrono::high_resolution_clock::now();
+		// auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
+		// std::cout << "time " << duration.count() << std::endl;
+
 		this->ShowPreview(completed_request, this->VideoStream());
 	}
 #endif
@@ -1844,11 +1911,38 @@ int Picam::run(int argc, char *argv[])
 // >>> libcamera_app.cpp
 void Picam::OpenCamera()
 {
+	char previewRect[128];
 	// Make a preview window.
 	Options previewOptions;
 	previewOptions.width = this->option->video_width;
 	previewOptions.height = this->option->video_height;
 	previewOptions.framerate = this->option->video_fps;
+	previewOptions.nopreview = !this->option->is_preview_enabled;
+	previewOptions.qt_preview = false; // This is always false as QT preview works only if X is running
+	previewOptions.verbose = log_get_level() >= LOG_LEVEL_DEBUG;
+	if (this->option->is_previewrect_enabled) {
+		previewOptions.fullscreen = false;
+		previewOptions.preview_x = this->option->preview_x;
+		previewOptions.preview_y = this->option->preview_y;
+		previewOptions.preview_width = this->option->preview_width;
+		previewOptions.preview_height = this->option->preview_height;
+		snprintf(
+			previewRect,
+			sizeof(previewRect)-1,
+			"%d,%d,%d,%d",
+			this->option->preview_x,
+			this->option->preview_y,
+			this->option->preview_width,
+			this->option->preview_height);
+		previewOptions.preview = previewRect;
+	} else {
+		previewOptions.fullscreen = true;
+		previewOptions.preview_x = 0;
+		previewOptions.preview_y = 0;
+		previewOptions.preview_width = 0;
+		previewOptions.preview_height = 0;
+	}
+	// fullscreen=false, x=100 y=200 width=300 height=400 にすると画面が暗くなる
 	preview_ = std::unique_ptr<Preview>(make_preview(&previewOptions));
 	preview_->SetDoneCallback(std::bind(&Picam::previewDoneCallback, this, std::placeholders::_1));
 
@@ -2030,12 +2124,15 @@ void Picam::ConfigureVideo(unsigned int flags)
 
 void Picam::Teardown()
 {
+	printf("stopPreview begin\n");
 	stopPreview();
+	printf("stopPreview end\n");
 
 	// post_processor_.Teardown();
 
 	log_debug("Tearing down requests, buffers and configuration\n");
 
+	printf("clearing mapped_buffers_\n");
 	for (auto &iter : mapped_buffers_)
 	{
 		// assert(iter.first->planes().size() == iter.second.size());
@@ -2044,15 +2141,20 @@ void Picam::Teardown()
 			munmap(span.data(), span.size());
 	}
 	mapped_buffers_.clear();
+	printf("cleared mapped_buffers_\n");
 
 	delete allocator_;
 	allocator_ = nullptr;
 
+	printf("configuration reset\n");
 	configuration_.reset();
 
+	printf("frame buffers clear\n");
 	frame_buffers_.clear();
 
+	printf("streams clear\n");
 	streams_.clear();
+	printf("Teardown end\n");
 }
 
 void Picam::StartCamera()
@@ -2091,8 +2193,13 @@ void Picam::StartCamera()
 		// if (StillStream())
 		// 	controls_.set(libcamera::controls::FrameDurationLimits, { INT64_C(100), INT64_C(1000000000) });
 		// else if (options_->framerate > 0)
-		if (this->option->video_fps > 0)
-		{
+		if (this->option->is_vfr_enabled) {
+			// Set framerate range to min=1 and max=100
+			int64_t frame_time_fps1 = 1000000 / 1; // in us
+			int64_t frame_time_fps100 = 1000000 / 100; // in us
+			std::cout << "vfr frame_time=" << frame_time_fps100 << ".." << frame_time_fps1 << std::endl; // frame_time == 33333
+			controls_.set(libcamera::controls::FrameDurationLimits, { frame_time_fps100, frame_time_fps1 });
+		} else if (this->option->video_fps > 0) {
 			int64_t frame_time = 1000000 / this->option->video_fps; // in us
 			std::cout << "frame_time=" << frame_time << std::endl; // frame_time == 33333
 			controls_.set(libcamera::controls::FrameDurationLimits, { frame_time, frame_time });
@@ -2263,12 +2370,14 @@ std::vector<libcamera::Span<uint8_t>> Picam::Mmap(libcamera::FrameBuffer *buffer
 
 void Picam::ShowPreview(CompletedRequestPtr &completed_request, libcamera::Stream *stream)
 {
+	// printf("preview: ShowPreview begin\n");
 	std::lock_guard<std::mutex> lock(preview_item_mutex_);
 	if (!preview_item_.stream)
 		preview_item_ = PreviewItem(completed_request, stream); // copy the shared_ptr here
 	else
 		preview_frames_dropped_++;
 	preview_cond_var_.notify_one();
+	// printf("preview: ShowPreview end\n");
 }
 
 StreamInfo Picam::GetStreamInfo(libcamera::Stream const *stream) const
@@ -2399,23 +2508,31 @@ void Picam::requestComplete(libcamera::Request *request)
 
 void Picam::previewDoneCallback(int fd)
 {
+	// printf("preview: previewDoneCallback begin\n");
 	std::lock_guard<std::mutex> lock(preview_mutex_);
 	auto it = preview_completed_requests_.find(fd);
 	if (it == preview_completed_requests_.end())
 		throw std::runtime_error("previewDoneCallback: missing fd " + std::to_string(fd));
 	preview_completed_requests_.erase(it); // drop shared_ptr reference
+	// printf("preview: previewDoneCallback end\n");
 }
 
 void Picam::startPreview()
 {
+	printf("preview: startPreview begin\n");
 	preview_abort_ = false;
 	preview_thread_ = std::thread(&Picam::previewThread, this);
+	printf("preview: startPreview end\n");
 }
 
 void Picam::stopPreview()
 {
-	if (!preview_thread_.joinable()) // in case never started
+	printf("preview: stopPreview begin\n");
+	if (!preview_thread_.joinable()) {
+		printf("preview: preview_thread is not joinable\n");
+		// in case never started
 		return;
+	}
 
 	{
 		std::lock_guard<std::mutex> lock(preview_item_mutex_);
@@ -2424,6 +2541,7 @@ void Picam::stopPreview()
 	}
 	preview_thread_.join();
 	preview_item_ = PreviewItem();
+	printf("preview: stopPreview end\n");
 }
 
 void Picam::previewThread()

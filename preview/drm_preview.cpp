@@ -12,6 +12,7 @@
 #include <xf86drmMode.h>
 
 #include "core/options.hpp"
+#include "log/log.h"
 
 #include "preview.hpp"
 
@@ -79,6 +80,9 @@ void DrmPreview::findCrtc()
 
 	max_image_width_ = res->max_width;
 	max_image_height_ = res->max_height;
+	printf("preview: count_crtcs=%d count_encoders=%d count_connectors=%d count_fbs=%d max_image_width=%u max_image_height=%u\n",
+	res->count_crtcs, res->count_encoders, res->count_connectors, res->count_fbs,
+	max_image_width_, max_image_height_);
 
 	if (!conId_)
 	{
@@ -87,6 +91,7 @@ void DrmPreview::findCrtc()
 
 		for (i = 0; i < res->count_connectors; i++)
 		{
+			printf("preview: inspecting connector: %d\n", i);
 			drmModeConnector *con = drmModeGetConnector(drmfd_, res->connectors[i]);
 			drmModeEncoder *enc = NULL;
 			drmModeCrtc *crtc = NULL;
@@ -94,28 +99,36 @@ void DrmPreview::findCrtc()
 			if (con->encoder_id)
 			{
 				enc = drmModeGetEncoder(drmfd_, con->encoder_id);
+				printf("preview: set encoder\n");
 				if (enc->crtc_id)
 				{
 					crtc = drmModeGetCrtc(drmfd_, enc->crtc_id);
+					printf("preview: set crtc\n");
 				}
 			}
 
-			if (!conId_ && crtc)
+			if (!conId_ && crtc) // TODO: Select connector by option
 			{
 				conId_ = con->connector_id;
 				crtcId_ = crtc->crtc_id;
+				printf("preview: set conId_=%d crtcId_=%u\n", conId_, crtcId_);
 			}
 
 			if (crtc)
 			{
 				screen_width_ = crtc->width;
 				screen_height_ = crtc->height;
+				printf("preview: crtc screen_width_=%u screen_height_=%u\n", screen_width_, screen_height_);
 			}
 
+			// log_debug("Connector %u (crtc %u): type %u, %ux%u %s",
+			// 	con->connector_id, (crtc ? crtc->crtc_id : 0), con->connector_type, (crtc ? crtc->width : 0), (crtc ? crtc->height : 0),
+			// 	(conId_ == (int)con->connector_id ? " (chosen)" : "")
+			// );
 			if (options_->verbose)
 				std::cerr << "Connector " << con->connector_id << " (crtc " << (crtc ? crtc->crtc_id : 0) << "): type "
 						  << con->connector_type << ", " << (crtc ? crtc->width : 0) << "x" << (crtc ? crtc->height : 0)
-						  << (conId_ == (int)con->connector_id ? " (chosen)" : "") << std::endl;
+						  << (conId_ == (int)con->connector_id ? " (chosen)" : "") << std::endl; // TODO: (chosen) is wrong when connector is specified
 		}
 
 		if (!conId_)
@@ -167,6 +180,7 @@ void DrmPreview::findCrtc()
 		y_ = crtc->y;
 		width_ = crtc->width;
 		height_ = crtc->height;
+		printf("preview: crtc x_=%u y_=%u width_=%u height_=%u\n", x_, y_, width_, height_);
 		drmModeFreeCrtc(crtc);
 	}
 }
@@ -237,6 +251,7 @@ DrmPreview::DrmPreview(Options const *options) : Preview(options), last_fd_(-1),
 	height_ = options_->preview_height;
 	screen_width_ = 0;
 	screen_height_ = 0;
+	printf("preview: ctor: x_=%u y_=%u width_=%u height_=%u\n", x_, y_, width_, height_);
 
 	try
 	{
@@ -261,6 +276,7 @@ DrmPreview::DrmPreview(Options const *options) : Preview(options), last_fd_(-1),
 		x_ = y_ = 0;
 		width_ = screen_width_;
 		height_ = screen_height_;
+		printf("preview: default behavior: x_=%u y_=%u width_=%u height_=%u\n", x_, y_, width_, height_);
 	}
 }
 
@@ -363,10 +379,22 @@ void DrmPreview::makeBuffer(int fd, size_t size, StreamInfo const &info, Buffer 
 	if (drmPrimeFDToHandle(drmfd_, fd, &buffer.bo_handle))
 		throw std::runtime_error("drmPrimeFDToHandle failed for fd " + std::to_string(fd));
 
-	uint32_t offsets[4] =
-		{ 0, info.stride * info.height, info.stride * info.height + (info.stride / 2) * (info.height / 2) };
-	uint32_t pitches[4] = { info.stride, info.stride / 2, info.stride / 2 };
+	uint32_t offsets[4] = {
+		0, // start offset for Y plane
+		info.stride * info.height, // start offset for U plane
+		info.stride * info.height + (info.stride / 2) * (info.height / 2) // start offset for V plane
+		};
+	uint32_t pitches[4] = {
+		info.stride, // stride (== width) of Y plane
+		info.stride / 2, // stride (== width) of U plane
+		info.stride / 2 // stride (== width) of V plane
+		};
 	uint32_t bo_handles[4] = { buffer.bo_handle, buffer.bo_handle, buffer.bo_handle };
+	printf("makeBuffer: stride=%u width=%u height=%u pitches[0]=%u [1]=%u [2]=%u [3]=%u offsets[0]=%u [1]=%u [2]=%u [3]=%u\n",
+		info.stride, info.width, info.height,
+		pitches[0], pitches[1], pitches[2], pitches[3],
+		offsets[0], offsets[1], offsets[2], offsets[3]
+	);
 
 	if (drmModeAddFB2(drmfd_, info.width, info.height, out_fourcc_, bo_handles, pitches, offsets, &buffer.fb_handle, 0))
 		throw std::runtime_error("drmModeAddFB2 failed: " + std::string(ERRSTR));
@@ -375,21 +403,75 @@ void DrmPreview::makeBuffer(int fd, size_t size, StreamInfo const &info, Buffer 
 void DrmPreview::Show(int fd, libcamera::Span<uint8_t> span, StreamInfo const &info)
 {
 	Buffer &buffer = buffers_[fd];
-	if (buffer.fd == -1)
+	if (buffer.fd == -1) {
+		printf("makeBuffer: fd=%d size=%u\n", fd, span.size());
 		makeBuffer(fd, span.size(), info, buffer);
+	}
+	printf("DrmPreview::Show fd=%d last_fd=%d size=%u width=%u height=%u stride=%u buffer.width=%d buffer.height=%d\n",
+		fd, last_fd_, span.size(), info.width, info.height, info.stride, buffer.info.width, buffer.info.height);
 
-	unsigned int x_off = 0, y_off = 0;
+	// info.width = 1920 (camera capture width)
+	// info.height = 1080 (camera capture height)
+	// info.stride = 1920 (camera capture stride)
+	// buffer.info.width = 1920 (this buffer frame width)
+	// buffer.info.height = 1080 (this buffer frame height)
+	// x_ = 100 (requested preview offset x)
+	// y_ = 200 (requested preview offset y)
+	// width_ = 300 (requested preview width)
+	// height_ = 400 (requested preview height)
+	int x_off = 0, y_off = 0;
 	unsigned int w = width_, h = height_;
-	if (info.width * height_ > width_ * info.height)
-		h = width_ * info.height / info.width, y_off = (height_ - h) / 2;
-	else
-		w = height_ * info.width / info.height, x_off = (width_ - w) / 2;
+	// if (info.width * height_ > width_ * info.height) {
+	// 	h = width_ * info.height / info.width, y_off = (height_ - h) / 2;
+	// 	printf("h=%u width_=%u y_off=%d height_=%u\n", h, width_, y_off, height_);
+	// } else {
+	// 	w = height_ * info.width / info.height, x_off = (width_ - w) / 2;
+	// 	printf("w=%u width_=%u x_off=%d height_=%u\n", w, width_, x_off, height_);
+	// }
 
-	if (drmModeSetPlane(drmfd_, planeId_, crtcId_, buffer.fb_handle, 0, x_off + x_, y_off + y_, w, h, 0, 0,
-						buffer.info.width << 16, buffer.info.height << 16))
+	unsigned int crtc_x;
+	unsigned int crtc_y;
+	if (x_off < 0 && x_off + (int)x_ < 0) {
+		crtc_x = 0;
+		printf("reset crtc_x to 0\n");
+	} else {
+		crtc_x = x_off + x_;
+	}
+	if (y_off < 0 && y_off + (int)y_ < 0) {
+		crtc_y = 0;
+		printf("reset crtc_y to 0\n");
+	} else {
+		crtc_y = y_off + y_;
+	}
+	printf("drmfd_=%d planeId=%u crtcId_=%u fb_id=%u crtc_x=%d crtc_y=%d crtc_w=%u crtc_h=%u src_x=%u src_y=%u src_w=%u src_h=%u src_w<<16=%u src_h<<16=%u\n",
+		drmfd_, planeId_, crtcId_, buffer.fb_handle,
+		// x_off + x_, // crtc_x
+		// y_off + y_, // crtc_y
+		crtc_x, // crtc_x
+		crtc_y, // crtc_y
+		w, // crtc_w
+		h, // crtc_h
+		0 << 16, // src_x in Q16.16
+		0 << 16, // src_y in Q16.16
+		buffer.info.width, // src_w in Q16.16
+		buffer.info.height, // src_h in Q16.16
+		buffer.info.width << 16, buffer.info.height << 16);
+	if (drmModeSetPlane(drmfd_, planeId_, crtcId_, buffer.fb_handle,
+		0, // flags
+		crtc_x,
+		crtc_y,
+		w, // crtc_w
+		h, // crtc_h
+		0 << 16, // src_x in Q16.16
+		0 << 16, // src_y in Q16.16
+		buffer.info.width << 16, // src_w in Q16.16
+		buffer.info.height << 16 // src_h in Q16.16
+		)) {
 		throw std::runtime_error("drmModeSetPlane failed: " + std::string(ERRSTR));
-	if (last_fd_ >= 0)
+	}
+	if (last_fd_ >= 0) {
 		done_callback_(last_fd_);
+	}
 	last_fd_ = fd;
 }
 

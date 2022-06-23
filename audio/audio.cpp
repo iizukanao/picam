@@ -46,7 +46,7 @@ static int audio_buffer_size;
 // TODO: Make these values injectable from options
 // static unsigned int audio_sample_rate = 48000;
 // static int audio_channels = 1;
-static const char *alsa_dev = "hw:2,0";
+// static const char *alsa_dev = "hw:2,0";
 // static int hls_number_of_segments = 3;
 // static long audio_bitrate = 40000;
 
@@ -54,14 +54,14 @@ static char errbuf[1024];
 
 static int is_audio_channels_specified = 0;
 
-static int open_audio_capture_device() {
+int Audio::open_audio_capture_device() {
   int err;
 
-  log_debug("opening ALSA device for capture: %s\n", alsa_dev);
-  err = snd_pcm_open(&capture_handle, alsa_dev, SND_PCM_STREAM_CAPTURE, 0);
+  log_debug("opening ALSA device for capture: %s\n", this->option->alsa_dev);
+  err = snd_pcm_open(&capture_handle, this->option->alsa_dev, SND_PCM_STREAM_CAPTURE, 0);
   if (err < 0) {
     log_error("error: cannot open audio capture device '%s': %s\n",
-        alsa_dev, snd_strerror(err));
+        this->option->alsa_dev, snd_strerror(err));
     log_error("hint: specify correct ALSA device with '--alsadev <dev>'\n");
     return -1;
   }
@@ -607,12 +607,6 @@ void Audio::encode_and_send_audio() {
 #endif
     last_pts = pts;
     pkt->pts = pkt->dts = pts;
-
-    if (this->is_vfr_enabled) {
-      struct timespec ts;
-      clock_gettime(CLOCK_MONOTONIC, &ts);
-      time_for_last_pts = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
-    }
 
     if (this->encode_callback) {
       this->encode_callback(

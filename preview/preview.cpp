@@ -12,26 +12,30 @@
 Preview *make_null_preview(Options const *options);
 Preview *make_egl_preview(Options const *options);
 Preview *make_drm_preview(Options const *options);
-Preview *make_qt_preview(Options const *options);
+// Preview *make_qt_preview(Options const *options);
 
 Preview *make_preview(Options const *options)
 {
-	if (options->nopreview)
+	if (options->nopreview) {
+		printf("preview: make_null_preview\n");
 		return make_null_preview(options);
-#if QT_PRESENT
-	else if (options->qt_preview)
-	{
-		Preview *p = make_qt_preview(options);
-		if (p)
-			std::cerr << "Made QT preview window" << std::endl;
-		return p;
 	}
-#endif
+// #if QT_PRESENT
+// 	else if (options->qt_preview)
+// 	{
+// 		printf("preview: make_qt_preview\n");
+// 		Preview *p = make_qt_preview(options);
+// 		if (p)
+// 			std::cerr << "Made QT preview window" << std::endl;
+// 		return p;
+// 	}
+// #endif
 	else
 	{
 		try
 		{
 #if LIBEGL_PRESENT
+			printf("preview: make_egl_preview\n");
 			Preview *p = make_egl_preview(options);
 			if (p)
 				std::cerr << "Made X/EGL preview window" << std::endl;
@@ -42,9 +46,11 @@ Preview *make_preview(Options const *options)
 		}
 		catch (std::exception const &e)
 		{
+			std::cerr << "make_egl_preview error: " << e.what() << std::endl;
 			try
 			{
 #if LIBDRM_PRESENT
+				printf("preview: make_drm_preview\n");
 				Preview *p = make_drm_preview(options);
 				if (p)
 					std::cerr << "Made DRM preview window" << std::endl;

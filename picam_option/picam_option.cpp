@@ -911,6 +911,7 @@ int PicamOption::parse(int argc, char **argv) {
           }
           is_preview_enabled = 1;
           is_previewrect_enabled = 1;
+        } else if (strcmp(long_options[option_index].name, "previewconn")) {
         } else if (strcmp(long_options[option_index].name, "blank") == 0) {
           blank_background_color = optarg ? strtoul(optarg, NULL, 0) : BLANK_BACKGROUND_DEFAULT;
           break;

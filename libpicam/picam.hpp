@@ -19,6 +19,8 @@
 #include "muxer/muxer.hpp"
 #include "audio/audio.hpp"
 
+#define ENABLE_AUTO_GOP_SIZE_CONTROL_FOR_VFR 1
+
 typedef std::function<void(void *, size_t, int64_t, bool)> EncodeOutputReadyCallback;
 
 // Pace of PTS
@@ -156,6 +158,12 @@ private:
 	int64_t time_for_last_pts = 0; // Used in VFR mode
 	pts_mode_t pts_mode = PTS_SPEED_NORMAL;
 
+#if ENABLE_AUTO_GOP_SIZE_CONTROL_FOR_VFR
+	// Variables for variable frame rate
+	int64_t last_keyframe_pts = 0;
+	int frames_since_last_keyframe = 0;
+#endif
+
 	uint64_t video_frame_count = 0;
 	uint64_t audio_frame_count = 0;
 
@@ -174,7 +182,7 @@ private:
 	bool is_audio_started = false;
 	int64_t video_start_time;
 	int64_t audio_start_time;
-	bool keepRunning = true;
+	volatile bool keepRunning = true;
 
 	RecSettings rec_settings;
 

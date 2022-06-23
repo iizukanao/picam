@@ -35,8 +35,8 @@ private:
   int64_t video_current_pts = 0;
   int64_t audio_current_pts = 0;
   int64_t last_pts = 0;
-  int64_t time_for_last_pts = 0; // Used in VFR mode
   int audio_pts_step_base;
+  int open_audio_capture_device();
   void encode_and_send_audio();
   int64_t get_next_audio_pts();
   void send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts);
