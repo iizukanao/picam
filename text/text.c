@@ -1111,10 +1111,14 @@ int text_get_position(int text_id, int canvas_width, int canvas_height, int *x, 
 
 /**
  * Draw all text objects to the canvas.
+ * 
+ * canvas_width: Displayable width of image
+ * canvas_height: Displayable height of image
+ * stride: Stride (image width including padding at the right) of canvas
  *
  * returns: nonzero if the canvas content has been changed
  */
-int text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height, int is_video) {
+int text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height, int stride, int is_video) {
   int i;
   int has_anything_changed = 0;
   int canvas_bytes_per_pixel = (is_video) ? 1 : BYTES_PER_PIXEL; // note: in YUV we're poinig to Y planar pixel
@@ -1159,27 +1163,34 @@ int text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height, int is_v
             || (!is_video && !textdata->in_preview)) {
           continue; // skip this textdata if we don't want to show it on this medium
         }
+
+        // Get the top-left coordinate within the canvas to draw the textdata
         int pen_x, pen_y;
         text_get_position(textdata->id, canvas_width, canvas_height, &pen_x, &pen_y);
+
         int row, col;
         for (row = 0; row < textdata->height; row++) {
+          // Ignore pixels that falls outside the canvas bounds
           if (pen_y + row < 0) {
             continue;
           }
-          if (pen_y + row >= canvas_height) { // out of bounds
+          if (pen_y + row >= canvas_height) {
             break;
           }
+
           for (col = 0; col < textdata->width; col++) {
+            // Ignore pixels that falls outside the canvas bounds
             if (pen_x + col < 0) {
               continue;
             }
-            if (pen_x + col >= canvas_width) { // out of bounds
+            if (pen_x + col >= canvas_width) {
               break;
             }
+
             int offset = (row * textdata->width + col) * BYTES_PER_PIXEL;
             color_argb_t color;
             color.x = *((uint32_t*) (textdata->bitmap + offset));
-            uint8_t* canvas_pixel = canvas + ((pen_y + row) * canvas_width + (pen_x + col)) * canvas_bytes_per_pixel;
+            uint8_t* canvas_pixel = canvas + ((pen_y + row) * stride + (pen_x + col)) * canvas_bytes_per_pixel;
 
             if (is_video) { // YUV420PackedPlanar video frame
               uint8_t opacity = color.c.a;

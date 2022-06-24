@@ -92,7 +92,7 @@ public:
 	Options *GetOptions() const { return options_.get(); }
 
 	std::string const &CameraId() const;
-	void OpenCamera();
+	// void OpenCamera();
 	void CloseCamera();
 
 	void ConfigureViewfinder();

@@ -7,11 +7,12 @@
 
 #include <map>
 #include <string>
+#include <iostream>
 
 // Include libcamera stuff before X11, as X11 #defines both Status and None
 // which upsets the libcamera headers.
 
-#include "core/options.hpp"
+//#include "core/options.hpp"
 
 #include "preview.hpp"
 
@@ -29,7 +30,7 @@
 class EglPreview : public Preview
 {
 public:
-	EglPreview(Options const *options);
+	EglPreview(PicamOption const *options);
 	~EglPreview();
 	virtual void SetInfoText(const std::string &text) override;
 	// Display the buffer. You get given the fd back in the BufferDoneCallback
@@ -167,10 +168,10 @@ static void gl_setup(int width, int height, int window_width, int window_height)
 	glEnableVertexAttribArray(0);
 }
 
-EglPreview::EglPreview(Options const *options) : Preview(options), last_fd_(-1), first_time_(true)
+EglPreview::EglPreview(PicamOption const *options) : Preview(options), last_fd_(-1), first_time_(true)
 {
-       printf("fullscreen=%d nopreview=%d preview=%s preview_x=%u preview_y=%u preview_width=%u preview_height=%u\n",
-			 	options->fullscreen, options->nopreview, options->preview.c_str(),
+       printf("is_previewrect_enabled=%d is_preview_enabled=%d preview_x=%u preview_y=%u preview_width=%u preview_height=%u\n",
+			 	options->is_previewrect_enabled, options->is_preview_enabled,
 				options->preview_x, options->preview_y, options->preview_width, options->preview_height);
 
 	display_ = XOpenDisplay(NULL);
@@ -257,11 +258,11 @@ void EglPreview::makeWindow(char const *name)
 		height_ = 768;
 	}
 
-	printf("fullscreen:%d x_=%d width_=%d screen_width=%d y_=%d height_=%d screen_height=%d\n",
-		options_->fullscreen, x_, width_, screen_width,
+	printf("is_previewrect_enabled=%d x_=%d width_=%d screen_width=%d y_=%d height_=%d screen_height=%d\n",
+		options_->is_previewrect_enabled, x_, width_, screen_width,
 		y_, height_, screen_height
 		);
-	if (options_->fullscreen || x_ + width_ > screen_width || y_ + height_ > screen_height)
+	if (!options_->is_previewrect_enabled || x_ + width_ > screen_width || y_ + height_ > screen_height)
 	{
 		x_ = y_ = 0;
 		width_ = DisplayWidth(display_, screen_num);
@@ -301,8 +302,9 @@ void EglPreview::makeWindow(char const *name)
 	window_ = XCreateWindow(display_, root, x_, y_, width_, height_, 0, visinfo->depth, InputOutput, visinfo->visual,
 							mask, &attr);
 
-	if (options_->fullscreen)
+	if (!options_->is_previewrect_enabled) {
 		no_border(display_, window_);
+	}
 
 	/* set hints and properties */
 	{
@@ -456,7 +458,7 @@ bool EglPreview::Quit()
 	return false;
 }
 
-Preview *make_egl_preview(Options const *options)
+Preview *make_egl_preview(PicamOption const *options)
 {
 	return new EglPreview(options);
 }

@@ -13,15 +13,16 @@
 #include <libcamera/base/span.h>
 
 #include "core/stream_info.hpp"
+#include "picam_option/picam_option.hpp"
 
-struct Options;
+// struct Options;
 
 class Preview
 {
 public:
 	typedef std::function<void(int fd)> DoneCallback;
 
-	Preview(Options const *options) : options_(options) {}
+	Preview(PicamOption const *options) : options_(options) {}
 	virtual ~Preview() {}
 	// This is where the application sets the callback it gets whenever the viewfinder
 	// is no longer displaying the buffer and it can be safely recycled.
@@ -40,7 +41,7 @@ public:
 
 protected:
 	DoneCallback done_callback_;
-	Options const *options_;
+	PicamOption const *options_;
 };
 
-Preview *make_preview(Options const *options);
+Preview *make_preview(PicamOption const *options);

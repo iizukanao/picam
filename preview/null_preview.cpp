@@ -7,17 +7,17 @@
 
 #include <iostream>
 
-#include "core/options.hpp"
+// #include "core/options.hpp"
+#include "log/log.h"
 
 #include "preview.hpp"
 
 class NullPreview : public Preview
 {
 public:
-	NullPreview(Options const *options) : Preview(options)
+	NullPreview(PicamOption const *options) : Preview(options)
 	{
-		if (options->verbose)
-			std::cerr << "Running without preview window" << std::endl;
+		log_debug("Running without preview window\n");
 	}
 	~NullPreview() {}
 	// Display the buffer. You get given the fd back in the BufferDoneCallback
@@ -35,7 +35,7 @@ public:
 private:
 };
 
-Preview *make_null_preview(Options const *options)
+Preview *make_null_preview(PicamOption const *options)
 {
 	return new NullPreview(options);
 }

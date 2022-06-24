@@ -104,7 +104,7 @@ void Picam::stopAudioThread() {
 void Picam::stopRecThread() {
 	printf("stopRecThread begin\n");
 	this->muxer->prepareForDestroy();
-	this->muxer->waitForExit();
+	// this->muxer->waitForExit();
 	printf("stopRecThread end\n");
 }
 
@@ -157,6 +157,40 @@ static int get_colourspace_flags(std::string const &codec)
 		return Picam::FLAG_VIDEO_NONE;
 }
 
+// void DumpHex(const void* data, size_t size) {
+// 	// char ascii[17];
+// 	// size_t i, j;
+// 	size_t i;
+// 	// ascii[16] = '\0';
+// 	for (i = 0; i < size; ++i) {
+// 		if (i % 8 == 0) {
+// 			printf("[%d] ", i);
+// 		}
+// 		printf("%02X ", ((unsigned char*)data)[i]);
+// 		// if (((unsigned char*)data)[i] >= ' ' && ((unsigned char*)data)[i] <= '~') {
+// 		// 	ascii[i % 16] = ((unsigned char*)data)[i];
+// 		// } else {
+// 		// 	ascii[i % 16] = '.';
+// 		// }
+// 		if ((i+1) % 8 == 0 || i+1 == size) {
+// 			printf(" ");
+// 			if ((i+1) % 16 == 0) {
+// 				// printf("|  %s \n", ascii);
+// 				printf("\n");
+// 			} else if (i+1 == size) {
+// 				// ascii[(i+1) % 16] = '\0';
+// 				// if ((i+1) % 16 <= 8) {
+// 				// 	printf(" ");
+// 				// }
+// 				// for (j = (i+1) % 16; j < 16; ++j) {
+// 				// 	printf("   ");
+// 				// }
+// 				// printf("|  %s \n", ascii);
+// 				printf("\n");
+// 			}
+// 		}
+// 	}
+// }
 
 #if !DEBUG_SKIP_VIDEO
 void Picam::modifyBuffer(CompletedRequestPtr &completed_request)
@@ -164,13 +198,27 @@ void Picam::modifyBuffer(CompletedRequestPtr &completed_request)
 	libcamera::Stream *stream = this->VideoStream();
 	StreamInfo info = this->GetStreamInfo(stream);
 	libcamera::FrameBuffer *buffer = completed_request->buffers[stream];
-	libcamera::Span span = this->Mmap(buffer)[0];
+	libcamera::Span<uint8_t> span = this->Mmap(buffer)[0];
 	void *mem = span.data();
 	if (!buffer || !mem)
 		throw std::runtime_error("no buffer to encode");
 	// int64_t timestamp_ns = completed_request->metadata.contains(libcamera::controls::SensorTimestamp)
 	// 						? completed_request->metadata.get(libcamera::controls::SensorTimestamp)
 	// 						: buffer->metadata().timestamp;
+
+	// static bool isWritten = false;
+	// if (!isWritten) {
+	// 	isWritten = true;
+	// 	std::cout << "width=" << info.width << " height=" << info.height << " stride=" << info.stride << std::endl;
+	// 	std::cout << "pixel dump (size=" << span.size() << "):" << std::endl;
+	// 	DumpHex(mem, span.size());
+	// }
+	// for (unsigned int row = 0; row < info.height; row++) {
+	// 	printf("%02x")
+	// 	uint8_t *pixels = (uint8_t *)mem;
+	// 	pixels[row * info.stride] = 255;
+	// }
+
 	const uint32_t FOURCC_YU12 = 0x32315559; // YU12
 	if (info.pixel_format.fourcc() == FOURCC_YU12) {
 
@@ -179,8 +227,8 @@ void Picam::modifyBuffer(CompletedRequestPtr &completed_request)
 		// if (!isTextInited) {
 		// 	isTextInited = true;
 		// 	float font_points = 28.0f;
-		//     int font_dpi = 96;
-		//     int color = 0xffffff;
+		// 	int font_dpi = 96;
+		// 	int color = 0xffffff;
 		// 	int stroke_color = 0x000000;
 		// 	float stroke_width = 1.0f;
 		// 	int in_preview = 1;
@@ -189,13 +237,13 @@ void Picam::modifyBuffer(CompletedRequestPtr &completed_request)
 		// 	float line_height_multiply = 1.0f;
 		// 	float tab_scale = 1.0f;
 		// 	LAYOUT_ALIGN layout_align = (LAYOUT_ALIGN) (LAYOUT_ALIGN_BOTTOM | LAYOUT_ALIGN_CENTER);
-		//     TEXT_ALIGN text_align = TEXT_ALIGN_CENTER;
+		// 	TEXT_ALIGN text_align = TEXT_ALIGN_CENTER;
 		// 	int horizontal_margin = 0;
 		// 	int vertical_margin = 35;
-		//     float duration = 2.0f;
+		// 	float duration = 60.0f;
 		// 	const char *replaced_text = "Hello C+_+!";
 		// 	int text_len = strlen(replaced_text);
-	  //       subtitle_init_with_font_name(NULL, font_points, font_dpi);
+		// 		subtitle_init_with_font_name(NULL, font_points, font_dpi);
 		// 	subtitle_set_color(color);
 		// 	subtitle_set_stroke_color(stroke_color);
 		// 	subtitle_set_stroke_width(stroke_width);
@@ -216,7 +264,7 @@ void Picam::modifyBuffer(CompletedRequestPtr &completed_request)
 		// 1280x720 -> max 47.5 fps
 		timestamp_update();
 		subtitle_update();
-		text_draw_all((uint8_t *)mem, info.width, info.height, 1); // is_video = 1
+		text_draw_all((uint8_t *)mem, info.width, info.height, info.stride, 1); // is_video = 1
 		// std::cout << "is_text_changed: " << is_text_changed << std::endl;
 	}
 }
@@ -1569,7 +1617,6 @@ void Picam::videoEncodeDoneCallback(void *mem, size_t size, int64_t timestamp_us
 	}
 
 	if (complete_mem != bytes) {
-		printf("freeing complete_mem\n");
 		free(complete_mem);
 	}
 
@@ -1694,33 +1741,34 @@ void Picam::event_loop()
 #endif
 	// uint64_t lastTimestamp = 0;
 
-	float timestamp_font_points = 14.0f;
-	int timestamp_font_dpi = 96;
-	const char *timestamp_format = "%a %b %d %l:%M:%S %p";
-	const LAYOUT_ALIGN timestamp_layout = (LAYOUT_ALIGN) (LAYOUT_ALIGN_BOTTOM | LAYOUT_ALIGN_RIGHT);
-	int timestamp_horizontal_margin = 10;
-	int timestamp_vertical_margin = 10;
-	const TEXT_ALIGN timestamp_text_align = TEXT_ALIGN_LEFT;
-	const int timestamp_color = 0xffffff;
-	const int timestamp_stroke_color = 0x000000;
-	const float timestamp_stroke_width = 1.3f;
-	const int timestamp_letter_spacing = 0;
-	// std::cout << "width=" << options->width << " height=" << options->height << std::endl;
-	int video_width_32 = (option->video_width+31)&~31;
-	int video_height_16 = (option->video_height+15)&~15;
+	// timestamp test
+	// float timestamp_font_points = 14.0f;
+	// int timestamp_font_dpi = 96;
+	// const char *timestamp_format = "%a %b %d %l:%M:%S %p";
+	// const LAYOUT_ALIGN timestamp_layout = (LAYOUT_ALIGN) (LAYOUT_ALIGN_BOTTOM | LAYOUT_ALIGN_RIGHT);
+	// int timestamp_horizontal_margin = 10;
+	// int timestamp_vertical_margin = 10;
+	// const TEXT_ALIGN timestamp_text_align = TEXT_ALIGN_LEFT;
+	// const int timestamp_color = 0xffffff;
+	// const int timestamp_stroke_color = 0x000000;
+	// const float timestamp_stroke_width = 1.3f;
+	// const int timestamp_letter_spacing = 0;
+	// // std::cout << "width=" << options->width << " height=" << options->height << std::endl;
+	// int video_width_32 = (option->video_width+31)&~31;
+	// int video_height_16 = (option->video_height+15)&~15;
 
-	// std::cout << "width_32=" << video_width_32 << " height_16=" << video_height_16 << std::endl;
-	timestamp_init_with_font_name(NULL,
-		timestamp_font_points, timestamp_font_dpi);
-	timestamp_set_format(timestamp_format);
-	timestamp_set_layout(timestamp_layout,
-		timestamp_horizontal_margin, timestamp_vertical_margin);
-	timestamp_set_align(timestamp_text_align);
-	timestamp_set_color(timestamp_color);
-	timestamp_set_stroke_color(timestamp_stroke_color);
-	timestamp_set_stroke_width(timestamp_stroke_width);
-	timestamp_set_letter_spacing(timestamp_letter_spacing);
-	timestamp_fix_position(video_width_32, video_height_16);
+	// // std::cout << "width_32=" << video_width_32 << " height_16=" << video_height_16 << std::endl;
+	// timestamp_init_with_font_name(NULL,
+	// 	timestamp_font_points, timestamp_font_dpi);
+	// timestamp_set_format(timestamp_format);
+	// timestamp_set_layout(timestamp_layout,
+	// 	timestamp_horizontal_margin, timestamp_vertical_margin);
+	// timestamp_set_align(timestamp_text_align);
+	// timestamp_set_color(timestamp_color);
+	// timestamp_set_stroke_color(timestamp_stroke_color);
+	// timestamp_set_stroke_width(timestamp_stroke_width);
+	// timestamp_set_letter_spacing(timestamp_letter_spacing);
+	// timestamp_fix_position(video_width_32, video_height_16);
 
 	audioThread = std::thread(audioLoop, audio);
 
@@ -1898,6 +1946,34 @@ int Picam::run(int argc, char *argv[])
 			this->option->rec_archive_dir, // rec_archive_dir
 		};
 
+		if (this->option->is_timestamp_enabled) {
+			if (this->option->timestamp_font_file[0] != 0) {
+				log_debug("timestamp_init with font_file=%s\n", this->option->timestamp_font_file);
+				timestamp_init(this->option->timestamp_font_file, this->option->timestamp_font_face_index,
+						this->option->timestamp_font_points, this->option->timestamp_font_dpi);
+			} else if (this->option->timestamp_font_name[0] != 0) {
+				log_debug("timestamp_initwith_font_name with font_name=%s\n", this->option->timestamp_font_name);
+				timestamp_init_with_font_name(this->option->timestamp_font_name,
+						this->option->timestamp_font_points, this->option->timestamp_font_dpi);
+			} else {
+				timestamp_init_with_font_name(NULL,
+						this->option->timestamp_font_points, this->option->timestamp_font_dpi);
+			}
+			timestamp_set_format(this->option->timestamp_format);
+			if (this->option->is_timestamp_abs_pos_enabled) {
+				timestamp_set_position(this->option->timestamp_pos_x, this->option->timestamp_pos_y);
+			} else {
+				timestamp_set_layout(this->option->timestamp_layout,
+						this->option->timestamp_horizontal_margin, this->option->timestamp_vertical_margin);
+			}
+			timestamp_set_align(this->option->timestamp_text_align);
+			timestamp_set_color(this->option->timestamp_color);
+			timestamp_set_stroke_color(this->option->timestamp_stroke_color);
+			timestamp_set_stroke_width(this->option->timestamp_stroke_width);
+			timestamp_set_letter_spacing(this->option->timestamp_letter_spacing);
+			timestamp_fix_position(this->option->video_width, this->option->video_height);
+		}
+
     this->event_loop();
 	}
 	catch (std::exception const &e)
@@ -1911,39 +1987,39 @@ int Picam::run(int argc, char *argv[])
 // >>> libcamera_app.cpp
 void Picam::OpenCamera()
 {
-	char previewRect[128];
+	// char previewRect[128];
 	// Make a preview window.
-	Options previewOptions;
-	previewOptions.width = this->option->video_width;
-	previewOptions.height = this->option->video_height;
-	previewOptions.framerate = this->option->video_fps;
-	previewOptions.nopreview = !this->option->is_preview_enabled;
-	previewOptions.qt_preview = false; // This is always false as QT preview works only if X is running
-	previewOptions.verbose = log_get_level() >= LOG_LEVEL_DEBUG;
-	if (this->option->is_previewrect_enabled) {
-		previewOptions.fullscreen = false;
-		previewOptions.preview_x = this->option->preview_x;
-		previewOptions.preview_y = this->option->preview_y;
-		previewOptions.preview_width = this->option->preview_width;
-		previewOptions.preview_height = this->option->preview_height;
-		snprintf(
-			previewRect,
-			sizeof(previewRect)-1,
-			"%d,%d,%d,%d",
-			this->option->preview_x,
-			this->option->preview_y,
-			this->option->preview_width,
-			this->option->preview_height);
-		previewOptions.preview = previewRect;
-	} else {
-		previewOptions.fullscreen = true;
-		previewOptions.preview_x = 0;
-		previewOptions.preview_y = 0;
-		previewOptions.preview_width = 0;
-		previewOptions.preview_height = 0;
-	}
+	// Options previewOptions;
+	// previewOptions.width = this->option->video_width;
+	// previewOptions.height = this->option->video_height;
+	// previewOptions.framerate = this->option->video_fps;
+	// previewOptions.nopreview = !this->option->is_preview_enabled;
+	// previewOptions.qt_preview = false; // This is always false as QT preview works only if X is running
+	// previewOptions.verbose = log_get_level() >= LOG_LEVEL_DEBUG;
+	// if (this->option->is_previewrect_enabled) {
+	// 	previewOptions.fullscreen = false;
+	// 	previewOptions.preview_x = this->option->preview_x;
+	// 	previewOptions.preview_y = this->option->preview_y;
+	// 	previewOptions.preview_width = this->option->preview_width;
+	// 	previewOptions.preview_height = this->option->preview_height;
+	// 	snprintf(
+	// 		previewRect,
+	// 		sizeof(previewRect)-1,
+	// 		"%d,%d,%d,%d",
+	// 		this->option->preview_x,
+	// 		this->option->preview_y,
+	// 		this->option->preview_width,
+	// 		this->option->preview_height);
+	// 	previewOptions.preview = previewRect;
+	// } else {
+	// 	previewOptions.fullscreen = true;
+	// 	previewOptions.preview_x = 0;
+	// 	previewOptions.preview_y = 0;
+	// 	previewOptions.preview_width = 0;
+	// 	previewOptions.preview_height = 0;
+	// }
 	// fullscreen=false, x=100 y=200 width=300 height=400 にすると画面が暗くなる
-	preview_ = std::unique_ptr<Preview>(make_preview(&previewOptions));
+	preview_ = std::unique_ptr<Preview>(make_preview(this->option));
 	preview_->SetDoneCallback(std::bind(&Picam::previewDoneCallback, this, std::placeholders::_1));
 
 	log_debug("Opening camera...\n");
@@ -2155,6 +2231,13 @@ void Picam::Teardown()
 	printf("streams clear\n");
 	streams_.clear();
 	printf("Teardown end\n");
+
+	if (this->sps_pps != NULL) {
+		free(this->sps_pps);
+	}
+  timestamp_shutdown();
+  subtitle_shutdown();
+  text_teardown();
 }
 
 void Picam::StartCamera()

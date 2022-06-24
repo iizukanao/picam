@@ -39,15 +39,15 @@ void Muxer::setup(MpegTSCodecSettings *codec_settings) {
 	// mpegts_open_stream(rec_ctx.format_context, recording_tmp_filepath, 0);
 }
 
-void Muxer::waitForExit() {
-  if (this->recThread.joinable()) {
-    printf("joining recThread\n");
-    this->recThread.join();
-    printf("joined recThread\n");
-  }
-}
+// void Muxer::waitForExit() {
+//   if (this->recThread.joinable()) {
+//     printf("joining recThread\n");
+//     this->recThread.join();
+//     printf("joined recThread\n");
+//   }
+// }
 
-void Muxer::rec_thread_stop(int skip_cleanup) {
+void *Muxer::rec_thread_stop(int skip_cleanup) {
   FILE *fsrc, *fdest;
   int read_len;
   uint8_t *copy_buf;
@@ -141,7 +141,7 @@ void Muxer::rec_thread_stop(int skip_cleanup) {
   is_recording = 0;
   state_set(NULL, "record", "false");
 
-  // pthread_exit(0);
+  pthread_exit(0);
 }
 
 void Muxer::flush_record() {
@@ -159,6 +159,7 @@ void Muxer::prepareForDestroy() {
     pthread_cond_signal(&rec_cond);
 
     this->stop_record();
+    pthread_join(this->rec_thread, NULL);
   }
 }
 
@@ -205,8 +206,13 @@ int Muxer::is_disk_almost_full() {
   }
 }
 
-void start_rec_thread(Muxer *muxer, RecSettings rec_settings) {
-  muxer->rec_start(rec_settings);
+// void start_rec_thread(Muxer *muxer, RecSettings rec_settings) {
+//   muxer->rec_start();
+// }
+
+void *rec_thread_start(void *self) {
+  Muxer *muxer = reinterpret_cast<Muxer *>(self);
+  return muxer->rec_start();
 }
 
 void Muxer::start_record(RecSettings settings) {
@@ -221,8 +227,14 @@ void Muxer::start_record(RecSettings settings) {
   }
 
   this->rec_thread_needs_exit = 0;
-  // pthread_create(&rec_thread, NULL, rec_thread_start, NULL);
-	this->recThread = std::thread(start_rec_thread, this, settings);
+  this->rec_settings = settings;
+  pthread_create(&this->rec_thread, NULL, rec_thread_start, this);
+  // if (this->recThread.joinable()) {
+  //   log_debug("recThread is joinable\n");
+  //   this->recThread.join();
+  // }
+  // log_debug("creating recThread\n");
+	// this->recThread = std::thread(start_rec_thread, this, settings);
 }
 
 void Muxer::onFrameArrive() {
@@ -235,7 +247,7 @@ void Muxer::onFrameArrive() {
 }
 
 // Called from thread
-void Muxer::rec_start(RecSettings rec_settings) {
+void *Muxer::rec_start() {
   time_t rawtime;
   struct tm *timeinfo;
   AVPacket *av_pkt;
@@ -253,7 +265,6 @@ void Muxer::rec_start(RecSettings rec_settings) {
   int has_error;
 
   this->rec_thread_needs_exit = 0;
-  this->rec_settings = rec_settings;
   has_error = 0;
   copy_buf = (uint8_t *)malloc(BUFSIZ);
   if (copy_buf == NULL) {

@@ -5,8 +5,8 @@ include(GNUInstallDirs)
 pkg_check_modules(LIBDRM QUIET libdrm)
 pkg_check_modules(X11 QUIET x11)
 pkg_check_modules(EPOXY QUIET epoxy)
-pkg_check_modules(QTCORE QUIET Qt5Core)
-pkg_check_modules(QTWIDGETS QUIET Qt5Widgets)
+#pkg_check_modules(QTCORE QUIET Qt5Core)
+#pkg_check_modules(QTWIDGETS QUIET Qt5Widgets)
 
 set(SRC "preview.cpp")
 set(TARGET_LIBS "")
@@ -41,27 +41,27 @@ else()
     message(STATUS "EGL display mode will be unavailable!")
 endif()
 
-IF (NOT DEFINED ENABLE_QT)
-    message(STATUS "ENABLE_QT not specified - set to 1")
-    set(ENABLE_QT 1)
-endif()
+#IF (NOT DEFINED ENABLE_QT)
+#    message(STATUS "ENABLE_QT not specified - set to 1")
+#    set(ENABLE_QT 1)
+#endif()
 set(QT_FOUND 0)
-if (ENABLE_QT AND QTCORE_FOUND AND QTWIDGETS_FOUND)
-    message(STATUS "QTCORE_LINK_LIBRARIES=${QTCORE_LINK_LIBRARIES}")
-    message(STATUS "QTCORE_INCLUDE_DIRS=${QTCORE_INCLUDE_DIRS}")
-    include_directories(${QTCORE_INCLUDE_DIRS} ${QTWIDGETS_INCLUDE_DIRS})
-    set(TARGET_LIBS ${TARGET_LIBS} ${QTCORE_LIBRARIES} ${QTWIDGETS_LIBRARIES})
-    # The qt5/QtCore/qvariant.h header throws a warning, so suppress this.
-    # Annoyingly there are two different (incompatible) flags for clang < 10
-    # and >= 10, so set both, and supress unknown options warnings.
-    set_source_files_properties(qt_preview.cpp PROPERTIES COMPILE_FLAGS
-                                "-Wno-unknown-warning-option -Wno-deprecated-copy -Wno-deprecated")
-    set(SRC ${SRC} qt_preview.cpp)
-    set(QT_FOUND 1)
-    message(STATUS "QT display mode enabled")
-else()
-    message(STATUS "QT display mode will be unavailable!")
-endif()
+#if (ENABLE_QT AND QTCORE_FOUND AND QTWIDGETS_FOUND)
+#    message(STATUS "QTCORE_LINK_LIBRARIES=${QTCORE_LINK_LIBRARIES}")
+#    message(STATUS "QTCORE_INCLUDE_DIRS=${QTCORE_INCLUDE_DIRS}")
+#    include_directories(${QTCORE_INCLUDE_DIRS} ${QTWIDGETS_INCLUDE_DIRS})
+#    set(TARGET_LIBS ${TARGET_LIBS} ${QTCORE_LIBRARIES} ${QTWIDGETS_LIBRARIES})
+#    # The qt5/QtCore/qvariant.h header throws a warning, so suppress this.
+#    # Annoyingly there are two different (incompatible) flags for clang < 10
+#    # and >= 10, so set both, and supress unknown options warnings.
+#    set_source_files_properties(qt_preview.cpp PROPERTIES COMPILE_FLAGS
+#                                "-Wno-unknown-warning-option -Wno-deprecated-copy -Wno-deprecated")
+#    set(SRC ${SRC} qt_preview.cpp)
+#    set(QT_FOUND 1)
+#    message(STATUS "QT display mode enabled")
+#else()
+#    message(STATUS "QT display mode will be unavailable!")
+#endif()
 
 add_library(preview null_preview.cpp ${SRC})
 target_link_libraries(preview ${TARGET_LIBS})

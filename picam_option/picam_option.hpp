@@ -126,7 +126,7 @@ public:
     float video_fps = 30.0f;
     float min_fps = -1.0f;
     float max_fps = -1.0f;
-    int fr_q16;
+    int fr_q16; // will be calculated later
     int video_pts_step = 0;
     int is_video_pts_step_specified = 0;
     int video_gop_size = 0;
@@ -147,9 +147,9 @@ public:
     long audio_bitrate = 40000; // 40 Kbps
     int is_audio_channels_specified = 0;
     int audio_channels = 1;
-    int audio_preview_channels;
+    int audio_preview_channels; // will be calculated later
     int audio_sample_rate = 48000;
-    int audio_period_size;
+    int audio_period_size; // will be calculated later
     int is_hlsout_enabled = 0;
     char hls_output_dir[256] = "/run/shm/video";
     int hls_keyframes_per_segment = 1;
@@ -182,13 +182,13 @@ public:
     char exposure_metering[8] = "average";
 
     int manual_exposure_compensation = 0; // EV compensation
-    float exposure_compensation;
+    float exposure_compensation = 0.0f;
     int manual_exposure_aperture = 0; // f-number
-    float exposure_aperture;
+    float exposure_aperture = 0.0f;
     int manual_exposure_shutter_speed = 0; // in microseconds
-    unsigned int exposure_shutter_speed;
+    unsigned int exposure_shutter_speed = 0;
     int manual_exposure_sensitivity = 0; // ISO
-    unsigned int exposure_sensitivity;
+    unsigned int exposure_sensitivity = 0;
 
     char state_dir[256] = "state";
     char hooks_dir[256] = "hooks";
@@ -205,12 +205,13 @@ public:
     };
     int is_preview_enabled = 0;
     int is_previewrect_enabled = 0;
-    int preview_x;
-    int preview_y;
-    int preview_width;
-    int preview_height;
+    int preview_x = 0;
+    int preview_y = 0;
+    int preview_width = 0;
+    int preview_height = 0;
     int preview_opacity = 255;
-    uint32_t blank_background_color;
+    int preview_hdmi = 0;
+    uint32_t blank_background_color = 0;
     int record_buffer_keyframes = 5;
 
     int is_timestamp_enabled = 0;
@@ -218,12 +219,12 @@ public:
     LAYOUT_ALIGN timestamp_layout = (LAYOUT_ALIGN) (LAYOUT_ALIGN_BOTTOM | LAYOUT_ALIGN_RIGHT);
     int timestamp_horizontal_margin = 10;
     int timestamp_vertical_margin = 10;
-    int timestamp_pos_x;
-    int timestamp_pos_y;
+    int timestamp_pos_x = 0;
+    int timestamp_pos_y = 0;
     int is_timestamp_abs_pos_enabled = 0;
     TEXT_ALIGN timestamp_text_align = TEXT_ALIGN_LEFT;
     char timestamp_font_name[128] = "FreeMono:style=Bold";
-    char timestamp_font_file[1024];
+    char timestamp_font_file[1024] = "";
     int timestamp_font_face_index = 0;
     float timestamp_font_points = 14.0f;
     int timestamp_font_dpi = 96;

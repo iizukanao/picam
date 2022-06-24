@@ -84,49 +84,49 @@ std::string const &LibcameraApp::CameraId() const
 	return camera_->id();
 }
 
-void LibcameraApp::OpenCamera()
-{
-	// Make a preview window.
-	preview_ = std::unique_ptr<Preview>(make_preview(options_.get()));
-	preview_->SetDoneCallback(std::bind(&LibcameraApp::previewDoneCallback, this, std::placeholders::_1));
+// void LibcameraApp::OpenCamera()
+// {
+// 	// Make a preview window.
+// 	preview_ = std::unique_ptr<Preview>(make_preview(options_.get()));
+// 	preview_->SetDoneCallback(std::bind(&LibcameraApp::previewDoneCallback, this, std::placeholders::_1));
 
-	if (options_->verbose)
-		std::cerr << "Opening camera..." << std::endl;
+// 	if (options_->verbose)
+// 		std::cerr << "Opening camera..." << std::endl;
 
-	camera_manager_ = std::make_unique<CameraManager>();
-	int ret = camera_manager_->start();
-	if (ret)
-		throw std::runtime_error("camera manager failed to start, code " + std::to_string(-ret));
+// 	camera_manager_ = std::make_unique<CameraManager>();
+// 	int ret = camera_manager_->start();
+// 	if (ret)
+// 		throw std::runtime_error("camera manager failed to start, code " + std::to_string(-ret));
 
-	std::vector<std::shared_ptr<libcamera::Camera>> cameras = camera_manager_->cameras();
-	// Do not show USB webcams as these are not supported in libcamera-apps!
-	auto rem = std::remove_if(cameras.begin(), cameras.end(),
-							  [](auto &cam) { return cam->id().find("/usb") != std::string::npos; });
-	cameras.erase(rem, cameras.end());
+// 	std::vector<std::shared_ptr<libcamera::Camera>> cameras = camera_manager_->cameras();
+// 	// Do not show USB webcams as these are not supported in libcamera-apps!
+// 	auto rem = std::remove_if(cameras.begin(), cameras.end(),
+// 							  [](auto &cam) { return cam->id().find("/usb") != std::string::npos; });
+// 	cameras.erase(rem, cameras.end());
 
-	if (cameras.size() == 0)
-		throw std::runtime_error("no cameras available");
-	if (options_->camera >= cameras.size())
-		throw std::runtime_error("selected camera is not available");
+// 	if (cameras.size() == 0)
+// 		throw std::runtime_error("no cameras available");
+// 	if (options_->camera >= cameras.size())
+// 		throw std::runtime_error("selected camera is not available");
 
-	std::string const &cam_id = cameras[options_->camera]->id();
-	camera_ = camera_manager_->get(cam_id);
-	if (!camera_)
-		throw std::runtime_error("failed to find camera " + cam_id);
+// 	std::string const &cam_id = cameras[options_->camera]->id();
+// 	camera_ = camera_manager_->get(cam_id);
+// 	if (!camera_)
+// 		throw std::runtime_error("failed to find camera " + cam_id);
 
-	if (camera_->acquire())
-		throw std::runtime_error("failed to acquire camera " + cam_id);
-	camera_acquired_ = true;
+// 	if (camera_->acquire())
+// 		throw std::runtime_error("failed to acquire camera " + cam_id);
+// 	camera_acquired_ = true;
 
-	if (options_->verbose)
-		std::cerr << "Acquired camera " << cam_id << std::endl;
+// 	if (options_->verbose)
+// 		std::cerr << "Acquired camera " << cam_id << std::endl;
 
-	if (!options_->post_process_file.empty())
-		post_processor_.Read(options_->post_process_file);
-	// The queue takes over ownership from the post-processor.
-	post_processor_.SetCallback(
-		[this](CompletedRequestPtr &r) { this->msg_queue_.Post(Msg(MsgType::RequestComplete, std::move(r))); });
-}
+// 	if (!options_->post_process_file.empty())
+// 		post_processor_.Read(options_->post_process_file);
+// 	// The queue takes over ownership from the post-processor.
+// 	post_processor_.SetCallback(
+// 		[this](CompletedRequestPtr &r) { this->msg_queue_.Post(Msg(MsgType::RequestComplete, std::move(r))); });
+// }
 
 void LibcameraApp::CloseCamera()
 {

@@ -119,9 +119,9 @@ public:
 		}
 		encoder_->EncodeBuffer(buffer->planes()[0].fd.get(), span.size(), mem, info, timestamp_ns / 1000);
 	}
-	VideoOptions *GetOptions() const { return static_cast<VideoOptions *>(options_.get()); }
+	// VideoOptions *GetOptions() const { return static_cast<VideoOptions *>(options_.get()); }
 	void StopEncoder() { printf("StopEncoder\n"); encoder_.reset(); }
-    // <<< libcamera_encoder.hpp
+		// <<< libcamera_encoder.hpp
 
 protected:
     // >>> libcamera_encoder.hpp
@@ -140,7 +140,7 @@ protected:
     // <<< libcamera_encoder.hpp
 
 	// >>> libcamera_app.hpp
-	std::unique_ptr<Options> options_;
+	// std::unique_ptr<Options> options_;
 	// <<< libcamera_app.hpp
 
 private:

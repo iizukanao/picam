@@ -5,19 +5,22 @@
  * preview.cpp - preview window interface
  */
 
-#include "core/options.hpp"
+#include <iostream>
+
+// #include "core/options.hpp"
+#include "log/log.h"
 
 #include "preview.hpp"
 
-Preview *make_null_preview(Options const *options);
-Preview *make_egl_preview(Options const *options);
-Preview *make_drm_preview(Options const *options);
+Preview *make_null_preview(PicamOption const *options);
+Preview *make_egl_preview(PicamOption const *options);
+Preview *make_drm_preview(PicamOption const *options);
 // Preview *make_qt_preview(Options const *options);
 
-Preview *make_preview(Options const *options)
+Preview *make_preview(PicamOption const *options)
 {
-	if (options->nopreview) {
-		printf("preview: make_null_preview\n");
+	if (!options->is_preview_enabled) {
+		// Do not show preview
 		return make_null_preview(options);
 	}
 // #if QT_PRESENT
@@ -35,7 +38,8 @@ Preview *make_preview(Options const *options)
 		try
 		{
 #if LIBEGL_PRESENT
-			printf("preview: make_egl_preview\n");
+			// EGL is used when X Window System is running.
+			// DRM cannot be used if X is running.
 			Preview *p = make_egl_preview(options);
 			if (p)
 				std::cerr << "Made X/EGL preview window" << std::endl;
@@ -50,7 +54,7 @@ Preview *make_preview(Options const *options)
 			try
 			{
 #if LIBDRM_PRESENT
-				printf("preview: make_drm_preview\n");
+				// DRM (Direct Rendering Mangaer) is used when X is not running.
 				Preview *p = make_drm_preview(options);
 				if (p)
 					std::cerr << "Made DRM preview window" << std::endl;
@@ -61,7 +65,7 @@ Preview *make_preview(Options const *options)
 			}
 			catch (std::exception const &e)
 			{
-				std::cerr << "Preview window unavailable" << std::endl;
+				std::cerr << "Preview window unavailable: " << e.what() << std::endl;
 				return make_null_preview(options);
 			}
 		}

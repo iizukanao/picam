@@ -125,6 +125,8 @@ void PicamOption::print_usage() {
   log_info("                      Display preview window at specified position\n");
   log_info("  --opacity           Preview window opacity\n");
   log_info("                      (0=transparent..255=opaque; default=%d)\n", defaultOption.preview_opacity);
+  log_info("  --hdmi              Preview output HDMI port (0 or 1; default=%d)\n", defaultOption.preview_hdmi);
+  log_info("                      HDMI port selection works only in console mode (when X is not running)\n");
   log_info("  --blank[=0xAARRGGBB]  Set the video background color to black (or optional ARGB value)\n");
   log_info("  --query             Query camera capabilities then exit\n");
   log_info("  --mode             Specify the camera sensor mode (values depend on the camera hardware)\n");
@@ -254,6 +256,7 @@ int PicamOption::parse(int argc, char **argv) {
     { "previewrect", required_argument, NULL, 0 },
     { "blank", optional_argument, NULL, 0 },
     { "opacity", required_argument, NULL, 0 },
+    { "hdmi", required_argument, NULL, 0 },
     { "quiet", no_argument, NULL, 'q' },
     { "recordbuf", required_argument, NULL, 0 },
     { "verbose", no_argument, NULL, 0 },
@@ -911,7 +914,22 @@ int PicamOption::parse(int argc, char **argv) {
           }
           is_preview_enabled = 1;
           is_previewrect_enabled = 1;
-        } else if (strcmp(long_options[option_index].name, "previewconn")) {
+        } else if (strcmp(long_options[option_index].name, "hdmi") == 0) {
+          char *end;
+          int value = strtol(optarg, &end, 10);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid hdmi: %s\n", optarg);
+            print_usage();
+            return EXIT_FAILURE;
+          }
+          // We allow only HDMI 0 or 1
+          if (value != 0 && value != 1) {
+            log_fatal("error: invalid hdmi: %d (must be 0 or 1)\n", value);
+            return EXIT_FAILURE;
+          }
+          printf("preview_hdmi set to %d\n", value);
+          preview_hdmi = value;
+          break;
         } else if (strcmp(long_options[option_index].name, "blank") == 0) {
           blank_background_color = optarg ? strtoul(optarg, NULL, 0) : BLANK_BACKGROUND_DEFAULT;
           break;
@@ -1215,6 +1233,7 @@ int PicamOption::parse(int argc, char **argv) {
   log_debug("preview_width=%d\n", preview_width);
   log_debug("preview_height=%d\n", preview_height);
   log_debug("preview_opacity=%d\n", preview_opacity);
+  log_debug("preview_hdmi=%d\n", preview_hdmi);
   log_debug("blank_background_color=0x%x\n", blank_background_color);
   log_debug("is_audio_preview_enabled=%d\n", is_audio_preview_enabled);
   log_debug("audio_preview_dev=%s\n", audio_preview_dev);

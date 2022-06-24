@@ -5,13 +5,17 @@
  * drm_preview.cpp - DRM-based preview window.
  */
 
+#include <map>
+#include <string.h>
+#include <unistd.h>
+#include <iostream>
 #include <drm.h>
 #include <drm_fourcc.h>
 #include <drm_mode.h>
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
-#include "core/options.hpp"
+// #include "core/options.hpp"
 #include "log/log.h"
 
 #include "preview.hpp"
@@ -19,7 +23,7 @@
 class DrmPreview : public Preview
 {
 public:
-	DrmPreview(Options const *options);
+	DrmPreview(PicamOption const *options);
 	~DrmPreview();
 	// Display the buffer. You get given the fd back in the BufferDoneCallback
 	// once its available for re-use.
@@ -86,11 +90,16 @@ void DrmPreview::findCrtc()
 
 	if (!conId_)
 	{
-		if (options_->verbose)
-			std::cerr << "No connector ID specified.  Choosing default from list:" << std::endl;
+		// log_debug("No connector ID specified.  Choosing default from list:\n");
 
 		for (i = 0; i < res->count_connectors; i++)
 		{
+			if (i == this->options_->preview_hdmi) {
+				log_debug("preview: CRTC connector %d: chosen\n", i);
+			} else {
+				log_debug("preview: CRTC connector %d: skipped because preview_hdmi=%d is specified\n", i, this->options_->preview_hdmi);
+				continue;
+			}
 			printf("preview: inspecting connector: %d\n", i);
 			drmModeConnector *con = drmModeGetConnector(drmfd_, res->connectors[i]);
 			drmModeEncoder *enc = NULL;
@@ -121,14 +130,14 @@ void DrmPreview::findCrtc()
 				printf("preview: crtc screen_width_=%u screen_height_=%u\n", screen_width_, screen_height_);
 			}
 
-			// log_debug("Connector %u (crtc %u): type %u, %ux%u %s",
-			// 	con->connector_id, (crtc ? crtc->crtc_id : 0), con->connector_type, (crtc ? crtc->width : 0), (crtc ? crtc->height : 0),
-			// 	(conId_ == (int)con->connector_id ? " (chosen)" : "")
-			// );
-			if (options_->verbose)
-				std::cerr << "Connector " << con->connector_id << " (crtc " << (crtc ? crtc->crtc_id : 0) << "): type "
-						  << con->connector_type << ", " << (crtc ? crtc->width : 0) << "x" << (crtc ? crtc->height : 0)
-						  << (conId_ == (int)con->connector_id ? " (chosen)" : "") << std::endl; // TODO: (chosen) is wrong when connector is specified
+			log_debug("Connector %u (crtc %u): type %u, %ux%u %s",
+				con->connector_id, (crtc ? crtc->crtc_id : 0), con->connector_type, (crtc ? crtc->width : 0), (crtc ? crtc->height : 0),
+				(conId_ == (int)con->connector_id ? " (chosen)" : "")
+			);
+			// if (options_->verbose)
+			// 	std::cerr << "Connector " << con->connector_id << " (crtc " << (crtc ? crtc->crtc_id : 0) << "): type "
+			// 			  << con->connector_type << ", " << (crtc ? crtc->width : 0) << "x" << (crtc ? crtc->height : 0)
+			// 			  << (conId_ == (int)con->connector_id ? " (chosen)" : "") << std::endl; // TODO: (chosen) is wrong when connector is specified
 		}
 
 		if (!conId_)
@@ -173,8 +182,9 @@ void DrmPreview::findCrtc()
 		throw std::runtime_error("connector supports no mode");
 	}
 
-	if (options_->fullscreen || width_ == 0 || height_ == 0)
+	if (!options_->is_previewrect_enabled || width_ == 0 || height_ == 0)
 	{
+		// fullscreen preview
 		drmModeCrtc *crtc = drmModeGetCrtc(drmfd_, crtcId_);
 		x_ = crtc->x;
 		y_ = crtc->y;
@@ -239,7 +249,7 @@ void DrmPreview::findPlane()
 	drmModeFreePlaneResources(planes);
 }
 
-DrmPreview::DrmPreview(Options const *options) : Preview(options), last_fd_(-1), first_time_(true)
+DrmPreview::DrmPreview(PicamOption const *options) : Preview(options), last_fd_(-1), first_time_(true)
 {
 	drmfd_ = drmOpen("vc4", NULL);
 	if (drmfd_ < 0)
@@ -269,8 +279,8 @@ DrmPreview::DrmPreview(Options const *options) : Preview(options), last_fd_(-1),
 		throw;
 	}
 
-	// Default behaviour here is to go fullscreen.
-	if (options_->fullscreen || width_ == 0 || height_ == 0 || x_ + width_ > screen_width_ ||
+	// Default behaviour here is to go fullscreen while maintaining aspect ratio.
+	if (!options_->is_previewrect_enabled || width_ == 0 || height_ == 0 || x_ + width_ > screen_width_ ||
 		y_ + height_ > screen_height_)
 	{
 		x_ = y_ = 0;
@@ -484,7 +494,7 @@ void DrmPreview::Reset()
 	first_time_ = true;
 }
 
-Preview *make_drm_preview(Options const *options)
+Preview *make_drm_preview(PicamOption const *options)
 {
 	return new DrmPreview(options);
 }

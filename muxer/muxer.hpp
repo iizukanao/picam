@@ -31,11 +31,11 @@ class Muxer
     void setup(MpegTSCodecSettings *codec_settings);
     int write_encoded_packets(int max_packets, int origin_pts);
     void start_record(RecSettings rec_settings);
-    void rec_start(RecSettings rec_settings);
+    void *rec_start();
     void write_frame(AVPacket *pkt);
     void add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_index, int flags);
     void prepare_encoded_packets(float video_fps, float audio_fps);
-    void waitForExit();
+    // void waitForExit();
     void stop_record();
     void onFrameArrive();
     void prepareForDestroy();
@@ -49,11 +49,12 @@ class Muxer
 
   private:
     PicamOption *option;
-    std::thread recThread;
+    // std::thread recThread;
+    pthread_t rec_thread;
     int is_disk_almost_full();
     void free_encoded_packets();
     void check_record_duration();
-    void rec_thread_stop(int skip_cleanup);
+    void *rec_thread_stop(int skip_cleanup);
     void flush_record();
     HTTPLiveStreaming *hls;
     RecSettings rec_settings;

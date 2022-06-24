@@ -150,7 +150,7 @@ int redraw_text(int text_id);
  *
  * returns: nonzero if the canvas content has been changed
  */
-int text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height, int is_video);
+int text_draw_all(uint8_t *canvas, int canvas_width, int canvas_height, int stride, int is_video);
 
 /**
  * Clear the text. Once this is called, the bitmap will not be drawn
