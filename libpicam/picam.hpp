@@ -203,6 +203,7 @@ private:
 	void stopAllThreads();
 	void stopAudioThread();
 	void stopRecThread();
+	void queryCameras();
 
     // >>> libcamera_app.hpp
 	template <typename T>

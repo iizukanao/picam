@@ -126,7 +126,7 @@ void PicamOption::print_usage() {
   log_info("  --opacity           Preview window opacity\n");
   log_info("                      (0=transparent..255=opaque; default=%d)\n", defaultOption.preview_opacity);
   log_info("  --hdmi              Preview output HDMI port (0 or 1; default=%d)\n", defaultOption.preview_hdmi);
-  log_info("                      HDMI port selection works only in console mode (when X is not running)\n");
+  log_info("                      HDMI port selection only works in console mode (when X is not running)\n");
   log_info("  --blank[=0xAARRGGBB]  Set the video background color to black (or optional ARGB value)\n");
   log_info("  --query             Query camera capabilities then exit\n");
   log_info("  --mode             Specify the camera sensor mode (values depend on the camera hardware)\n");
@@ -962,7 +962,7 @@ int PicamOption::parse(int argc, char **argv) {
           print_program_version();
           return EXIT_SUCCESS;
         } else if (strcmp(long_options[option_index].name, "help") == 0) {
-          print_usage();
+          this->show_help = true;
           return EXIT_SUCCESS;
         }
         break;

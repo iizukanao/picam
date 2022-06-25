@@ -20,6 +20,10 @@ Muxer::Muxer(PicamOption *option) {
 
 Muxer::~Muxer() {
   this->free_encoded_packets();
+  if (this->keyframe_pointers != NULL) {
+    free(this->keyframe_pointers);
+    this->keyframe_pointers = NULL;
+  }
 }
 
 void Muxer::setup(MpegTSCodecSettings *codec_settings) {

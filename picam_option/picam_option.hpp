@@ -1,5 +1,6 @@
 #pragma once
 
+#include <limits.h>
 #include <libcamera/control_ids.h>
 #include <linux/videodev2.h>
 
@@ -193,6 +194,8 @@ public:
     char state_dir[256] = "state";
     char hooks_dir[256] = "hooks";
     float audio_volume_multiply = 1.0f;
+    int audio_min_value = SHRT_MIN; // -32768
+    int audio_max_value = SHRT_MAX; // 32767
     int is_hls_encryption_enabled = 0;
     char hls_encryption_key_uri[256] = "stream.key";
     uint8_t hls_encryption_key[16] = {
@@ -232,6 +235,7 @@ public:
     int timestamp_stroke_color = 0x000000;
     float timestamp_stroke_width = 1.3f;
     int timestamp_letter_spacing = 0;
+    bool show_help = false;
 
 private:
     void calculate();

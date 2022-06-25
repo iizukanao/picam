@@ -41,8 +41,6 @@ using namespace std::placeholders;
 
 // Some keypress/signal handling.
 
-#define DEBUG_SKIP_VIDEO 0
-
 // static int signal_received;
 static std::thread audioThread;
 static float video_fps = 40.0f; // TODO: Make this an option
@@ -97,6 +95,7 @@ void Picam::stopAudioThread() {
 		audioThread.join();
 		std::cout << "joined" << std::endl;
 	}
+	audio->teardown();
 	delete audio;
 	printf("stopAudioThread end\n");
 }
@@ -112,42 +111,6 @@ void Picam::stopAllThreads() {
 	this->stopAudioThread();
 	this->stopRecThread();
 }
-
-// static void default_signal_handler(int signal_number)
-// {
-// 	signal_received = signal_number;
-// 	std::cout << "Received signal " << signal_number << std::endl;
-// 	Picam *picam;
-// 	picam->getInstance().stopAllThreads();
-// 	std::cout << "end of signal handler" << std::endl;
-// }
-
-#if !DEBUG_SKIP_VIDEO
-static int get_key_or_signal(PicamOption const *options, pollfd p[1])
-{
-	int key = 0;
-	// if (options->keypress)
-	// {
-	// 	poll(p, 1, 0);
-	// 	if (p[0].revents & POLLIN)
-	// 	{
-	// 		char *user_string = nullptr;
-	// 		size_t len;
-	// 		[[maybe_unused]] size_t r = getline(&user_string, &len, stdin);
-	// 		key = user_string[0];
-	// 	}
-	// }
-	// if (options->signal)
-	// {
-	// 	if (signal_received == SIGUSR1)
-	// 		key = '\n';
-	// 	else if (signal_received == SIGUSR2)
-	// 		key = 'x';
-	// 	signal_received = 0;
-	// }
-	return key;
-}
-#endif
 
 static int get_colourspace_flags(std::string const &codec)
 {
@@ -192,7 +155,6 @@ static int get_colourspace_flags(std::string const &codec)
 // 	}
 // }
 
-#if !DEBUG_SKIP_VIDEO
 void Picam::modifyBuffer(CompletedRequestPtr &completed_request)
 {
 	libcamera::Stream *stream = this->VideoStream();
@@ -268,7 +230,6 @@ void Picam::modifyBuffer(CompletedRequestPtr &completed_request)
 		// std::cout << "is_text_changed: " << is_text_changed << std::endl;
 	}
 }
-#endif
 
 // The main event loop for the application.
 
@@ -1472,6 +1433,7 @@ static int timespec_subtract(struct timespec *result, struct timespec *t2, struc
 
 void Picam::check_video_and_audio_started() {
 	if (this->is_audio_started && this->is_video_started) {
+		// Let other components know that both audio and video has started
 		struct timespec ts;
 		clock_gettime(CLOCK_MONOTONIC, &ts);
 		this->video_start_time = this->audio_start_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
@@ -1479,6 +1441,7 @@ void Picam::check_video_and_audio_started() {
 			send_video_start_time();
 			send_audio_start_time(this->audio_start_time);
 		}
+		this->audio->set_audio_start_time(audio_start_time);
 		log_info("capturing started\n");
 	}
 }
@@ -1644,32 +1607,118 @@ void Picam::videoEncodeDoneCallback(void *mem, size_t size, int64_t timestamp_us
 	// 	fprintf(fp_timestamps_, "%" PRId64 ".%03" PRId64 "\n", last_timestamp_ / 1000, last_timestamp_ % 1000);
 }
 
+void Picam::queryCameras()
+{
+		std::unique_ptr<libcamera::CameraManager> cm = std::make_unique<libcamera::CameraManager>();
+		int ret = cm->start();
+		if (ret)
+			throw std::runtime_error("camera manager failed to start, code " + std::to_string(-ret));
+
+		std::vector<std::shared_ptr<libcamera::Camera>> cameras = cm->cameras();
+		// Do not show USB webcams as these are not supported in libcamera-apps!
+		auto rem = std::remove_if(cameras.begin(), cameras.end(),
+								  [](auto &cam) { return cam->id().find("/usb") != std::string::npos; });
+		cameras.erase(rem, cameras.end());
+
+		if (cameras.size() != 0)
+		{
+			unsigned int idx = 0;
+			std::cerr << "Available cameras" << std::endl
+					  << "-----------------" << std::endl;
+			for (auto const &cam : cameras)
+			{
+				std::cerr << idx++ << " : " << cam->properties().get(libcamera::properties::Model);
+				if (cam->properties().contains(libcamera::properties::PixelArrayActiveAreas))
+					std::cerr << " ["
+							  << cam->properties().get(libcamera::properties::PixelArrayActiveAreas)[0].size().toString()
+							  << "]";
+				std::cerr << " (" << cam->id() << ")" << std::endl;
+
+				std::unique_ptr<libcamera::CameraConfiguration> config = cam->generateConfiguration({libcamera::StreamRole::Raw});
+				if (!config)
+					throw std::runtime_error("failed to generate capture configuration");
+				const libcamera::StreamFormats &formats = config->at(0).formats();
+
+				if (!formats.pixelformats().size())
+					continue;
+
+				std::cerr << "    Modes: ";
+				unsigned int i = 0;
+				for (const auto &pix : formats.pixelformats())
+				{
+					if (i++) std::cerr << "           ";
+					std::cerr << "'" << pix.toString() << "' : ";
+					for (const auto &size : formats.sizes(pix))
+						std::cerr << size.toString() << " ";
+					std::cerr << std::endl;
+				}
+			}
+		}
+		else
+			std::cerr << "No cameras available!" << std::endl;
+
+		cameras.clear();
+		cm->stop();
+}
+
 // Based on libcamera_vid.cpp
 void Picam::event_loop()
 {
-	// VideoOptions const *options = this->GetOptions();
-	// std::unique_ptr<Output> output = std::unique_ptr<Output>(Output::Create(options));
-	// this->SetEncodeOutputReadyCallback(std::bind(&Output::OutputReady, output.get(), _1, _2, _3, _4));
-
-	// std::cout << "### SetEncodeOutputReadyCallback ###" << std::endl;
 	this->SetEncodeOutputReadyCallback(std::bind(&Picam::videoEncodeDoneCallback, this, _1, _2, _3, _4));
 
-	int hls_number_of_segments = 3;
 	MpegTSCodecSettings codec_settings;
-	unsigned int audio_sample_rate = 48000;
-	long audio_bitrate = 40000;
-	int audio_channels = 1;
-	codec_settings.audio_sample_rate = audio_sample_rate;
-	codec_settings.audio_bit_rate = audio_bitrate;
-	codec_settings.audio_channels = audio_channels;
-	codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
+	if (this->option->disable_audio_capturing) {
+		// HLS will not work when video-only, so we add silent audio track.
+		this->option->audio_channels = 1;
+		codec_settings.audio_sample_rate = this->option->audio_sample_rate;
+		codec_settings.audio_bit_rate = 1000;
+		codec_settings.audio_channels = this->option->audio_channels;
+		codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
+	} else {
+		codec_settings.audio_sample_rate = this->option->audio_sample_rate;
+		codec_settings.audio_bit_rate = this->option->audio_bitrate;
+		codec_settings.audio_channels = this->option->audio_channels;
+		codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
+	}
+
 
 #if AUDIO_ONLY
   hls = hls_create_audio_only(hls_number_of_segments, &codec_settings); // 2 == num_recent_files
 #else
-	printf("hls_create\n");
-	hls = hls_create(hls_number_of_segments, &codec_settings); // 2 == num_recent_files
+	hls = hls_create(this->option->hls_number_of_segments, &codec_settings); // 2 == num_recent_files
 #endif
+
+	if (this->option->is_hlsout_enabled) {
+		hls->dir = this->option->hls_output_dir;
+		hls->num_retained_old_files = 10;
+		if (this->option->is_hls_encryption_enabled) {
+			hls->use_encryption = 1;
+
+			int uri_len = strlen(this->option->hls_encryption_key_uri) + 1;
+			hls->encryption_key_uri = (char *)malloc(uri_len);
+			if (hls->encryption_key_uri == NULL) {
+				perror("malloc for hls->encryption_key_uri");
+				exit(EXIT_FAILURE);
+			}
+			memcpy(hls->encryption_key_uri, this->option->hls_encryption_key_uri, uri_len);
+
+			hls->encryption_key = (uint8_t *)malloc(16);
+			if (hls->encryption_key == NULL) {
+				perror("malloc for hls->encryption_key");
+				exit(EXIT_FAILURE);
+			}
+			memcpy(hls->encryption_key, this->option->hls_encryption_key, 16);
+
+			hls->encryption_iv = (uint8_t *)malloc(16);
+			if (hls->encryption_iv == NULL) {
+				perror("malloc for hls->encryption_iv");
+				exit(EXIT_FAILURE);
+			}
+			memcpy(hls->encryption_iv, this->option->hls_encryption_iv, 16);
+		} // if (enable_hls_encryption)
+	}
+
+	log_debug("configuring devices\n");
 
 	std::cout << "### OpenCamera" << std::endl;
 	this->OpenCamera();
@@ -1680,19 +1729,10 @@ void Picam::event_loop()
 	this->StartEncoder();
 	std::cout << "### StartCamera" << std::endl;
 	this->StartCamera();
-#if !DEBUG_SKIP_VIDEO
-	auto start_time = std::chrono::high_resolution_clock::now();
-#endif
 	
-	// TODO: Configure microphone
-	// TODO: Set up MPEG-TS (Configure) libavformat and libavcodec)
-	// TODO: Create a thread for audio capture and encoding
-
 	state_default_dir("state");
 
 	audio = new Audio(this->option);
-	// std::unique_ptr<Audio> audio(new Audio(options));
-	// audio->setup() をスレッド内でやる必要がある?
 	audio->setup(hls);
 
 	this->muxer = new Muxer(this->option);
@@ -1706,39 +1746,9 @@ void Picam::event_loop()
 		this->muxer->add_encoded_packet(audio_pts, data, size, stream_index, flags);
 	});
 
-	int fr_q16 = video_fps * 65536;
-	int video_pts_step_default = 0;
-	int video_pts_step = video_pts_step_default; // Make this an option
-	if (video_pts_step == video_pts_step_default) {
-		video_pts_step = round(90000 / video_fps);
-
-		// It appears that the minimum fps is 1.31
-		if (video_pts_step > 68480) {
-		video_pts_step = 68480;
-		}
-	}
-	int video_gop_size_default = 0;
-	int video_gop_size = video_gop_size_default; // TODO: Make this an option
-	if (video_gop_size == video_gop_size_default) {
-		video_gop_size = ceil(video_fps);
-	}
-
-	mpegts_set_config(option->video_bitrate, option->video_width, option->video_height);
-	float audio_volume_multiply = option->audio_volume_multiply;
-	int audio_min_value = (int) (-32768 / audio_volume_multiply);
-	int audio_max_value = (int) (32767 / audio_volume_multiply);
-	printf("fr_q16=%d video_bitrate=%ld audio_min_value=%d audio_max_value=%d\n",
-		fr_q16, option->video_bitrate, audio_min_value, audio_max_value);
-
 	this->muxer->prepare_encoded_packets(video_fps, audio->get_fps());
 
-	// Monitoring for keypresses and signals.
-	// signal(SIGUSR1, default_signal_handler);
-	// signal(SIGUSR2, default_signal_handler);
-
-#if !DEBUG_SKIP_VIDEO
-	pollfd p[1] = { { STDIN_FILENO, POLLIN, 0 } };
-#endif
+	// pollfd p[1] = { { STDIN_FILENO, POLLIN, 0 } };
 	// uint64_t lastTimestamp = 0;
 
 	// timestamp test
@@ -1772,10 +1782,7 @@ void Picam::event_loop()
 
 	audioThread = std::thread(audioLoop, audio);
 
-	// muxer->start_record();
-
-#if !DEBUG_SKIP_VIDEO
-	for (unsigned int count = 0; ; count++)
+	while (true)
 	{
 		Picam::Msg msg = this->Wait();
 		if (msg.type == Picam::MsgType::RequestComplete) {
@@ -1788,20 +1795,7 @@ void Picam::event_loop()
 		else if (msg.type != Picam::MsgType::RequestComplete)
 			throw std::runtime_error("unrecognised message!");
 
-		// Check if we received a signal
-		int key = get_key_or_signal(option, p);
-		// if (key == '\n')
-		// 	output->Signal();
-
-		// log_debug("Viewfinder frame %d\n", count);
-		auto now = std::chrono::high_resolution_clock::now();
-		uint64_t timeout_ms = 5 * 60 * 1000;
-		// uint64_t timeout_ms = 30 * 1000;
-		uint32_t frames = 0;
-		bool timeout = !frames && timeout_ms &&
-					   (now - start_time > std::chrono::milliseconds(timeout_ms));
-		bool frameout = frames && count >= frames;
-		if (!this->keepRunning || timeout || frameout || key == 'x' || key == 'X')
+		if (!this->keepRunning)
 		{
 			// if (timeout)
 			// 	std::cerr << "Halting: reached timeout of " << timeout_ms << " milliseconds.\n";
@@ -1814,28 +1808,6 @@ void Picam::event_loop()
 
 		// Got a video frame from camera
 		CompletedRequestPtr &completed_request = std::get<CompletedRequestPtr>(msg.payload);
-
-		// std::cout << " sequence=" << completed_request->sequence << "\tframerate=" << completed_request->framerate << std::endl;
-		// std::cout << " buffers:" << std::endl;
-		// for (const auto& elem : completed_request->buffers)
-		// {
-		// // 	auto config = elem.first->configuration();
-		// // 	std::cout << "  pixelformat=" << config.pixelFormat.toString()
-		// // 		<< " width=" << config.size.width << " height=" << config.size.height
-		// // 		<< " frameSize=" << config.frameSize << " bufferCount=" << config.bufferCount
-		// // 		<< " second=" << elem.second << std::endl;
-		// 	auto frameBuffer = elem.second;
-		// // 	auto planes = frameBuffer->planes();
-		// // 	for (const libcamera::FrameBuffer::Plane plane : elem.second->planes()) {
-		// // 		std::cout << "  plane length=" << plane.length << std::endl;
-		// // 	}
-		// 	auto metadata = frameBuffer->metadata();
-		// 	// std::cout << " timestamp=" << metadata.timestamp << std::endl;
-		// 	if (lastTimestamp != 0) {
-		// 		std::cout << " diff=" << ((metadata.timestamp - lastTimestamp) / 1000000.0f) << std::endl;
-		// 	}
-		// 	lastTimestamp = metadata.timestamp;
-		// }
 
 		if (this->option->is_vfr_enabled) {
 			// video
@@ -1856,12 +1828,10 @@ void Picam::event_loop()
 
 		this->ShowPreview(completed_request, this->VideoStream());
 	}
-#endif
 
-	audioThread.join();
-
-	std::cout << "delete audio" << std::endl;
-	delete audio;
+	this->stopAudioThread();
+	log_debug("hls_destroy\n");
+	hls_destroy(hls);
 }
 
 void Picam::setOption(PicamOption *option)
@@ -1886,6 +1856,7 @@ int Picam::run(int argc, char *argv[])
 
   log_set_level(LOG_LEVEL_DEBUG); // Log level will be changed later by PicamOption::parse()
   log_set_stream(stdout);
+  av_log_set_level(AV_LOG_ERROR);
 
 	try
 	{
@@ -1894,48 +1865,71 @@ int Picam::run(int argc, char *argv[])
     if (ret != 0) {
       exit(ret);
     }
-    mpegts_set_config(option.video_bitrate, option.video_width, option.video_height);
-    audio_min_value = (int) (-32768 / option.audio_volume_multiply);
-    audio_max_value = (int) (32767 / option.audio_volume_multiply);
-
+		if (option.show_help) {
+			option.print_usage();
+			return EXIT_SUCCESS;
+		}
     this->setOption(&option);
+
+		// int fr_q16 = video_fps * 65536;
+		int video_pts_step_default = 0;
+		int video_pts_step = video_pts_step_default; // Make this an option
+		if (video_pts_step == video_pts_step_default) {
+			video_pts_step = round(90000 / video_fps);
+
+			// It appears that the minimum fps is 1.31
+			if (video_pts_step > 68480) {
+				video_pts_step = 68480;
+			}
+		}
+		int video_gop_size_default = 0;
+		int video_gop_size = video_gop_size_default; // TODO: Make this an option
+		if (video_gop_size == video_gop_size_default) {
+			video_gop_size = ceil(video_fps);
+		}
+		mpegts_set_config(option.video_bitrate, option.video_width, option.video_height);
+		option.audio_min_value = (int) (-32768 / option.audio_volume_multiply);
+		option.audio_max_value = (int) (32767 / option.audio_volume_multiply);
 
 		struct sigaction int_handler;
 		int_handler.sa_handler = stopSignalHandler;
 		sigaction(SIGINT, &int_handler, NULL);
 		sigaction(SIGTERM, &int_handler, NULL);
 
-		if (!this->option->query_and_exit) {
-			if (state_create_dir(this->option->state_dir) != 0) {
-				return EXIT_FAILURE;
-			}
-			if (hooks_create_dir(this->option->hooks_dir) != 0) {
-				return EXIT_FAILURE;
-			}
+		if (this->option->query_and_exit) {
+			this->queryCameras();
+			return EXIT_SUCCESS;
+		}
 
-			create_dir(this->option->rec_dir);
-			create_dir(this->option->rec_tmp_dir);
-			create_dir(this->option->rec_archive_dir);
+		if (state_create_dir(this->option->state_dir) != 0) {
+			return EXIT_FAILURE;
+		}
+		if (hooks_create_dir(this->option->hooks_dir) != 0) {
+			return EXIT_FAILURE;
+		}
 
-			if (this->option->is_hlsout_enabled) {
-				this->ensure_hls_dir_exists();
-			}
+		create_dir(this->option->rec_dir);
+		create_dir(this->option->rec_tmp_dir);
+		create_dir(this->option->rec_archive_dir);
 
-			state_set(this->option->state_dir, "record", "false");
+		if (this->option->is_hlsout_enabled) {
+			this->ensure_hls_dir_exists();
+		}
 
-			if (clear_hooks(this->option->hooks_dir) != 0) {
-				log_error("error: clear_hooks() failed\n");
-			}
-			start_watching_hooks(&hooks_thread, this->option->hooks_dir, on_file_create, 1);
+		state_set(this->option->state_dir, "record", "false");
 
-			if (this->option->is_rtspout_enabled) {
-				rtsp_setup_socks({
-					this->option->rtsp_video_control_path,
-					this->option->rtsp_audio_control_path,
-					this->option->rtsp_video_data_path,
-					this->option->rtsp_audio_data_path,
-				});
-			}
+		if (clear_hooks(this->option->hooks_dir) != 0) {
+			log_error("error: clear_hooks() failed\n");
+		}
+		start_watching_hooks(&hooks_thread, this->option->hooks_dir, on_file_create, 1);
+
+		if (this->option->is_rtspout_enabled) {
+			rtsp_setup_socks({
+				this->option->rtsp_video_control_path,
+				this->option->rtsp_audio_control_path,
+				this->option->rtsp_video_data_path,
+				this->option->rtsp_audio_data_path,
+			});
 		}
 
 		this->rec_settings = {
@@ -1975,6 +1969,12 @@ int Picam::run(int argc, char *argv[])
 		}
 
     this->event_loop();
+
+    log_debug("stop_watching_hooks\n");
+    stop_watching_hooks();
+    log_debug("pthread_join hooks_thread\n");
+    pthread_join(hooks_thread, NULL);
+	  log_debug("shutdown successful\n");
 	}
 	catch (std::exception const &e)
 	{

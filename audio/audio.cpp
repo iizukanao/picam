@@ -10,6 +10,9 @@ extern "C" {
 // Internal flag indicates that audio is available for read
 #define AVAIL_AUDIO 2
 
+// ALSA buffer size for playback will be multiplied by this number (max: 16)
+#define ALSA_PLAYBACK_BUFFER_MULTIPLY 10
+
 Audio::Audio(PicamOption *option)
 	: option(option)
 {
@@ -22,6 +25,18 @@ Audio::~Audio()
   // this->my_fp.close();
 }
 
+void Audio::teardown()
+{
+  if (!this->option->disable_audio_capturing) {
+    log_debug("teardown_audio_capture_device\n");
+    this->teardown_audio_capture_device();
+    if (this->is_audio_preview_device_opened) {
+      log_debug("teardown_audio_preview_device\n");
+      this->teardown_audio_preview_device();
+    }
+  }
+}
+
 // ALSA buffer size for capture will be multiplied by this number
 #define ALSA_BUFFER_MULTIPLY 50
 
@@ -29,7 +44,7 @@ Audio::~Audio()
 
 // sound
 static snd_pcm_t *capture_handle;
-// static snd_pcm_t *audio_preview_handle;
+static snd_pcm_t *audio_preview_handle;
 static snd_pcm_hw_params_t *alsa_hw_params;
 static AVFrame *av_frame;
 static int audio_fd_count;
@@ -54,6 +69,23 @@ static char errbuf[1024];
 
 static int is_audio_channels_specified = 0;
 
+void Audio::teardown_audio_capture_device() {
+  snd_pcm_close (capture_handle);
+
+  free(poll_fds);
+}
+
+void Audio::teardown_audio_preview_device() {
+  snd_pcm_close(audio_preview_handle);
+}
+
+int64_t Audio::get_next_audio_write_time() {
+  if (this->audio_frame_count == 0) {
+    return LLONG_MIN;
+  }
+  return this->audio_start_time + this->audio_frame_count * 1000000000.0f / ((float)this->option->audio_sample_rate / (float)this->option->audio_period_size);
+}
+
 int Audio::open_audio_capture_device() {
   int err;
 
@@ -64,6 +96,122 @@ int Audio::open_audio_capture_device() {
         this->option->alsa_dev, snd_strerror(err));
     log_error("hint: specify correct ALSA device with '--alsadev <dev>'\n");
     return -1;
+  }
+
+  return 0;
+}
+
+int Audio::open_audio_preview_device() {
+  int err;
+  snd_pcm_hw_params_t *audio_preview_params;
+
+  log_debug("opening ALSA device for playback (preview): %s\n", this->option->audio_preview_dev);
+  err = snd_pcm_open(&audio_preview_handle, this->option->audio_preview_dev, SND_PCM_STREAM_PLAYBACK, SND_PCM_NONBLOCK);
+  if (err < 0) {
+    log_error("error: cannot open audio playback (preview) device '%s': %s\n",
+        this->option->audio_preview_dev, snd_strerror(err));
+    log_error("hint: specify correct ALSA device with '--audiopreviewdev <dev>'\n");
+    exit(EXIT_FAILURE);
+  }
+
+  err = snd_pcm_hw_params_malloc(&audio_preview_params);
+  if (err < 0) {
+    log_fatal("error: cannot allocate hardware parameter structure for audio preview: %s\n",
+        snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  // fill hw_params with a full configuration space for a PCM.
+  err = snd_pcm_hw_params_any(audio_preview_handle, audio_preview_params);
+  if (err < 0) {
+    log_fatal("error: cannot initialize hardware parameter structure for audio preview: %s\n",
+        snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  // enable rate resampling
+  unsigned int enable_resampling = 1;
+  err = snd_pcm_hw_params_set_rate_resample(audio_preview_handle, audio_preview_params, enable_resampling);
+  if (err < 0) {
+    log_fatal("error: cannot enable rate resampling for audio preview: %s\n",
+        snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  err = snd_pcm_hw_params_set_access(audio_preview_handle, audio_preview_params,
+      SND_PCM_ACCESS_MMAP_INTERLEAVED);
+  if (err < 0) {
+    log_fatal("error: cannot set access type for audio preview: %s\n",
+        snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  // SND_PCM_FORMAT_S16_LE => PCM 16 bit signed little endian
+  err = snd_pcm_hw_params_set_format(audio_preview_handle, audio_preview_params, SND_PCM_FORMAT_S16_LE);
+  if (err < 0) {
+    log_fatal("error: cannot set sample format for audio preview: %s\n",
+        snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  this->option->audio_preview_channels = this->get_audio_channels();
+  err = snd_pcm_hw_params_set_channels(audio_preview_handle, audio_preview_params, this->option->audio_preview_channels);
+  if (err < 0) {
+    log_fatal("error: cannot set channel count for audio preview: %s\n",
+        snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  // set the sample rate
+  unsigned int rate = this->get_audio_sample_rate();
+  err = snd_pcm_hw_params_set_rate_near(audio_preview_handle, audio_preview_params, &rate, 0);
+  if (err < 0) {
+    log_fatal("error: cannot set sample rate for audio preview: %s\n",
+        snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  // set the buffer size
+  err = snd_pcm_hw_params_set_buffer_size(audio_preview_handle, audio_preview_params,
+      audio_buffer_size * ALSA_PLAYBACK_BUFFER_MULTIPLY);
+  if (err < 0) {
+    log_fatal("error: failed to set buffer size for audio preview: audio_buffer_size=%d error=%s\n",
+        audio_buffer_size, snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  int period_size = this->option->audio_period_size;
+  int dir;
+  // set the period size
+  err = snd_pcm_hw_params_set_period_size_near(audio_preview_handle, audio_preview_params,
+      (snd_pcm_uframes_t *)&period_size, &dir);
+  if (err < 0) {
+    log_fatal("error: failed to set period size for audio preview: %s\n",
+        snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  // apply the hardware configuration
+  err = snd_pcm_hw_params (audio_preview_handle, audio_preview_params);
+  if (err < 0) {
+    log_fatal("error: cannot set PCM hardware parameters for audio preview: %s\n",
+        snd_strerror(err));
+    exit(EXIT_FAILURE);
+  }
+
+  // end of configuration
+  snd_pcm_hw_params_free(audio_preview_params);
+
+  // dump the configuration of capture_handle
+  if (log_get_level() <= LOG_LEVEL_DEBUG) {
+    snd_output_t *output;
+    err = snd_output_stdio_attach(&output, stdout, 0);
+    if (err < 0) {
+      log_error("snd_output_stdio_attach failed: %s\n", snd_strerror(err));
+      return 0;
+    }
+    log_debug("audio preview device:\n");
+    snd_pcm_dump(audio_preview_handle, output);
   }
 
   return 0;
@@ -359,19 +507,23 @@ int Audio::configure_audio_capture_device() {
 
 void Audio::setup(HTTPLiveStreaming *hls) {
   this->hls = hls;
-  av_log_set_level(AV_LOG_DEBUG); // does not have any effect
 	// this->my_fp.open("/dev/shm/out.aac", std::ios::out | std::ios::binary);
 
-	int ret = open_audio_capture_device();
-	if (ret == -1) {
-		log_warn("warning: audio capturing is disabled\n");
-		exit(EXIT_FAILURE);
-	} else if (ret < 0) {
-		log_fatal("error: init_audio failed: %d\n", ret);
-		exit(EXIT_FAILURE);
-	}
+  if (this->option->disable_audio_capturing) {
+    memset(samples, 0, this->option->audio_period_size * sizeof(short) * this->option->audio_channels);
+    this->is_audio_recording_started = true;
+  } else {
+    int ret = this->open_audio_capture_device();
+    if (ret == -1) {
+      log_warn("warning: audio capturing is disabled\n");
+      exit(EXIT_FAILURE);
+    } else if (ret < 0) {
+      log_fatal("error: init_audio failed: %d\n", ret);
+      exit(EXIT_FAILURE);
+    }
 
-	this->preconfigure_microphone();
+    this->preconfigure_microphone();
+  }
 	// codec_settings.audio_sample_rate = audio_sample_rate;
 	// codec_settings.audio_bit_rate = audio_bitrate;
 	// codec_settings.audio_channels = audio_channels;
@@ -388,7 +540,7 @@ void Audio::setup(HTTPLiveStreaming *hls) {
   this->setup_av_frame(hls->format_ctx);
 
 	printf("configuring audio capture device\n");
-	ret = configure_audio_capture_device();
+	int ret = configure_audio_capture_device();
 	if (ret != 0) {
 		log_fatal("error: configure_audio_capture_device: ret=%d\n", ret);
 		exit(EXIT_FAILURE);
@@ -760,34 +912,34 @@ int Audio::read_audio_poll_mmap() {
     size -= frames; // needed in the condition of the while loop to check if period is filled
   }
 
-  // if (this->is_audio_preview_enabled) {
-  //   uint16_t *ptr;
-  //   int cptr;
-  //   int err;
+  if (this->option->is_audio_preview_enabled) {
+    uint16_t *ptr;
+    int cptr;
+    int err;
 
-  //   if (!this->is_audio_preview_device_opened) {
-  //     open_audio_preview_device();
-  //     is_audio_preview_device_opened = 1;
-  //   }
+    if (!this->is_audio_preview_device_opened) {
+      this->open_audio_preview_device();
+      is_audio_preview_device_opened = 1;
+    }
 
-  //   ptr = this_samples;
-  //   cptr = this->option->audio_period_size;
-  //   while (cptr > 0) {
-  //     err = snd_pcm_mmap_writei(audio_preview_handle, ptr, cptr);
-  //     if (err == -EAGAIN) {
-  //       continue;
-  //     }
-  //     if (err < 0) {
-  //       if (xrun_recovery(audio_preview_handle, err) < 0) {
-  //         log_fatal("audio preview error: %s\n", snd_strerror(err));
-  //         exit(EXIT_FAILURE);
-  //       }
-  //       break; // skip one period
-  //     }
-  //     ptr += err * audio_preview_channels;
-  //     cptr -= err;
-  //   }
-  // }
+    ptr = this_samples;
+    cptr = this->option->audio_period_size;
+    while (cptr > 0) {
+      err = snd_pcm_mmap_writei(audio_preview_handle, ptr, cptr);
+      if (err == -EAGAIN) {
+        continue;
+      }
+      if (err < 0) {
+        if (xrun_recovery(audio_preview_handle, err) < 0) {
+          log_fatal("audio preview error: %s\n", snd_strerror(err));
+          exit(EXIT_FAILURE);
+        }
+        break; // skip one period
+      }
+      ptr += err * this->option->audio_preview_channels;
+      cptr -= err;
+    }
+  }
 
   if (this->audio_volume_multiply != 1.0f) {
     int total_samples = this->option->audio_period_size * this->get_audio_channels();
@@ -826,6 +978,21 @@ void Audio::loop() {
   std::cout << "Audio::loop" << std::endl;
 
   while (this->keepRunning) {
+    if (this->option->disable_audio_capturing) {
+      this->encode_and_send_audio();
+      struct timespec ts;
+      clock_gettime(CLOCK_MONOTONIC, &ts);
+      int64_t diff_time = this->get_next_audio_write_time() - (ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec);
+      if (diff_time > 0) {
+        ts.tv_sec = diff_time / 1000000000;
+        diff_time -= ts.tv_sec * 1000000000;
+        ts.tv_nsec = diff_time;
+        int ret = clock_nanosleep(CLOCK_MONOTONIC, 0, &ts, NULL);
+        if (ret != 0) {
+          log_error("nanosleep error:%d\n", ret);
+        }
+      }
+    }
     if (is_first_audio) {
       this->read_audio_poll_mmap();
       // We ignore the first audio frame.
@@ -897,4 +1064,9 @@ void Audio::mute() {
 
 void Audio::unmute() {
   this->is_muted = false;
+}
+
+void Audio::set_audio_start_time(int64_t audio_start_time)
+{
+  this->audio_start_time = audio_start_time;
 }

@@ -61,7 +61,7 @@ class Muxer
     EncodedPacket **encoded_packets; // circular buffer that stores encoded audio and video
     int encoded_packets_size; // the number of EncodedPacket that can be stored in encoded_packets
     int current_encoded_packet = -1; // write pointer of encoded_packets array that holds latest encoded audio or video
-    int *keyframe_pointers; // circular buffer that stores where keyframe occurs within encoded_packets
+    int *keyframe_pointers = NULL; // circular buffer that stores where keyframe occurs within encoded_packets
     int current_keyframe_pointer = -1; // write pointer of keyframe_pointers array
     int is_keyframe_pointers_filled = 0; // will be changed to 1 once encoded_packets is fully filled
     int rec_thread_frame = 0;
