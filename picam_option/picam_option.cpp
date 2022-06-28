@@ -26,8 +26,8 @@ void PicamOption::print_usage() {
   log_info("                      dynamically controlled.\n");
   log_info("  --minfps <num>      Minimum frames per second. Implies --vfr.\n");
   log_info("  --maxfps <num>      Maximum frames per second. Implies --vfr.\n");
-  log_info("  --rotation <num>    Image rotation in clockwise degrees\n");
-  log_info("                      (0, 90, 180, 270)\n");
+  // log_info("  --rotation <num>    Image rotation in clockwise degrees\n");
+  // log_info("                      (0, 90, 180, 270)\n");
   log_info("  --hflip             Flip image horizontally\n");
   log_info("  --vflip             Flip image vertically\n");
   log_info("  --avcprofile <str>  Set AVC/H.264 profile to one of:\n");
@@ -186,7 +186,7 @@ int PicamOption::parse(int argc, char **argv) {
     { "ptsstep", required_argument, NULL, 0 },
     { "videobitrate", required_argument, NULL, 'v' },
     { "gopsize", required_argument, NULL, 'g' },
-    { "rotation", required_argument, NULL, 0 },
+    // { "rotation", required_argument, NULL, 0 },
     { "hflip", no_argument, NULL, 0 },
     { "vflip", no_argument, NULL, 0 },
     { "avcprofile", required_argument, NULL, 0 },
@@ -300,16 +300,16 @@ int PicamOption::parse(int argc, char **argv) {
           video_pts_step = value;
           is_video_pts_step_specified = 1;
           break;
-        } else if (strcmp(long_options[option_index].name, "rotation") == 0) {
-          char *end;
-          int value = strtol(optarg, &end, 10);
-          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
-            log_fatal("error: invalid rotation: %s\n", optarg);
-            print_usage();
-            return EXIT_FAILURE;
-          }
-          video_rotation = value;
-          break;
+        // } else if (strcmp(long_options[option_index].name, "rotation") == 0) {
+        //   char *end;
+        //   int value = strtol(optarg, &end, 10);
+        //   if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+        //     log_fatal("error: invalid rotation: %s\n", optarg);
+        //     print_usage();
+        //     return EXIT_FAILURE;
+        //   }
+        //   video_rotation = value;
+        //   break;
         } else if (strcmp(long_options[option_index].name, "hflip") == 0) {
           video_hflip = 1;
           break;
@@ -1151,7 +1151,7 @@ int PicamOption::parse(int argc, char **argv) {
   log_debug("video_fps=%f\n", video_fps);
   log_debug("video_pts_step=%d\n", video_pts_step);
   log_debug("video_gop_size=%d\n", video_gop_size);
-  log_debug("video_rotation=%d\n", video_rotation);
+  // log_debug("video_rotation=%d\n", video_rotation);
   log_debug("video_hflip=%d\n", video_hflip);
   log_debug("video_vflip=%d\n", video_vflip);
   log_debug("video_bitrate=%ld\n", video_bitrate);

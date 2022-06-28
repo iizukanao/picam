@@ -2122,11 +2122,11 @@ void Picam::ConfigureVideo(unsigned int flags)
 	if (this->option->video_vflip) {
 		transform = libcamera::Transform::VFlip * transform;
 	}
-	bool ok;
-	libcamera::Transform rot = libcamera::transformFromRotation(this->option->video_rotation, &ok);
-	if (!ok)
-		throw std::runtime_error("illegal rotation value");
-	transform = rot * transform;
+	// bool ok;
+	// libcamera::Transform rot = libcamera::transformFromRotation(this->option->video_rotation, &ok);
+	// if (!ok)
+	// 	throw std::runtime_error("illegal rotation value");
+	// transform = rot * transform;
 	if (!!(transform & libcamera::Transform::Transpose))
 		throw std::runtime_error("transforms requiring transpose not supported");
 	std::string denoise = "auto";

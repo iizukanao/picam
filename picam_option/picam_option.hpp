@@ -131,7 +131,7 @@ public:
     int is_video_pts_step_specified = 0;
     int video_gop_size = 0;
     int is_video_gop_size_specified = 0;
-    int video_rotation = 0;
+    // int video_rotation = 0;
     int video_hflip = 0;
     int video_vflip = 0;
     long video_bitrate = 2000 * 1000; // 2 Mbps
