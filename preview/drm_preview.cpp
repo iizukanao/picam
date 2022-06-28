@@ -400,11 +400,11 @@ void DrmPreview::makeBuffer(int fd, size_t size, StreamInfo const &info, Buffer 
 		info.stride / 2 // stride (== width) of V plane
 		};
 	uint32_t bo_handles[4] = { buffer.bo_handle, buffer.bo_handle, buffer.bo_handle };
-	printf("makeBuffer: stride=%u width=%u height=%u pitches[0]=%u [1]=%u [2]=%u [3]=%u offsets[0]=%u [1]=%u [2]=%u [3]=%u\n",
-		info.stride, info.width, info.height,
-		pitches[0], pitches[1], pitches[2], pitches[3],
-		offsets[0], offsets[1], offsets[2], offsets[3]
-	);
+	// printf("makeBuffer: stride=%u width=%u height=%u pitches[0]=%u [1]=%u [2]=%u [3]=%u offsets[0]=%u [1]=%u [2]=%u [3]=%u\n",
+	// 	info.stride, info.width, info.height,
+	// 	pitches[0], pitches[1], pitches[2], pitches[3],
+	// 	offsets[0], offsets[1], offsets[2], offsets[3]
+	// );
 
 	if (drmModeAddFB2(drmfd_, info.width, info.height, out_fourcc_, bo_handles, pitches, offsets, &buffer.fb_handle, 0))
 		throw std::runtime_error("drmModeAddFB2 failed: " + std::string(ERRSTR));
@@ -414,11 +414,10 @@ void DrmPreview::Show(int fd, libcamera::Span<uint8_t> span, StreamInfo const &i
 {
 	Buffer &buffer = buffers_[fd];
 	if (buffer.fd == -1) {
-		printf("makeBuffer: fd=%d size=%u\n", fd, span.size());
 		makeBuffer(fd, span.size(), info, buffer);
 	}
-	printf("DrmPreview::Show fd=%d last_fd=%d size=%u width=%u height=%u stride=%u buffer.width=%d buffer.height=%d\n",
-		fd, last_fd_, span.size(), info.width, info.height, info.stride, buffer.info.width, buffer.info.height);
+	// printf("DrmPreview::Show fd=%d last_fd=%d size=%u width=%u height=%u stride=%u buffer.width=%d buffer.height=%d\n",
+	// 	fd, last_fd_, span.size(), info.width, info.height, info.stride, buffer.info.width, buffer.info.height);
 
 	// info.width = 1920 (camera capture width)
 	// info.height = 1080 (camera capture height)
@@ -453,19 +452,17 @@ void DrmPreview::Show(int fd, libcamera::Span<uint8_t> span, StreamInfo const &i
 	} else {
 		crtc_y = y_off + y_;
 	}
-	printf("drmfd_=%d planeId=%u crtcId_=%u fb_id=%u crtc_x=%d crtc_y=%d crtc_w=%u crtc_h=%u src_x=%u src_y=%u src_w=%u src_h=%u src_w<<16=%u src_h<<16=%u\n",
-		drmfd_, planeId_, crtcId_, buffer.fb_handle,
-		// x_off + x_, // crtc_x
-		// y_off + y_, // crtc_y
-		crtc_x, // crtc_x
-		crtc_y, // crtc_y
-		w, // crtc_w
-		h, // crtc_h
-		0 << 16, // src_x in Q16.16
-		0 << 16, // src_y in Q16.16
-		buffer.info.width, // src_w in Q16.16
-		buffer.info.height, // src_h in Q16.16
-		buffer.info.width << 16, buffer.info.height << 16);
+	// printf("drmfd_=%d planeId=%u crtcId_=%u fb_id=%u crtc_x=%d crtc_y=%d crtc_w=%u crtc_h=%u src_x=%u src_y=%u src_w=%u src_h=%u src_w<<16=%u src_h<<16=%u\n",
+	// 	drmfd_, planeId_, crtcId_, buffer.fb_handle,
+	// 	crtc_x, // crtc_x
+	// 	crtc_y, // crtc_y
+	// 	w, // crtc_w
+	// 	h, // crtc_h
+	// 	0 << 16, // src_x in Q16.16
+	// 	0 << 16, // src_y in Q16.16
+	// 	buffer.info.width, // src_w in Q16.16
+	// 	buffer.info.height, // src_h in Q16.16
+	// 	buffer.info.width << 16, buffer.info.height << 16);
 	if (drmModeSetPlane(drmfd_, planeId_, crtcId_, buffer.fb_handle,
 		0, // flags
 		crtc_x,
