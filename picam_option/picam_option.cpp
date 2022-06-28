@@ -1112,18 +1112,19 @@ int PicamOption::parse(int argc, char **argv) {
   }
 
   // Print a warning if the video size is larger than 1280x720
-  if (video_width * video_height > 1280 * 720) {
-    if (strcmp(video_avc_profile, "high") != 0 || strcmp(video_avc_level, "4") != 0) {
-      log_info("using AVC High Profile Level 4\n");
-      snprintf(video_avc_profile, sizeof(video_avc_profile), "high");
-      snprintf(video_avc_level, sizeof(video_avc_level), "4");
-    }
-    if (!is_vfr_enabled && video_fps > 20.0f) {
-      log_warn("warn: fps > 20 might not work properly when width and height is large.\n");
-      log_warn("      Use lower --fps or use --vfr. If you still want to use this\n");
-      log_warn("      configuration, see if picam keeps up with %.1f fps using --verbose.\n", video_fps);
-    }
-  }
+  // if (video_width * video_height > 1280 * 720) {
+  //   if (strcmp(video_avc_profile, "high") != 0 || strcmp(video_avc_level, "4") != 0) {
+  //     log_info("using AVC High Profile Level 4\n");
+  //     snprintf(video_avc_profile, sizeof(video_avc_profile), "high");
+  //     snprintf(video_avc_level, sizeof(video_avc_level), "4");
+  //   }
+
+  //   if (!is_vfr_enabled && video_fps > 20.0f) {
+  //     log_warn("warn: fps > 20 might not work properly when width and height is large.\n");
+  //     log_warn("      Use lower --fps or use --vfr. If you still want to use this\n");
+  //     log_warn("      configuration, see if picam keeps up with %.1f fps using --verbose.\n", video_fps);
+  //   }
+  // }
 
   if (is_vfr_enabled &&
       (min_fps != -1.0f || max_fps != -1.0f) &&

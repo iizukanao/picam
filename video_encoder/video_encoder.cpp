@@ -82,7 +82,14 @@ VideoEncoder::VideoEncoder(PicamOption const *options, StreamInfo const &info)
 	// 		throw std::runtime_error("failed to set profile");
 	// }
 	ctrl.id = V4L2_CID_MPEG_VIDEO_H264_PROFILE;
-	ctrl.value = V4L2_MPEG_VIDEO_H264_PROFILE_MAIN;
+	v4l2_mpeg_video_h264_profile profile = V4L2_MPEG_VIDEO_H264_PROFILE_CONSTRAINED_BASELINE;
+  for (unsigned int i = 0; i < sizeof(video_avc_profile_options) / sizeof(video_avc_profile_option); i++) {
+    if (strcmp(video_avc_profile_options[i].name, options->video_avc_profile) == 0) {
+      profile = video_avc_profile_options[i].profile;
+      break;
+    }
+  }
+	ctrl.value = profile;
 	if (xioctl(fd_, VIDIOC_S_CTRL, &ctrl) < 0) {
 		throw std::runtime_error("failed to set profile");
 	}
