@@ -114,10 +114,8 @@ VideoEncoder::VideoEncoder(PicamOption const *options, StreamInfo const &info)
 	// 	if (xioctl(fd_, VIDIOC_S_CTRL, &ctrl) < 0)
 	// 		throw std::runtime_error("failed to set intra period");
 	// }
-	ctrl.id = V4L2_CID_MPEG_VIDEO_H264_I_PERIOD;
-	ctrl.value = (unsigned int)options->video_fps;
-	if (xioctl(fd_, VIDIOC_S_CTRL, &ctrl) < 0)
-		throw std::runtime_error("failed to set intra period");
+
+	this->setGopSize(options->video_gop_size);
 
 	// if (options->inline_headers)
 	// {
@@ -258,6 +256,17 @@ VideoEncoder::~VideoEncoder()
 
 	close(fd_);
 	log_debug("VideoEncoder closed\n");
+}
+
+void VideoEncoder::setGopSize(int gop_size)
+{
+	v4l2_control ctrl = {};
+	// Period between I-frames in the open GOP for H264.
+	ctrl.id = V4L2_CID_MPEG_VIDEO_H264_I_PERIOD;
+	ctrl.value = gop_size;
+	if (xioctl(fd_, VIDIOC_S_CTRL, &ctrl) < 0) {
+		throw std::runtime_error("failed to set intra period");
+	}
 }
 
 void VideoEncoder::EncodeBuffer(int fd, size_t size, void *mem, StreamInfo const &info, int64_t timestamp_us)

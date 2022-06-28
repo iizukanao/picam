@@ -24,6 +24,7 @@ class VideoEncoder
 public:
 	VideoEncoder(PicamOption const *options, StreamInfo const &info);
 	~VideoEncoder();
+	void setGopSize(int gop_size);
 
 	// >>> encoder.hpp
 	// This is where the application sets the callback it gets whenever the encoder

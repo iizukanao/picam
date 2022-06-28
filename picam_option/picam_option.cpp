@@ -25,9 +25,7 @@ void PicamOption::print_usage() {
   log_info("  --vfr               Enable variable frame rate. GOP size will be\n");
   log_info("                      dynamically controlled.\n");
   log_info("  --minfps <num>      Minimum frames per second. Implies --vfr.\n");
-  log_info("                      It might not work if width / height >= 1.45.\n");
   log_info("  --maxfps <num>      Maximum frames per second. Implies --vfr.\n");
-  log_info("                      It might not work if width / height >= 1.45.\n");
   log_info("  --rotation <num>    Image rotation in clockwise degrees\n");
   log_info("                      (0, 90, 180, 270)\n");
   log_info("  --hflip             Flip image horizontally\n");
@@ -1133,7 +1131,6 @@ int PicamOption::parse(int argc, char **argv) {
     log_warn("warning: --minfps and --maxfps might not work because width (%d) / height (%d) >= approx 1.45\n", video_width, video_height);
   }
 
-  fr_q16 = video_fps * 65536;
   if (!is_video_pts_step_specified) {
     video_pts_step = round(90000 / video_fps);
 
@@ -1146,10 +1143,12 @@ int PicamOption::parse(int argc, char **argv) {
     video_gop_size = ceil(video_fps);
   }
 
+  audio_min_value = (int) (-32768 / audio_volume_multiply);
+  audio_max_value = (int) (32767 / audio_volume_multiply);
+
   log_debug("video_width=%d\n", video_width);
   log_debug("video_height=%d\n", video_height);
   log_debug("video_fps=%f\n", video_fps);
-  log_debug("fr_q16=%d\n", fr_q16);
   log_debug("video_pts_step=%d\n", video_pts_step);
   log_debug("video_gop_size=%d\n", video_gop_size);
   log_debug("video_rotation=%d\n", video_rotation);

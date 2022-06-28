@@ -43,7 +43,6 @@ using namespace std::placeholders;
 
 // static int signal_received;
 static std::thread audioThread;
-static float video_fps = 40.0f; // TODO: Make this an option
 // static int64_t video_timestamp_origin_us = -1;
 
 // hooks
@@ -631,31 +630,6 @@ void Picam::parse_start_record_file(char *full_filename) {
 void on_file_create(char *filename, char *content) {
 	Picam *picam;
 	picam->getInstance().handleHook(filename, content);
-}
-
-static void set_gop_size(int gop_size) {
-	// TODO: Implement this using libcamera
-
-  // OMX_VIDEO_CONFIG_AVCINTRAPERIOD avc_intra_period;
-  // OMX_ERRORTYPE error;
-
-  // memset(&avc_intra_period, 0, sizeof(OMX_VIDEO_CONFIG_AVCINTRAPERIOD));
-  // avc_intra_period.nSize = sizeof(OMX_VIDEO_CONFIG_AVCINTRAPERIOD);
-  // avc_intra_period.nVersion.nVersion = OMX_VERSION;
-  // avc_intra_period.nPortIndex = VIDEO_ENCODE_OUTPUT_PORT;
-
-  // // Distance between two IDR frames
-  // avc_intra_period.nIDRPeriod = gop_size;
-
-  // // It seems this value has no effect for the encoding.
-  // avc_intra_period.nPFrames = gop_size;
-
-  // error = OMX_SetParameter(ILC_GET_HANDLE(video_encode),
-  //     OMX_IndexConfigVideoAVCIntraPeriod, &avc_intra_period);
-  // if (error != OMX_ErrorNone) {
-  //   log_fatal("error: failed to set video_encode %d AVC intra period: 0x%x\n", VIDEO_ENCODE_OUTPUT_PORT, error);
-  //   exit(EXIT_FAILURE);
-  // }
 }
 
 void Picam::handleHook(char *filename, char *content) {
@@ -1462,9 +1436,10 @@ void Picam::videoEncodeDoneCallback(void *mem, size_t size, int64_t timestamp_us
 	size_t complete_mem_size = size;
 	uint8_t nalUnitType = bytes[4] & 0b11111; // Lower 5 bits of the 5th byte
 	if (nalUnitType == 7) {
+		// We have to store this SPS and PPS for the lifetime of this capture session.
 		// The structure of the very first frame always comes like this:
 		//   00 00 00 01 27 <..SPS payload..> 00 00 00 01 28 <..PPS payload..> 00 00 00 01 25 <..I-frame payload..>
-		// So, instead of finding each start code prefix (00 00 01) and NAL unit type,
+		// Instead of finding each start code prefix (00 00 01) and NAL unit type,
 		// we take a shortcut and just soak up until just before 00 00 00 01 25 and copy it into this->sps_pps
 		uint8_t const start_code_keyframe[] = { 0x00, 0x00, 0x00, 0x01, 0x25 };
 		uint8_t *keyframe_start = (uint8_t *)memmem(bytes + 5, size - 5, start_code_keyframe, sizeof(start_code_keyframe));
@@ -1472,7 +1447,6 @@ void Picam::videoEncodeDoneCallback(void *mem, size_t size, int64_t timestamp_us
 			log_error("SPS/PPS was not found in the encoded frame\n");
 		} else {
 			this->sps_pps_size = keyframe_start - bytes;
-			printf("set_sps_pps: size=%u\n", this->sps_pps_size);
 			if (this->sps_pps != NULL) {
 				free(this->sps_pps);
 			}
@@ -1525,24 +1499,46 @@ void Picam::videoEncodeDoneCallback(void *mem, size_t size, int64_t timestamp_us
 
 #if ENABLE_AUTO_GOP_SIZE_CONTROL_FOR_VFR
   if (this->option->is_vfr_enabled) {
-		printf("controlling vfr\n");
-    int64_t pts_between_keyframes = pts - last_keyframe_pts;
-    if (pts_between_keyframes < 80000) { // < .89 seconds
-      // Frame rate is running faster than we thought
-      int ideal_video_gop_size = (frames_since_last_keyframe + 1)
-        * 90000.0f / pts_between_keyframes;
-      if (ideal_video_gop_size > this->option->video_gop_size) {
-        this->option->video_gop_size = ideal_video_gop_size;
-        log_debug("increase gop_size to %d ", ideal_video_gop_size);
-        set_gop_size(this->option->video_gop_size);
-      }
-    }
-    last_keyframe_pts = pts;
-    frames_since_last_keyframe = 0;
+		if (keyframe) {
+			int64_t pts_between_keyframes = pts - last_keyframe_pts;
+			if (pts_between_keyframes < 80000) { // < .89 seconds
+				// Frame rate is running faster than we thought
+				int ideal_video_gop_size = (frames_since_last_keyframe + 1)
+					* 90000.0f / pts_between_keyframes;
+				if (ideal_video_gop_size > this->option->video_gop_size) {
+					this->option->video_gop_size = ideal_video_gop_size;
+					log_debug("increase gop_size to %d ", ideal_video_gop_size);
+					this->encoder_->setGopSize(this->option->video_gop_size);
+				}
+			}
+			last_keyframe_pts = pts;
+			frames_since_last_keyframe = 0;
+		} else {
+			if (video_current_pts - last_keyframe_pts >= 100000) { // >= 1.11 seconds
+				// Frame rate is running slower than we thought
+				int ideal_video_gop_size = frames_since_last_keyframe;
+				if (ideal_video_gop_size == 0) {
+					ideal_video_gop_size = 1;
+				}
+				if (ideal_video_gop_size < this->option->video_gop_size) {
+					this->option->video_gop_size = ideal_video_gop_size;
+					log_debug("decrease gop_size to %d ", this->option->video_gop_size);
+					this->encoder_->setGopSize(this->option->video_gop_size);
+				}
+			}
+			frames_since_last_keyframe++;
+		}
   }
 #endif
 
 	this->last_pts = pts;
+	if (this->option->is_vfr_enabled) {
+		// video
+		struct timespec ts;
+		clock_gettime(CLOCK_MONOTONIC, &ts);
+		time_for_last_pts = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
+	}
+	// Add video packet
 	this->muxer->add_encoded_packet(pts, complete_mem, complete_mem_size, hls->format_ctx->streams[0]->index, flags);
 
 	this->frame_count_since_keyframe++;
@@ -1743,10 +1739,11 @@ void Picam::event_loop()
 			this->check_video_and_audio_started();
 		}
 		int64_t audio_pts = this->get_next_audio_pts();
+		// Add audio packet
 		this->muxer->add_encoded_packet(audio_pts, data, size, stream_index, flags);
 	});
 
-	this->muxer->prepare_encoded_packets(video_fps, audio->get_fps());
+	this->muxer->prepare_encoded_packets(this->option->video_fps, audio->get_fps());
 
 	// pollfd p[1] = { { STDIN_FILENO, POLLIN, 0 } };
 	// uint64_t lastTimestamp = 0;
@@ -1809,13 +1806,6 @@ void Picam::event_loop()
 		// Got a video frame from camera
 		CompletedRequestPtr &completed_request = std::get<CompletedRequestPtr>(msg.payload);
 
-		if (this->option->is_vfr_enabled) {
-			// video
-			struct timespec ts;
-			clock_gettime(CLOCK_MONOTONIC, &ts);
-			time_for_last_pts = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
-		}
-
 		this->modifyBuffer(completed_request);
 
 		// NOTE: If Raspberry Pi is connected to a monitor, EncodeBuffer() will
@@ -1870,26 +1860,7 @@ int Picam::run(int argc, char *argv[])
 			return EXIT_SUCCESS;
 		}
     this->setOption(&option);
-
-		// int fr_q16 = video_fps * 65536;
-		int video_pts_step_default = 0;
-		int video_pts_step = video_pts_step_default; // Make this an option
-		if (video_pts_step == video_pts_step_default) {
-			video_pts_step = round(90000 / video_fps);
-
-			// It appears that the minimum fps is 1.31
-			if (video_pts_step > 68480) {
-				video_pts_step = 68480;
-			}
-		}
-		int video_gop_size_default = 0;
-		int video_gop_size = video_gop_size_default; // TODO: Make this an option
-		if (video_gop_size == video_gop_size_default) {
-			video_gop_size = ceil(video_fps);
-		}
 		mpegts_set_config(option.video_bitrate, option.video_width, option.video_height);
-		option.audio_min_value = (int) (-32768 / option.audio_volume_multiply);
-		option.audio_max_value = (int) (32767 / option.audio_volume_multiply);
 
 		struct sigaction int_handler;
 		int_handler.sa_handler = stopSignalHandler;
@@ -2277,16 +2248,23 @@ void Picam::StartCamera()
 		// 	controls_.set(libcamera::controls::FrameDurationLimits, { INT64_C(100), INT64_C(1000000000) });
 		// else if (options_->framerate > 0)
 		if (this->option->is_vfr_enabled) {
-			// Set framerate range to min=1 and max=100
-			int64_t frame_time_fps1 = 1000000 / 1; // in us
-			int64_t frame_time_fps100 = 1000000 / 100; // in us
-			std::cout << "vfr frame_time=" << frame_time_fps100 << ".." << frame_time_fps1 << std::endl; // frame_time == 33333
-			controls_.set(libcamera::controls::FrameDurationLimits, { frame_time_fps100, frame_time_fps1 });
+			float min_fps = this->option->min_fps;
+			if (min_fps == -1.0f) {
+				min_fps = 1.0f;
+			}
+			float max_fps = this->option->max_fps;
+			if (max_fps == -1.0f) {
+				max_fps = 100.0f;
+			}
+			// Set framerate range
+			int64_t frame_time_at_min_fps = 1000000 / min_fps; // in us
+			int64_t frame_time_at_max_fps = 1000000 / max_fps; // in us
+			log_debug("vfr frame_time=%" PRId64 "..%" PRId64 "\n", frame_time_at_max_fps, frame_time_at_min_fps);
+			controls_.set(libcamera::controls::FrameDurationLimits, { frame_time_at_max_fps, frame_time_at_min_fps });
 		} else if (this->option->video_fps > 0) {
 			int64_t frame_time = 1000000 / this->option->video_fps; // in us
-			std::cout << "frame_time=" << frame_time << std::endl; // frame_time == 33333
+			log_debug("cfr frame_time=%" PRId64 "\n", frame_time);
 			controls_.set(libcamera::controls::FrameDurationLimits, { frame_time, frame_time });
-			// controls_.set(libcamera::controls::FrameDurationLimits, { frame_time, INT64_C(50000) });
 		}
 	}
 

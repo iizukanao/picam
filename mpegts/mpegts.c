@@ -34,9 +34,8 @@ AVCodecContext *setup_video_stream(AVFormatContext *format_ctx) {
   video_codec_ctx->codec_tag     = 0;
   video_codec_ctx->bit_rate      = video_bitrate;
 
-  // Main profile is not playable on Android
-  video_codec_ctx->profile       = FF_PROFILE_H264_CONSTRAINED_BASELINE;
-  video_codec_ctx->level         = 31;  // Level 3.1
+  video_codec_ctx->profile       = FF_PROFILE_H264_MAIN;
+  video_codec_ctx->level         = 41;  // Level 4.1
 
   video_stream->time_base.num = 1;
   video_stream->time_base.den = 180000;
