@@ -122,6 +122,7 @@ public:
     float min_fps = -1.0f;
     float max_fps = -1.0f;
     int video_pts_step = 0;
+    int audio_pts_step = 0;
     int is_video_pts_step_specified = 0;
     int video_gop_size = 0;
     int is_video_gop_size_specified = 0;

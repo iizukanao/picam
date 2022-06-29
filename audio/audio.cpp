@@ -224,9 +224,9 @@ inline int Audio::get_audio_channels() {
   return this->hls->audio_ctx->ch_layout.nb_channels;
 }
 
-int Audio::get_audio_pts_step_base() {
-  return this->audio_pts_step_base;
-}
+// int Audio::get_audio_pts_step_base() {
+//   return this->audio_pts_step_base;
+// }
 
 // Configure the microphone before main setup
 void Audio::preconfigure_microphone() {
@@ -327,8 +327,8 @@ void Audio::setup_av_frame(AVFormatContext *format_ctx) {
 #endif
 
   this->option->audio_period_size = buffer_size / this->get_audio_channels() / sizeof(short);
-  this->audio_pts_step_base = 90000.0f * this->option->audio_period_size / this->get_audio_sample_rate();
-  log_debug("audio_pts_step_base: %d\n", this->audio_pts_step_base);
+  this->option->audio_pts_step = 90000.0f * this->option->audio_period_size / this->get_audio_sample_rate();
+  log_debug("audio_pts_step: %d\n", this->option->audio_pts_step);
 
   ret = avcodec_fill_audio_frame(av_frame, audio_codec_ctx->ch_layout.nb_channels, (AVSampleFormat) audio_codec_ctx->format,
       (const uint8_t*)this->samples, buffer_size, 0);
@@ -619,52 +619,52 @@ int Audio::wait_for_poll(snd_pcm_t *device, struct pollfd *target_fds, unsigned 
   }
 }
 
-int64_t Audio::get_next_audio_pts() {
-  int64_t pts;
-  this->audio_frame_count++;
+// int64_t Audio::get_next_audio_pts() {
+//   int64_t pts;
+//   this->audio_frame_count++;
 
-  // We use audio timing as the base clock,
-  // so we do not modify PTS here.
-  pts = this->audio_current_pts + this->audio_pts_step_base;
+//   // We use audio timing as the base clock,
+//   // so we do not modify PTS here.
+//   pts = this->audio_current_pts + this->audio_pts_step_base;
 
-  this->audio_current_pts = pts;
+//   this->audio_current_pts = pts;
 
-  return pts;
-}
+//   return pts;
+// }
 
-void Audio::send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts) {
-  if (this->is_rtspout_enabled) {
-    int payload_size = databuflen + 7;  // +1(packet type) +6(pts)
-    int total_size = payload_size + 3;  // more 3 bytes for payload length
-    uint8_t *sendbuf = (uint8_t *)malloc(total_size);
-    if (sendbuf == NULL) {
-      log_error("error: cannot allocate memory for audio sendbuf: size=%d", total_size);
-      return;
-    }
-    // payload header
-    sendbuf[0] = (payload_size >> 16) & 0xff;
-    sendbuf[1] = (payload_size >> 8) & 0xff;
-    sendbuf[2] = payload_size & 0xff;
-    // payload
-    sendbuf[3] = 0x03;  // packet type (0x03 == audio data)
-    sendbuf[4] = (pts >> 40) & 0xff;
-    sendbuf[5] = (pts >> 32) & 0xff;
-    sendbuf[6] = (pts >> 24) & 0xff;
-    sendbuf[7] = (pts >> 16) & 0xff;
-    sendbuf[8] = (pts >> 8) & 0xff;
-    sendbuf[9] = pts & 0xff;
-    memcpy(sendbuf + 10, databuf, databuflen);
-    printf("[debug] send is disabled\n");
-    // if (send(sockfd_audio, sendbuf, total_size, 0) == -1) {
-    //   perror("send audio data");
-    // }
-    free(sendbuf);
-  } // if (is_rtspout_enabled)
-}
+// void Audio::send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts) {
+//   if (this->is_rtspout_enabled) {
+//     int payload_size = databuflen + 7;  // +1(packet type) +6(pts)
+//     int total_size = payload_size + 3;  // more 3 bytes for payload length
+//     uint8_t *sendbuf = (uint8_t *)malloc(total_size);
+//     if (sendbuf == NULL) {
+//       log_error("error: cannot allocate memory for audio sendbuf: size=%d", total_size);
+//       return;
+//     }
+//     // payload header
+//     sendbuf[0] = (payload_size >> 16) & 0xff;
+//     sendbuf[1] = (payload_size >> 8) & 0xff;
+//     sendbuf[2] = payload_size & 0xff;
+//     // payload
+//     sendbuf[3] = 0x03;  // packet type (0x03 == audio data)
+//     sendbuf[4] = (pts >> 40) & 0xff;
+//     sendbuf[5] = (pts >> 32) & 0xff;
+//     sendbuf[6] = (pts >> 24) & 0xff;
+//     sendbuf[7] = (pts >> 16) & 0xff;
+//     sendbuf[8] = (pts >> 8) & 0xff;
+//     sendbuf[9] = pts & 0xff;
+//     memcpy(sendbuf + 10, databuf, databuflen);
+//     printf("[debug] send is disabled\n");
+//     // if (send(sockfd_audio, sendbuf, total_size, 0) == -1) {
+//     //   perror("send audio data");
+//     // }
+//     free(sendbuf);
+//   } // if (is_rtspout_enabled)
+// }
 
 void Audio::encode_and_send_audio() {
   int ret;
-  int64_t pts;
+  // int64_t pts;
 
 #if AUDIO_ONLY
   AVCodecContext *ctx = this->hls->format_ctx->streams[0]->codec;
@@ -750,19 +750,19 @@ void Audio::encode_and_send_audio() {
     pkt->stream_index = hls->format_ctx->streams[1]->index; // This must be done after avcodec_encode_audio2
 #endif // AUDIO_ONLY
 
-    pts = get_next_audio_pts();
+    // pts = get_next_audio_pts();
 
     // send_audio_frame(pkt->data, pkt->size, pts);
 
 #if ENABLE_PTS_WRAP_AROUND
     pts = pts % PTS_MODULO;
 #endif
-    last_pts = pts;
-    pkt->pts = pkt->dts = pts;
+    // last_pts = pts;
+    // pkt->pts = pkt->dts = pts;
 
     if (this->encode_callback) {
       this->encode_callback(
-          pkt->pts,
+          0, // pts (will not be used)
           pkt->data,
           pkt->size,
           pkt->stream_index,
@@ -936,19 +936,19 @@ int Audio::read_audio_poll_mmap() {
     }
   }
 
-  if (this->audio_volume_multiply != 1.0f) {
+  if (this->option->audio_volume_multiply != 1.0f) {
     int total_samples = this->option->audio_period_size * this->get_audio_channels();
     int i;
     for (i = 0; i < total_samples; i++) {
       int16_t value = (int16_t)this_samples[i];
-      if (value < this->audio_min_value) { // negative overflow of audio volume
+      if (value < this->option->audio_min_value) { // negative overflow of audio volume
         log_info("o-");
         value = -32768;
-      } else if (value > this->audio_max_value) { // positive overflow audio volume
+      } else if (value > this->option->audio_max_value) { // positive overflow audio volume
         log_info("o+");
         value = 32767;
       } else {
-        value = (int16_t)(value * audio_volume_multiply);
+        value = (int16_t)(value * this->option->audio_volume_multiply);
       }
       this_samples[i] = (uint16_t)value;
     }

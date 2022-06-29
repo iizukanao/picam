@@ -1157,7 +1157,7 @@ int64_t Picam::get_next_video_pts_cfr() {
   }
 
   int pts_diff = audio_current_pts - video_current_pts - this->option->video_pts_step;
-  int tolerance = (this->option->video_pts_step + audio->get_audio_pts_step_base()) * 2;
+  int tolerance = (this->option->video_pts_step + this->option->audio_pts_step) * 2;
   if (pts_diff >= PTS_DIFF_TOO_LARGE) {
     // video PTS is too slow
     log_debug("vR%d", pts_diff);
@@ -1167,7 +1167,7 @@ int64_t Picam::get_next_video_pts_cfr() {
       // speed up video PTS
       speed_up_count++;
       pts_mode = PTS_SPEED_UP;
-      log_debug("vSPEED_UP(video_pts_step=%d audio_pts_base=%d pts_diff=%d)", this->option->video_pts_step, audio->get_audio_pts_step_base(), pts_diff);
+      log_debug("vSPEED_UP(video_pts_step=%d audio_pts_step=%d pts_diff=%d)", this->option->video_pts_step, this->option->audio_pts_step, pts_diff);
     }
     // Catch up with audio PTS if the delay is too large.
     pts = video_current_pts + this->option->video_pts_step + 150;
@@ -1216,7 +1216,7 @@ int64_t Picam::get_next_audio_pts() {
 
   // We use audio timing as the base clock,
   // so we do not modify PTS here.
-  pts = audio_current_pts + audio->get_audio_pts_step_base();
+  pts = audio_current_pts + this->option->audio_pts_step;
 
   audio_current_pts = pts;
 
@@ -1736,7 +1736,7 @@ void Picam::event_loop()
 
 	this->muxer = new Muxer(this->option);
 	this->muxer->setup(&codec_settings);
-	audio->set_encode_callback([=](int64_t pts, uint8_t *data, int size, int stream_index, int flags) -> void {
+	audio->set_encode_callback([=](int64_t _pts, uint8_t *data, int size, int stream_index, int flags) -> void {
 		if (!this->is_audio_started) {
 			this->is_audio_started = true;
 			this->check_video_and_audio_started();
