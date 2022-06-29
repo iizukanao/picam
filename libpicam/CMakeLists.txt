@@ -9,5 +9,6 @@ find_package(PkgConfig)
 pkg_check_modules(LIBAV REQUIRED harfbuzz fontconfig libavformat libavcodec)
 include_directories(${LIBAV_INCLUDE_DIRS})
 target_link_libraries(libpicam picam_option video_encoder outputs timestamp audio log httplivestreaming muxer libstate libhook preview rtsp asound ${LIBAV_LIBRARIES} lzma pthread ${LIBCAMERA_LINK_LIBRARIES} ${Boost_LIBRARIES})
+set_target_properties(libpicam PROPERTIES PREFIX "")
 
 install(TARGETS muxer LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})

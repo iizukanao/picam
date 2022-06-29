@@ -16,13 +16,10 @@ extern "C" {
 Audio::Audio(PicamOption *option)
 	: option(option)
 {
-  std::cout << "audio constructor called" << std::endl;
 }
 
 Audio::~Audio()
 {
-  std::cout << "audio destructor called" << std::endl;
-  // this->my_fp.close();
 }
 
 void Audio::teardown()
@@ -66,8 +63,6 @@ static int audio_buffer_size;
 // static long audio_bitrate = 40000;
 
 static char errbuf[1024];
-
-static int is_audio_channels_specified = 0;
 
 void Audio::teardown_audio_capture_device() {
   snd_pcm_close (capture_handle);
@@ -254,31 +249,31 @@ void Audio::preconfigure_microphone() {
   }
 
   // set the number of channels
-  int audio_channels = this->hls->audio_ctx->ch_layout.nb_channels;
-  err = snd_pcm_hw_params_set_channels(capture_handle, alsa_hw_params, audio_channels);
+  err = snd_pcm_hw_params_set_channels(capture_handle, alsa_hw_params, this->option->audio_channels);
   if (err < 0) {
-    if (audio_channels == 1) {
-      if (is_audio_channels_specified) {
+    if (microphone_channels == 1) {
+      if (this->option->is_audio_channels_specified) {
         log_info("cannot use mono audio; trying stereo\n");
       } else {
         log_debug("cannot use mono audio; trying stereo\n");
       }
-      audio_channels = 2;
+      microphone_channels = 2;
     } else {
-      if (is_audio_channels_specified) {
+      if (this->option->is_audio_channels_specified) {
         log_info("cannot use stereo audio; trying mono\n");
       } else {
         log_debug("cannot use stereo audio; trying mono\n");
       }
-      audio_channels = 1;
+      microphone_channels = 1;
     }
-    err = snd_pcm_hw_params_set_channels(capture_handle, alsa_hw_params, audio_channels);
+    err = snd_pcm_hw_params_set_channels(capture_handle, alsa_hw_params, microphone_channels);
     if (err < 0) {
       log_fatal("error: cannot set channel count for microphone (%s)\n", snd_strerror(err));
       exit(EXIT_FAILURE);
     }
   }
-  log_debug("final audio_channels: %d\n", audio_channels);
+  log_debug("final microphone channels: %d\n", microphone_channels);
+  this->option->audio_channels = microphone_channels;
 }
 
 void Audio::setup_av_frame(AVFormatContext *format_ctx) {
@@ -505,24 +500,29 @@ int Audio::configure_audio_capture_device() {
   return 0;
 }
 
-void Audio::setup(HTTPLiveStreaming *hls) {
-  this->hls = hls;
-	// this->my_fp.open("/dev/shm/out.aac", std::ios::out | std::ios::binary);
-
-  if (this->option->disable_audio_capturing) {
-    memset(samples, 0, this->option->audio_period_size * sizeof(short) * this->option->audio_channels);
-    this->is_audio_recording_started = true;
-  } else {
+void Audio::preconfigure() {
+  if (!this->option->disable_audio_capturing) {
     int ret = this->open_audio_capture_device();
     if (ret == -1) {
       log_warn("warning: audio capturing is disabled\n");
-      exit(EXIT_FAILURE);
+      this->option->disable_audio_capturing = 1;
     } else if (ret < 0) {
       log_fatal("error: init_audio failed: %d\n", ret);
       exit(EXIT_FAILURE);
     }
-
+  }
+  if (!this->option->disable_audio_capturing) {
     this->preconfigure_microphone();
+  }
+}
+
+void Audio::setup(HTTPLiveStreaming *hls) {
+  log_debug("audio setup\n");
+  this->hls = hls;
+
+  if (this->option->disable_audio_capturing) {
+    memset(samples, 0, this->option->audio_period_size * sizeof(short) * this->option->audio_channels);
+    this->is_audio_recording_started = true;
   }
 	// codec_settings.audio_sample_rate = audio_sample_rate;
 	// codec_settings.audio_bit_rate = audio_bitrate;
@@ -540,7 +540,7 @@ void Audio::setup(HTTPLiveStreaming *hls) {
   this->setup_av_frame(hls->format_ctx);
 
 	printf("configuring audio capture device\n");
-	int ret = configure_audio_capture_device();
+	int ret = this->configure_audio_capture_device();
 	if (ret != 0) {
 		log_fatal("error: configure_audio_capture_device: ret=%d\n", ret);
 		exit(EXIT_FAILURE);
@@ -773,11 +773,6 @@ void Audio::encode_and_send_audio() {
     // because it changes internal data of the AVPacket.
     // Otherwise av_write_frame() will fail with the error:
     // "AAC bitstream not in ADTS format and extradata missing".
-
-    // this->my_fp.write((char *)pkt->data, pkt->size);
-    // pthread_mutex_lock(&rec_write_mutex);
-    // add_encoded_packet(pts, copied_data, pkt->size, pkt->stream_index, pkt->flags);
-    // pthread_mutex_unlock(&rec_write_mutex);
 
     // if (is_recording) {
     //   pthread_mutex_lock(&rec_mutex);

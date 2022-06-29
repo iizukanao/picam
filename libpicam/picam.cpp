@@ -1662,6 +1662,11 @@ void Picam::event_loop()
 {
 	this->SetEncodeOutputReadyCallback(std::bind(&Picam::videoEncodeDoneCallback, this, _1, _2, _3, _4));
 
+	// audio->preconfigure() has to be executed before setting codec_settings
+	// because it adjusts the number of audio channels
+	audio = new Audio(this->option);
+	audio->preconfigure();
+
 	MpegTSCodecSettings codec_settings;
 	if (this->option->disable_audio_capturing) {
 		// HLS will not work when video-only, so we add silent audio track.
@@ -1676,7 +1681,6 @@ void Picam::event_loop()
 		codec_settings.audio_channels = this->option->audio_channels;
 		codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
 	}
-
 
 #if AUDIO_ONLY
   hls = hls_create_audio_only(hls_number_of_segments, &codec_settings); // 2 == num_recent_files
@@ -1728,7 +1732,6 @@ void Picam::event_loop()
 	
 	state_default_dir("state");
 
-	audio = new Audio(this->option);
 	audio->setup(hls);
 
 	this->muxer = new Muxer(this->option);

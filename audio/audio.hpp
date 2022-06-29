@@ -26,6 +26,7 @@ public:
   void mute();
   void unmute();
   void set_audio_start_time(int64_t audio_start_time);
+  void preconfigure();
 
 protected:
   PicamOption *option;
@@ -47,6 +48,7 @@ private:
   int64_t get_next_audio_pts();
   void send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts);
   void preconfigure_microphone();
+  int microphone_channels = -1;
   int get_audio_channels();
   int get_audio_sample_rate();
   int configure_audio_capture_device();

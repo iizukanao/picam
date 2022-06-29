@@ -34,10 +34,10 @@ void PicamOption::print_usage() {
   log_info("                      constrained_baseline/baseline/main/high\n");
   log_info("                      (default: %s)\n", defaultOption.video_avc_profile);
   log_info("  --avclevel <value>  Set AVC/H.264 level (default: %s)\n", defaultOption.video_avc_level);
-  log_info("  --qpmin <num>       Minimum quantization level (0..51)\n");
-  log_info("  --qpmax <num>       Maximum quantization level (0..51)\n");
-  log_info("  --qpinit <num>      Initial quantization level\n");
-  log_info("  --dquant <num>      Slice DQuant level\n");
+  // log_info("  --qpmin <num>       Minimum quantization level (0..51)\n");
+  // log_info("  --qpmax <num>       Maximum quantization level (0..51)\n");
+  // log_info("  --qpinit <num>      Initial quantization level\n");
+  // log_info("  --dquant <num>      Slice DQuant level\n");
   log_info(" [audio]\n");
   log_info("  -c, --channels <num>  Audio channels (1=mono, 2=stereo)\n");
   log_info("                      Default is mono. If it fails, stereo is used.\n");
