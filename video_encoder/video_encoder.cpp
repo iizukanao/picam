@@ -109,7 +109,14 @@ VideoEncoder::VideoEncoder(PicamOption const *options, StreamInfo const &info)
 	// 		throw std::runtime_error("failed to set level");
 	// }
 	ctrl.id = V4L2_CID_MPEG_VIDEO_H264_LEVEL;
-	ctrl.value = V4L2_MPEG_VIDEO_H264_LEVEL_4_1;
+	v4l2_mpeg_video_h264_level level = V4L2_MPEG_VIDEO_H264_LEVEL_4_1;
+  for (unsigned int i = 0; i < sizeof(video_avc_level_options) / sizeof(video_avc_level_option); i++) {
+    if (strcmp(video_avc_level_options[i].name, options->video_avc_level) == 0) {
+      level = video_avc_level_options[i].level;
+      break;
+    }
+  }
+	ctrl.value = level;
 	if (xioctl(fd_, VIDIOC_S_CTRL, &ctrl) < 0) {
 		throw std::runtime_error("failed to set level");
 	}
@@ -213,8 +220,12 @@ VideoEncoder::VideoEncoder(PicamOption const *options, StreamInfo const &info)
 	// Enable streaming and we're done.
 
 	v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
-	if (xioctl(fd_, VIDIOC_STREAMON, &type) < 0)
-		throw std::runtime_error("failed to start output streaming");
+	if (xioctl(fd_, VIDIOC_STREAMON, &type) < 0) {
+		if (strncmp(options->video_avc_level, "4", 1) != 0) {
+			throw std::runtime_error("Failed to start output streaming. Note that --avclevel below 4.0 may not work with larger resolutions.");
+		}
+		throw std::runtime_error("Failed to start output streaming.");
+	}
 	type = V4L2_BUF_TYPE_VIDEO_CAPTURE_MPLANE;
 	if (xioctl(fd_, VIDIOC_STREAMON, &type) < 0)
 		throw std::runtime_error("failed to start capture streaming");

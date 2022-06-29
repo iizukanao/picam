@@ -84,22 +84,16 @@ typedef struct video_avc_level_option {
   v4l2_mpeg_video_h264_level level;
 } video_avc_level_option;
 const video_avc_level_option video_avc_level_options[] = {
-  { "1",   V4L2_MPEG_VIDEO_H264_LEVEL_1_0 },
-  { "1b",  V4L2_MPEG_VIDEO_H264_LEVEL_1B },
-  { "1.1", V4L2_MPEG_VIDEO_H264_LEVEL_1_1 },
-  { "1.2", V4L2_MPEG_VIDEO_H264_LEVEL_1_2 },
-  { "1.3", V4L2_MPEG_VIDEO_H264_LEVEL_1_3 },
-  { "2",   V4L2_MPEG_VIDEO_H264_LEVEL_2_0 },
-  { "2.1", V4L2_MPEG_VIDEO_H264_LEVEL_2_1 },
-  { "2.2", V4L2_MPEG_VIDEO_H264_LEVEL_2_2 },
+  // Level < 3.0 is not supported by the encoder
   { "3",   V4L2_MPEG_VIDEO_H264_LEVEL_3_0 },
+  { "3.0",   V4L2_MPEG_VIDEO_H264_LEVEL_3_0 },
   { "3.1", V4L2_MPEG_VIDEO_H264_LEVEL_3_1 },
   { "3.2", V4L2_MPEG_VIDEO_H264_LEVEL_3_2 },
   { "4",   V4L2_MPEG_VIDEO_H264_LEVEL_4_0 },
+  { "4.0",   V4L2_MPEG_VIDEO_H264_LEVEL_4_0 },
   { "4.1", V4L2_MPEG_VIDEO_H264_LEVEL_4_1 },
   { "4.2", V4L2_MPEG_VIDEO_H264_LEVEL_4_2 },
-  { "5",   V4L2_MPEG_VIDEO_H264_LEVEL_5_0 },
-  { "5.1", V4L2_MPEG_VIDEO_H264_LEVEL_5_1 },
+  // Level >= 5.0 is not supported by the encoder
 };
 
 class PicamOption {
@@ -136,7 +130,7 @@ public:
     int video_vflip = 0;
     long video_bitrate = 2000 * 1000; // 2 Mbps
     char video_avc_profile[21] = "constrained_baseline";
-    char video_avc_level[4] = "3.1";
+    char video_avc_level[4] = "4.1";
     int video_qp_min = -1;
     int video_qp_max = -1;
     int video_qp_initial = -1;
