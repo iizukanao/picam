@@ -1662,8 +1662,8 @@ void Picam::event_loop()
 {
 	this->SetEncodeOutputReadyCallback(std::bind(&Picam::videoEncodeDoneCallback, this, _1, _2, _3, _4));
 
-	// audio->preconfigure() has to be executed before setting codec_settings
-	// because it adjusts the number of audio channels
+	// audio->preconfigure() has to be executed before using codec_settings
+	// because it adjusts the number of audio channels.
 	audio = new Audio(this->option);
 	audio->preconfigure();
 

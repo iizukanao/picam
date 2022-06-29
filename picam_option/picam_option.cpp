@@ -44,6 +44,9 @@ void PicamOption::print_usage() {
   log_info("  -c, --channels <num>  Audio channels (1=mono, 2=stereo)\n");
   log_info("                      Default is mono. If it fails, stereo is used.\n");
   log_info("  -r, --samplerate <num>  Audio sample rate (default: %d)\n", defaultOption.audio_sample_rate);
+  log_info("                      The sample rates supported by libfdk_aac encoder are:\n");
+  log_info("                      8000, 11025, 12000, 16000, 22050, 24000,\n");
+  log_info("                      32000, 44100, 48000, 64000, 88200, 96000\n");
   log_info("  -a, --audiobitrate <num>  Audio bit rate (default: %ld)\n", defaultOption.audio_bitrate);
   log_info("  --alsadev <dev>     ALSA microphone device (default: %s)\n", defaultOption.alsa_dev);
   log_info("  --volume <num>      Amplify audio by multiplying the volume by <num>\n");
