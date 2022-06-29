@@ -1151,9 +1151,8 @@ int64_t Picam::get_next_video_pts_cfr() {
   int64_t pts;
   video_frame_count++;
 
-  if (video_current_pts == 0) {
-	video_current_pts = audio_current_pts - this->option->video_pts_step;
-	log_debug("initial video_current_pts set to %" PRId64 "\n", video_current_pts);
+  if (video_current_pts == LLONG_MIN) {
+		video_current_pts = audio_current_pts - this->option->video_pts_step;
   }
 
   int pts_diff = audio_current_pts - video_current_pts - this->option->video_pts_step;
@@ -1497,6 +1496,13 @@ void Picam::videoEncodeDoneCallback(void *mem, size_t size, int64_t timestamp_us
 	// muxer->add_encoded_packet(std::round((timestamp_us - video_timestamp_origin_us) / (1000000 / 90000)), (uint8_t *)mem, size, hls->format_ctx->streams[0]->index, flags);
 	int64_t pts = this->get_next_video_pts();
 
+	// struct timespec ts;
+	// clock_gettime(CLOCK_MONOTONIC, &ts);
+	// int64_t this_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
+	// int64_t diff_from_prev = this_time - this->time_at_last_video;
+	// log_debug("%lld (diff=%lld) v%lld\n", this_time, diff_from_prev, pts);
+	// this->time_at_last_video = this_time;
+
 #if ENABLE_AUTO_GOP_SIZE_CONTROL_FOR_VFR
   if (this->option->is_vfr_enabled) {
 		if (keyframe) {
@@ -1736,6 +1742,7 @@ void Picam::event_loop()
 
 	this->muxer = new Muxer(this->option);
 	this->muxer->setup(&codec_settings);
+
 	audio->set_encode_callback([=](int64_t _pts, uint8_t *data, int size, int stream_index, int flags) -> void {
 		if (!this->is_audio_started) {
 			this->is_audio_started = true;
@@ -1744,6 +1751,13 @@ void Picam::event_loop()
 		int64_t audio_pts = this->get_next_audio_pts();
 		// Add audio packet
 		this->muxer->add_encoded_packet(audio_pts, data, size, stream_index, flags);
+
+    // struct timespec ts;
+    // clock_gettime(CLOCK_MONOTONIC, &ts);
+		// int64_t this_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
+		// int64_t diff_from_prev = this_time - this->time_at_last_audio;
+		// log_debug("%lld (diff=%lld) a%lld\n", this_time, diff_from_prev, audio_pts);
+		// this->time_at_last_audio = this_time;
 	});
 
 	this->muxer->prepare_encoded_packets(this->option->video_fps, audio->get_fps());

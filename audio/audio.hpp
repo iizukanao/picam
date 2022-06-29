@@ -34,12 +34,7 @@ protected:
 private:
   std::function<void(int64_t pts, uint8_t *data, int size, int stream_index, int flags)> encode_callback;
   bool keepRunning = true;
-  int is_audio_recording_started = 0;
-  // int64_t video_current_pts = 0;
-  // int64_t audio_current_pts = 0;
-  // int64_t last_pts = 0;
-  // int audio_pts_step_base;
-  int64_t audio_start_time;
+  int64_t audio_start_time = LLONG_MIN;
   int open_audio_capture_device();
   int open_audio_preview_device();
   void teardown_audio_capture_device();

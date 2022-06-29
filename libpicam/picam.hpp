@@ -152,11 +152,15 @@ private:
 	int audio_min_value;
 	int audio_max_value;
 	PicamOption *option;
-	int64_t video_current_pts = 0;
+	int64_t video_current_pts = LLONG_MIN;
 	int64_t audio_current_pts = 0;
 	int64_t last_pts = 0;
 	int64_t time_for_last_pts = 0; // Used in VFR mode
 	pts_mode_t pts_mode = PTS_SPEED_NORMAL;
+
+	// debug
+	// int64_t time_at_last_video = -1;
+	// int64_t time_at_last_audio = -1;
 
 #if ENABLE_AUTO_GOP_SIZE_CONTROL_FOR_VFR
 	// Variables for variable frame rate

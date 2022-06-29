@@ -76,7 +76,7 @@ void Audio::teardown_audio_preview_device() {
 
 int64_t Audio::get_next_audio_write_time() {
   if (this->audio_frame_count == 0) {
-    return LLONG_MIN;
+    return this->audio_start_time;
   }
   return this->audio_start_time + this->audio_frame_count * 1000000000.0f / ((float)this->option->audio_sample_rate / (float)this->option->audio_period_size);
 }
@@ -330,6 +330,10 @@ void Audio::setup_av_frame(AVFormatContext *format_ctx) {
   this->option->audio_pts_step = 90000.0f * this->option->audio_period_size / this->get_audio_sample_rate();
   log_debug("audio_pts_step: %d\n", this->option->audio_pts_step);
 
+  if (this->option->disable_audio_capturing) {
+    memset(this->samples, 0, this->option->audio_period_size * sizeof(short) * this->option->audio_channels);
+  }
+
   ret = avcodec_fill_audio_frame(av_frame, audio_codec_ctx->ch_layout.nb_channels, (AVSampleFormat) audio_codec_ctx->format,
       (const uint8_t*)this->samples, buffer_size, 0);
   if (ret < 0) {
@@ -520,10 +524,6 @@ void Audio::setup(HTTPLiveStreaming *hls) {
   log_debug("audio setup\n");
   this->hls = hls;
 
-  if (this->option->disable_audio_capturing) {
-    memset(samples, 0, this->option->audio_period_size * sizeof(short) * this->option->audio_channels);
-    this->is_audio_recording_started = true;
-  }
 	// codec_settings.audio_sample_rate = audio_sample_rate;
 	// codec_settings.audio_bit_rate = audio_bitrate;
 	// codec_settings.audio_channels = audio_channels;
@@ -539,12 +539,18 @@ void Audio::setup(HTTPLiveStreaming *hls) {
 //   this->setup_av_frame(hls->format_ctx);
   this->setup_av_frame(hls->format_ctx);
 
-	printf("configuring audio capture device\n");
-	int ret = this->configure_audio_capture_device();
-	if (ret != 0) {
-		log_fatal("error: configure_audio_capture_device: ret=%d\n", ret);
-		exit(EXIT_FAILURE);
-	}
+  if (this->option->disable_audio_capturing) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    audio_start_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
+  } else {
+    printf("configuring audio capture device\n");
+    int ret = this->configure_audio_capture_device();
+    if (ret != 0) {
+      log_fatal("error: configure_audio_capture_device: ret=%d\n", ret);
+      exit(EXIT_FAILURE);
+    }
+  }
 	printf("audio device configured\n");
 }
 
@@ -671,6 +677,8 @@ void Audio::encode_and_send_audio() {
 #else
   // AVCodecParameters *ctx = this->hls->format_ctx->streams[1]->codecpar;
 #endif
+
+  this->audio_frame_count++;
 
   AVPacket *pkt = av_packet_alloc();
   if (pkt == NULL) {
@@ -987,7 +995,9 @@ void Audio::loop() {
           log_error("nanosleep error:%d\n", ret);
         }
       }
+      continue;
     }
+
     if (is_first_audio) {
       this->read_audio_poll_mmap();
       // We ignore the first audio frame.
@@ -1025,31 +1035,8 @@ void Audio::loop() {
       if (1) {
 #endif
         this->encode_and_send_audio();
-
-        // if (this->is_audio_recording_started == 0) {
-        //   this->is_audio_recording_started = 1;
-        //   if (is_video_recording_started == 1) {
-        //     struct timespec ts;
-        //     clock_gettime(CLOCK_MONOTONIC, &ts);
-        //     video_start_time = audio_start_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
-        //     send_video_start_time();
-        //     send_audio_start_time();
-        //     log_info("capturing started\n");
-        //   }
-        // }
-        // if (is_video_recording_started == 1) {
-        //   if (audio_pending_drop_frames > 0) {
-        //     log_debug("dA");
-        //     audio_pending_drop_frames--;
-        //   } else {
-        //     if (is_audio_muted) {
-        //       memset(this->samples, 0, this->option->audio_period_size * sizeof(short) * audio_channels);
-        //     }
-        //     encode_and_send_audio();
-        //   }
-        // }
-      }
-    }
+      } // end of if(1)
+    } // end of if (avail_flags & AVAIL_AUDIO)
   } // end of while loop (keepRunning)
 }
 
@@ -1064,4 +1051,5 @@ void Audio::unmute() {
 void Audio::set_audio_start_time(int64_t audio_start_time)
 {
   this->audio_start_time = audio_start_time;
+  this->audio_frame_count = 0;
 }
