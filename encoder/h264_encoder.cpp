@@ -44,9 +44,6 @@ static int get_v4l2_colorspace(std::optional<libcamera::ColorSpace> const &cs)
 H264Encoder::H264Encoder(VideoOptions const *options, StreamInfo const &info)
 	: Encoder(options), abortPoll_(false), abortOutput_(false)
 {
-	// std::cout << "my_fp.open" << std::endl;
-	// my_fp.open("out.yuv", std::ios::out | std::ios::binary);
-
 	// First open the encoder device. Maybe we should double-check its "caps".
 
 	const char device_name[] = "/dev/video11";
@@ -206,9 +203,6 @@ H264Encoder::H264Encoder(VideoOptions const *options, StreamInfo const &info)
 
 H264Encoder::~H264Encoder()
 {
-	// std::cout << "my_fp.close" << std::endl;
-	// my_fp.close();
-
 	abortPoll_ = true;
 	poll_thread_.join();
 	abortOutput_ = true;
@@ -250,7 +244,6 @@ void H264Encoder::EncodeBuffer(int fd, size_t size, void *mem, StreamInfo const 
 {
 	// FIXME: Modify camera YUV frame provided by mem
 	// mem is a YUV frame
-	// my_fp.write((char *)mem, size);
 
 	// const uint32_t FOURCC_YU12 = 0x32315559; // YU12
 	// // std::cout << "size=" << size << " width=" << info.width << " height=" << info.height

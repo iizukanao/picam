@@ -45,5 +45,4 @@ private:
 	FILE *fp_timestamps_;
 	int64_t time_offset_;
 	int64_t last_timestamp_;
-	std::ofstream my_fp;
 };

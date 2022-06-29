@@ -16,9 +16,6 @@
 Output::Output(VideoOptions const *options)
 	: options_(options), state_(WAITING_KEYFRAME), fp_timestamps_(nullptr), time_offset_(0), last_timestamp_(0)
 {
-	// std::cout << "output my_fp.open" << std::endl;
-	// my_fp.open("/dev/shm/out.h264", std::ios::out | std::ios::binary);
-
 	if (!options->save_pts.empty())
 	{
 		fp_timestamps_ = fopen(options->save_pts.c_str(), "w");
@@ -32,9 +29,6 @@ Output::Output(VideoOptions const *options)
 
 Output::~Output()
 {
-	// std::cout << "output my_fp.close" << std::endl;
-	// my_fp.close();
-
 	if (fp_timestamps_)
 		fclose(fp_timestamps_);
 }
@@ -72,11 +66,6 @@ void Output::OutputReady(void *mem, size_t size, int64_t timestamp_us, bool keyf
 
 void Output::outputBuffer(void *mem, size_t size, int64_t timestamp_us, uint32_t flags)
 {
-	// FIXME: mem is H.264 encoded frame. Supply them to ffmpeg.
-	// std::cout << "write to out.h264" << std::endl;
-	// my_fp.write((char *)mem, size);
-
-	// std::cout << "outputBuffer size=" << size << std::endl;
 	// Supply this so that a vanilla Output gives you an object that outputs no buffers.
 }
 

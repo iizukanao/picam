@@ -66,5 +66,4 @@ private:
 	std::mutex output_mutex_;
 	std::condition_variable output_cond_var_;
 	std::thread output_thread_;
-	// std::ofstream my_fp;
 };

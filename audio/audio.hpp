@@ -63,7 +63,6 @@ private:
   int audio_max_value = (int) (32767 / this->audio_volume_multiply);
   uint16_t *samples;
   void setup_av_frame(AVFormatContext *format_ctx);
-  std::ofstream my_fp;
   HTTPLiveStreaming *hls;
   bool is_muted = false;
 };
