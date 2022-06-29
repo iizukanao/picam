@@ -25,7 +25,9 @@ void PicamOption::print_usage() {
   log_info("  --vfr               Enable variable frame rate. GOP size will be\n");
   log_info("                      dynamically controlled.\n");
   log_info("  --minfps <num>      Minimum frames per second. Implies --vfr.\n");
+  // log_info("                      It might not work if width / height >= 1.45.\n");
   log_info("  --maxfps <num>      Maximum frames per second. Implies --vfr.\n");
+  // log_info("                      It might not work if width / height >= 1.45.\n");
   // log_info("  --rotation <num>    Image rotation in clockwise degrees\n");
   // log_info("                      (0, 90, 180, 270)\n");
   log_info("  --hflip             Flip image horizontally\n");
