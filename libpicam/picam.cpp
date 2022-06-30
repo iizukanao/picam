@@ -1411,8 +1411,8 @@ void Picam::check_video_and_audio_started() {
 		clock_gettime(CLOCK_MONOTONIC, &ts);
 		this->video_start_time = this->audio_start_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
 		if (this->option->is_rtspout_enabled) {
-			send_video_start_time();
-			send_audio_start_time(this->audio_start_time);
+			rtsp_send_video_start_time();
+			rtsp_send_audio_start_time(this->audio_start_time);
 		}
 		this->audio->set_audio_start_time(audio_start_time);
 		log_info("capturing started\n");
@@ -1965,6 +1965,10 @@ int Picam::run(int argc, char *argv[])
 
 		if (this->option->is_tcpout_enabled) {
 			this->muxer->teardown_tcp_output();
+		}
+
+		if (this->option->is_rtspout_enabled) {
+			rtsp_teardown_socks();
 		}
 
     log_debug("stop_watching_hooks\n");

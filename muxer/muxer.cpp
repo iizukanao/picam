@@ -4,6 +4,7 @@
 #include "muxer/muxer.hpp"
 #include "mpegts/mpegts.h"
 #include "libstate/state.h"
+#include "rtsp/rtsp.h"
 #include "log/log.h"
 
 // Number of packets to chase recording for each cycle
@@ -261,7 +262,8 @@ void Muxer::teardown_tcp_output() {
 
 // Receives both video and audio frames.
 void Muxer::onFrameArrive(EncodedPacket *encoded_packet) {
-  bool isVideoKeyframe = encoded_packet->stream_index == 0 && // video
+  bool isVideo = encoded_packet->stream_index == 0;
+  bool isVideoKeyframe = isVideo &&
     encoded_packet->flags & AV_PKT_FLAG_KEY; // keyframe
 
   if (this->is_recording) {
@@ -278,6 +280,14 @@ void Muxer::onFrameArrive(EncodedPacket *encoded_packet) {
     pthread_mutex_lock(&tcp_mutex);
     av_write_frame(tcp_ctx, pkt);
     pthread_mutex_unlock(&tcp_mutex);
+  }
+
+  if (this->option->is_rtspout_enabled) {
+    if (isVideo) {
+      rtsp_send_video_frame(encoded_packet->data, encoded_packet->size, encoded_packet->pts);
+    } else { // audio
+      rtsp_send_audio_frame(encoded_packet->data, encoded_packet->size, encoded_packet->pts);
+    }
   }
 
   if (this->option->is_hlsout_enabled) {

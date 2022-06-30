@@ -4,6 +4,7 @@
 #include <sys/un.h>
 #include <errno.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include "log/log.h"
 #include "rtsp.h"
@@ -86,7 +87,7 @@ void rtsp_setup_socks(RtspConfig config) {
 }
 
 // Send video packet to node-rtsp-rtmp-server
-void send_video_start_time() {
+void rtsp_send_video_start_time() {
   int payload_size = 11;
   uint8_t sendbuf[14] = {
     // payload size
@@ -107,7 +108,7 @@ void send_video_start_time() {
 }
 
 // Send audio packet to node-rtsp-rtmp-server
-void send_audio_start_time(int64_t audio_start_time) {
+void rtsp_send_audio_start_time(int64_t audio_start_time) {
   int payload_size = 9;
   int64_t logical_start_time = audio_start_time;
   uint8_t sendbuf[12] = {
@@ -131,6 +132,33 @@ void send_audio_start_time(int64_t audio_start_time) {
     perror("send audio start time");
     exit(EXIT_FAILURE);
   }
+}
+
+void rtsp_send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts) {
+  int payload_size = databuflen + 7;  // +1(packet type) +6(pts)
+  int total_size = payload_size + 3;  // more 3 bytes for payload length
+  uint8_t *sendbuf = malloc(total_size);
+  if (sendbuf == NULL) {
+    log_error("error: cannot allocate memory for audio sendbuf: size=%d", total_size);
+    return;
+  }
+  // payload header
+  sendbuf[0] = (payload_size >> 16) & 0xff;
+  sendbuf[1] = (payload_size >> 8) & 0xff;
+  sendbuf[2] = payload_size & 0xff;
+  // payload
+  sendbuf[3] = 0x03;  // packet type (0x03 == audio data)
+  sendbuf[4] = (pts >> 40) & 0xff;
+  sendbuf[5] = (pts >> 32) & 0xff;
+  sendbuf[6] = (pts >> 24) & 0xff;
+  sendbuf[7] = (pts >> 16) & 0xff;
+  sendbuf[8] = (pts >> 8) & 0xff;
+  sendbuf[9] = pts & 0xff;
+  memcpy(sendbuf + 10, databuf, databuflen);
+  if (send(sockfd_audio, sendbuf, total_size, 0) == -1) {
+    perror("send audio data");
+  }
+  free(sendbuf);
 }
 
 void rtsp_send_video_frame(uint8_t *databuf, int databuflen, int64_t pts) {
@@ -158,4 +186,11 @@ void rtsp_send_video_frame(uint8_t *databuf, int databuflen, int64_t pts) {
     perror("send video data");
   }
   free(sendbuf);
+}
+
+void rtsp_teardown_socks() {
+  close(sockfd_video);
+  close(sockfd_video_control);
+  close(sockfd_audio);
+  close(sockfd_audio_control);
 }
