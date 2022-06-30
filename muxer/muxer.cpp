@@ -12,7 +12,9 @@
 static pthread_mutex_t rec_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t rec_write_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t rec_cond = PTHREAD_COND_INITIALIZER;
-static pthread_mutex_t encoded_packet_mutex = PTHREAD_MUTEX_INITIALIZER;
+// static pthread_mutex_t encoded_packet_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static char errbuf[1024];
 
 Muxer::Muxer(PicamOption *option) {
   this->option = option;
@@ -26,8 +28,9 @@ Muxer::~Muxer() {
   }
 }
 
-void Muxer::setup(MpegTSCodecSettings *codec_settings) {
+void Muxer::setup(MpegTSCodecSettings *codec_settings, HTTPLiveStreaming *hls) {
   this->codec_settings = codec_settings;
+  this->hls = hls;
 
 	// MpegTSContext rec_ctx = mpegts_create_context(codec_settings);
 	// char recording_tmp_filepath[256];
@@ -241,13 +244,71 @@ void Muxer::start_record(RecSettings settings) {
 	// this->recThread = std::thread(start_rec_thread, this, settings);
 }
 
-void Muxer::onFrameArrive() {
+void Muxer::setup_tcp_output()
+{
+  // avformat_network_init();
+  MpegTSContext ts_ctx = mpegts_create_context(this->codec_settings);
+  tcp_ctx = ts_ctx.format_context;
+  mpegts_open_stream(tcp_ctx, this->option->tcp_output_dest, 0);
+}
+
+void Muxer::teardown_tcp_output() {
+  log_debug("teardown_tcp_output\n");
+  mpegts_close_stream(tcp_ctx);
+  mpegts_destroy_context(tcp_ctx);
+  // avformat_network_deinit();
+}
+
+// Receives both video and audio frames.
+void Muxer::onFrameArrive(EncodedPacket *encoded_packet) {
+  bool isVideoKeyframe = encoded_packet->stream_index == 0 && // video
+    encoded_packet->flags & AV_PKT_FLAG_KEY; // keyframe
+
   if (this->is_recording) {
     pthread_mutex_lock(&rec_mutex);
     this->rec_thread_needs_write = 1;
     pthread_cond_signal(&rec_cond);
     pthread_mutex_unlock(&rec_mutex);
   }
+
+  AVPacket *pkt = av_packet_alloc();
+  encoded_packet_to_avpacket(encoded_packet, pkt);
+
+  if (this->option->is_tcpout_enabled) {
+    pthread_mutex_lock(&tcp_mutex);
+    av_write_frame(tcp_ctx, pkt);
+    pthread_mutex_unlock(&tcp_mutex);
+  }
+
+  if (this->option->is_hlsout_enabled) {
+    pthread_mutex_lock(&mutex_writing);
+
+    int split; // Whether we should split .ts file here
+    if (isVideoKeyframe) {
+      if (video_send_keyframe_count % this->option->hls_keyframes_per_segment == 0 && video_frame_count != 1) {
+        split = 1;
+      } else {
+        split = 0;
+      }
+
+      video_send_keyframe_count = video_send_keyframe_count % this->option->hls_keyframes_per_segment;
+
+      // Update counter
+      video_send_keyframe_count++;
+    } else {
+      split = 0;
+    }
+
+    int ret = hls_write_packet(hls, pkt, split);
+    pthread_mutex_unlock(&mutex_writing);
+    if (ret < 0) {
+      av_strerror(ret, errbuf, sizeof(errbuf));
+      log_error("keyframe write error (hls): %s\n", errbuf);
+      log_error("please check if the disk is full\n");
+    }
+  }
+
+  av_packet_free(&pkt);
 }
 
 // Called from thread
@@ -492,6 +553,7 @@ int Muxer::write_encoded_packets(int max_packets, int origin_pts) {
 
 // Remember the point where keyframe occurs within encoded_packets
 void Muxer::mark_keyframe_packet() {
+  pthread_mutex_lock(&rec_write_mutex);
   // keyframe_pointers is a circular buffer and
   // current_keyframe_pointer holds the index of last written item.
   current_keyframe_pointer++;
@@ -502,6 +564,7 @@ void Muxer::mark_keyframe_packet() {
     }
   }
   keyframe_pointers[current_keyframe_pointer] = current_encoded_packet;
+  pthread_mutex_unlock(&rec_write_mutex);
 }
 
 void Muxer::add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_index, int flags) {
@@ -513,7 +576,8 @@ void Muxer::add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_
   // }
   // printf("\n");
 
-  pthread_mutex_lock(&encoded_packet_mutex);
+  pthread_mutex_lock(&rec_write_mutex);
+  // pthread_mutex_lock(&encoded_packet_mutex);
   if (++current_encoded_packet == encoded_packets_size) {
     current_encoded_packet = 0;
   }
@@ -554,9 +618,10 @@ void Muxer::add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_
   packet->size = size;
   packet->stream_index = stream_index;
   packet->flags = flags;
-  pthread_mutex_unlock(&encoded_packet_mutex);
+  // pthread_mutex_unlock(&encoded_packet_mutex);
+  pthread_mutex_unlock(&rec_write_mutex);
 
-  this->onFrameArrive();
+  this->onFrameArrive(packet);
 }
 
 void Muxer::free_encoded_packets() {
@@ -644,4 +709,13 @@ int Muxer::set_record_buffer_keyframes(int newsize) {
   is_keyframe_pointers_filled = 0;
 
   return 0;
+}
+
+void encoded_packet_to_avpacket(EncodedPacket *enc_pkt, AVPacket *avpkt)
+{
+  avpkt->pts = avpkt->dts = enc_pkt->pts;
+  avpkt->data = enc_pkt->data;
+  avpkt->size = enc_pkt->size;
+  avpkt->stream_index = enc_pkt->stream_index;
+  avpkt->flags = enc_pkt->flags;
 }

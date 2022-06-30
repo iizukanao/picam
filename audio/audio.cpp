@@ -821,7 +821,7 @@ void Audio::encode_and_send_audio() {
 
     av_packet_unref(pkt);
 
-    this->current_audio_frames++;
+    // this->current_audio_frames++;
   } else {
     log_error("error: not getting audio output");
   }

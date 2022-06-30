@@ -49,7 +49,7 @@ private:
   int configure_audio_capture_device();
   int64_t get_next_audio_write_time();
   long long audio_frame_count = 0;
-  int current_audio_frames = 0;
+  // int current_audio_frames = 0;
   int is_audio_preview_device_opened = 0;
   uint16_t *samples;
   void setup_av_frame(AVFormatContext *format_ctx);

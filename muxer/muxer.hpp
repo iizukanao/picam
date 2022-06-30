@@ -28,7 +28,7 @@ class Muxer
   public:
     Muxer(PicamOption *option);
     ~Muxer();
-    void setup(MpegTSCodecSettings *codec_settings);
+    void setup(MpegTSCodecSettings *codec_settings, HTTPLiveStreaming *hls);
     int write_encoded_packets(int max_packets, int origin_pts);
     void start_record(RecSettings rec_settings);
     void *rec_start();
@@ -37,10 +37,12 @@ class Muxer
     void prepare_encoded_packets(float video_fps, float audio_fps);
     // void waitForExit();
     void stop_record();
-    void onFrameArrive();
+    void onFrameArrive(EncodedPacket *encoded_packet);
     void prepareForDestroy();
     void mark_keyframe_packet();
     int set_record_buffer_keyframes(int newsize);
+    void setup_tcp_output();
+    void teardown_tcp_output();
 
     // how many keyframes should we look back for the next recording
     int recording_look_back_keyframes;
@@ -82,4 +84,18 @@ class Muxer
     int rec_thread_needs_flush = 0;
     int rec_thread_needs_write = 0;
     int flush_recording_seconds = 5; // Flush recording data every 5 seconds
+
+    int video_send_keyframe_count = 0;
+    int64_t video_frame_count = 0;
+
+    // tcp output
+    AVFormatContext *tcp_ctx;
+    pthread_mutex_t tcp_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+    // hls output
+    pthread_mutex_t mutex_writing = PTHREAD_MUTEX_INITIALIZER;
 };
+
+extern "C" {
+  void encoded_packet_to_avpacket(EncodedPacket *encoded_packet, AVPacket *av_packet);
+}

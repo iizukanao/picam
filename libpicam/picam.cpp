@@ -1552,6 +1552,7 @@ void Picam::videoEncodeDoneCallback(void *mem, size_t size, int64_t timestamp_us
 	log_debug(".");
 	if (keyframe) {
 		this->muxer->mark_keyframe_packet();
+
 		// calculate FPS and display it
 		if (tsBegin.tv_sec != 0 && tsBegin.tv_nsec != 0) {
 			struct timespec tsEnd, tsDiff;
@@ -1741,7 +1742,11 @@ void Picam::event_loop()
 	audio->setup(hls);
 
 	this->muxer = new Muxer(this->option);
-	this->muxer->setup(&codec_settings);
+	this->muxer->setup(&codec_settings, hls);
+
+	if (this->option->is_tcpout_enabled) {
+		this->muxer->setup_tcp_output();
+	}
 
 	audio->set_encode_callback([=](int64_t _pts, uint8_t *data, int size, int stream_index, int flags) -> void {
 		if (!this->is_audio_started) {
@@ -1957,6 +1962,10 @@ int Picam::run(int argc, char *argv[])
 		}
 
     this->event_loop();
+
+		if (this->option->is_tcpout_enabled) {
+			this->muxer->teardown_tcp_output();
+		}
 
     log_debug("stop_watching_hooks\n");
     stop_watching_hooks();

@@ -50,9 +50,12 @@ typedef struct MpegTSWrite {
     const AVClass *av_class;
     MpegTSSection pat; /* MPEG-2 PAT table */
     MpegTSSection sdt; /* MPEG-2 SDT table context */
+    MpegTSSection nit; /* MPEG-2 NIT table context */
     MpegTSService **services;
+    AVPacket *pkt;
     int64_t sdt_period; /* SDT period in PCR time base */
     int64_t pat_period; /* PAT/PMT period in PCR time base */
+    int64_t nit_period; /* NIT period in PCR time base */
     int nb_services;
     //
     // NOTE: there are more fields but we don't need them
