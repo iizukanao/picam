@@ -317,6 +317,49 @@ static void get_colour_space_info(std::optional<libcamera::ColorSpace> const &cs
 		std::cerr << "DrmPreview: unexpected colour space " << libcamera::ColorSpace::toString(cs) << std::endl;
 }
 
+[[maybe_unused]] static int drm_set_transparency(int fd, int plane_id, int transparency)
+{
+	log_debug("drm_set_transparency: fd=%d plane_id=%d transparency=%d\n", fd, plane_id, transparency);
+	char const *name = "alpha";
+
+	drmModeObjectPropertiesPtr properties = nullptr;
+	drmModePropertyPtr prop = nullptr;
+	int ret = -1;
+	properties = drmModeObjectGetProperties(fd, plane_id, DRM_MODE_OBJECT_PLANE);
+
+	for (unsigned int i = 0; i < properties->count_props; i++)
+	{
+		int prop_id = properties->props[i];
+		prop = drmModeGetProperty(fd, prop_id);
+		if (!prop)
+			continue;
+
+		log_debug("prop[%d] name=%s flags=%d\n", i, prop->name, prop->flags);
+		if (!strstr(prop->name, name))
+		{
+			drmModeFreeProperty(prop);
+			prop = nullptr;
+			continue;
+		}
+
+		// We have found the right property from its name, now search the enum table
+		// for the numerical value that corresponds to the value name that we have.
+		log_debug("setting alpha to %d\n", transparency);
+		ret = drmModeObjectSetProperty(fd, plane_id, DRM_MODE_OBJECT_PLANE, prop_id, transparency);
+		if (ret < 0)
+			std::cerr << "DrmPreview: failed to set value " << transparency << " for property " << name << std::endl;
+		goto done;
+	}
+
+	std::cerr << "DrmPreview: failed to find property " << name << std::endl;
+done:
+	if (prop)
+		drmModeFreeProperty(prop);
+	if (properties)
+		drmModeFreeObjectProperties(properties);
+	return ret;
+}
+
 static int drm_set_property(int fd, int plane_id, char const *name, char const *val)
 {
 	drmModeObjectPropertiesPtr properties = nullptr;
@@ -380,6 +423,11 @@ void DrmPreview::makeBuffer(int fd, size_t size, StreamInfo const &info, Buffer 
 		first_time_ = false;
 
 		setup_colour_space(drmfd_, planeId_, info.colour_space);
+
+		// This is not working (when executed, preview stops working until reboot)
+		// if (this->options_->preview_opacity != 255) {
+		// 	drm_set_transparency(drmfd_, planeId_, this->options_->preview_opacity);
+		// }
 	}
 
 	buffer.fd = fd;
