@@ -16,6 +16,7 @@ typedef struct white_balance_option {
 } white_balance_option;
 const white_balance_option white_balance_options[] = {
   { "off",          libcamera::controls::AwbCustom },
+  { "custom",          libcamera::controls::AwbCustom },
   { "auto",         libcamera::controls::AwbAuto },
   // { "sun",          OMX_WhiteBalControlSunLight },
   { "cloudy",       libcamera::controls::AwbCloudy },
@@ -35,7 +36,7 @@ typedef struct exposure_control_option {
   libcamera::controls::AeExposureModeEnum control;
 } exposure_control_option;
 const exposure_control_option exposure_control_options[] = {
-  { "off",           libcamera::controls::ExposureCustom },
+  { "custom",           libcamera::controls::ExposureCustom },
   { "normal",           libcamera::controls::ExposureNormal },
   { "short",           libcamera::controls::ExposureShort },
   { "long",           libcamera::controls::ExposureLong },
@@ -60,7 +61,7 @@ typedef struct exposure_metering_option {
   libcamera::controls::AeMeteringModeEnum metering;
 } exposure_metering_option;
 const exposure_metering_option exposure_metering_options[] = {
-  { "centre_weighted", libcamera::controls::MeteringCentreWeighted },
+  { "center", libcamera::controls::MeteringCentreWeighted },
   // { "average", OMX_MeteringModeAverage },
   { "spot",    libcamera::controls::MeteringSpot },
   { "matrix",  libcamera::controls::MeteringMatrix },

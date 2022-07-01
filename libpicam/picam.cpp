@@ -387,8 +387,13 @@ int create_dir(const char *dir) {
 }
 
 // Set red and blue gains used when AWB is off
-static int camera_set_custom_awb_gains() {
-	// TODO: Implement this using libcamera
+int Picam::camera_set_custom_awb_gains() {
+	log_debug("camera_set_custom_awb_gains: red=%.1f, blue=%.1f\n",
+		this->option->awb_red_gain, this->option->awb_blue_gain);
+	controls_.set(libcamera::controls::ColourGains, {
+		this->option->awb_red_gain,
+		this->option->awb_blue_gain
+	});
 
 //   OMX_CONFIG_CUSTOMAWBGAINSTYPE custom_awb_gains;
 //   OMX_ERRORTYPE error;
@@ -409,6 +414,19 @@ static int camera_set_custom_awb_gains() {
 //   }
 
   return 0;
+}
+
+int Picam::camera_set_ae_metering_mode(char *mode) {
+	log_debug("camera_set_metering_mode: %s\n", mode);
+  libcamera::controls::AeMeteringModeEnum metering = libcamera::controls::MeteringCentreWeighted;
+  for (unsigned int i = 0; i < sizeof(exposure_metering_options) / sizeof(exposure_metering_option); i++) {
+    if (strcmp(exposure_metering_options[i].name, mode) == 0) {
+      metering = exposure_metering_options[i].metering;
+      break;
+    }
+  }
+	controls_.set(libcamera::controls::AeMeteringMode, metering);
+	return 0;
 }
 
 [[maybe_unused]] static int camera_set_exposure_value() {
@@ -492,8 +510,30 @@ static int camera_set_custom_awb_gains() {
   return 0;
 }
 
-static int camera_set_white_balance(char *wb) {
-	// TODO: Implement this using libcamera
+int Picam::camera_set_white_balance(char *wb) {
+	// std::cout << "supported white balance modes:" << std::endl;
+	// for (size_t i = 0; i < libcamera::controls::AwbModeValues.size(); i++) {
+	// 	std::cout << libcamera::controls::AwbModeValues[i].toString() << std::endl;
+	// }
+	log_debug("camera_set_white_balance: %s\n", wb);
+	if (strncmp(wb, "off", 3) == 0) {
+		log_debug("disable AWB\n");
+		controls_.set(libcamera::controls::AwbMode, libcamera::controls::AwbCustom);
+		controls_.set(libcamera::controls::AwbEnable, false);
+	} else {
+		libcamera::controls::AwbModeEnum control = libcamera::controls::AwbAuto;
+		for (unsigned int i = 0; i < sizeof(white_balance_options) / sizeof(white_balance_option); i++) {
+			log_debug("strcmp(%s,%s)=%d\n", white_balance_options[i].name, wb, strcmp(white_balance_options[i].name, wb));
+			if (strcmp(white_balance_options[i].name, wb) == 0) {
+				log_debug("found\n");
+				control = white_balance_options[i].control;
+				break;
+			}
+		}
+		log_debug("enable AWB: %d\n", control);
+		controls_.set(libcamera::controls::AwbEnable, true);
+		controls_.set(libcamera::controls::AwbMode, control);
+	}
 
   // OMX_CONFIG_WHITEBALCONTROLTYPE whitebal;
   // OMX_ERRORTYPE error;
@@ -527,8 +567,16 @@ static int camera_set_white_balance(char *wb) {
   return 0;
 }
 
-static int camera_set_exposure_control(char *ex) {
-	// TODO: Implement this using libcamera
+int Picam::camera_set_exposure_control(char *ex) {
+	log_debug("camera_set_exposure_control: %s\n", ex);
+  libcamera::controls::AeExposureModeEnum control = libcamera::controls::ExposureNormal;
+  for (unsigned int i = 0; i < sizeof(exposure_control_options) / sizeof(exposure_control_option); i++) {
+    if (strcmp(exposure_control_options[i].name, ex) == 0) {
+      control = exposure_control_options[i].control;
+      break;
+    }
+  }
+	controls_.set(libcamera::controls::AeExposureMode, control);
 
   // OMX_CONFIG_EXPOSURECONTROLTYPE exposure_control_type;
   // OMX_ERRORTYPE error;
@@ -571,7 +619,7 @@ static int camera_set_exposure_control(char *ex) {
 }
 
 /* Set region of interest */
-[[maybe_unused]] static int camera_set_input_crop(float left, float top, float width, float height) {
+// [[maybe_unused]] static int camera_set_input_crop(float left, float top, float width, float height) {
 	// TODO: Implement this using libcamera
 
   // OMX_CONFIG_INPUTCROPTYPE input_crop_type;
@@ -594,8 +642,8 @@ static int camera_set_exposure_control(char *ex) {
   //   return -1;
   // }
 
-  return 0;
-}
+//   return 0;
+// }
 
 /**
  * Reads a file and returns the contents.
@@ -820,7 +868,7 @@ void Picam::handleHook(char *filename, char *content) {
       }
     }
     if (matched) {
-      if (camera_set_white_balance(this->option->white_balance) == 0) {
+      if (this->camera_set_white_balance(this->option->white_balance) == 0) {
         log_info("changed the white balance to %s\n", this->option->white_balance);
       } else {
         log_error("error: failed to set the white balance to %s\n", this->option->white_balance);
@@ -856,7 +904,7 @@ void Picam::handleHook(char *filename, char *content) {
       }
     }
     if (matched) {
-      if (camera_set_exposure_control(this->option->exposure_control) == 0) {
+      if (this->camera_set_exposure_control(this->option->exposure_control) == 0) {
         log_info("changed the exposure control to %s\n", this->option->exposure_control);
       } else {
         log_error("error: failed to set the exposure control to %s\n", this->option->exposure_control);
@@ -2361,21 +2409,15 @@ void Picam::StartCamera()
 	// This makes all the Request objects that we shall need.
 	makeRequests();
 
-	// Previously option
-	float roi_x = 0;
-	float roi_y = 0;
-	float roi_width = 0;
-	float roi_height = 0;
-
 	// Build a list of initial controls that we must set in the camera before starting it.
 	// We don't overwrite anything the application may have set before calling us.
-	if (!controls_.contains(libcamera::controls::ScalerCrop) && roi_width != 0 && roi_height != 0)
+	if (!controls_.contains(libcamera::controls::ScalerCrop) && this->option->roi_width != 0 && this->option->roi_height != 0)
 	{
 		libcamera::Rectangle sensor_area = camera_->properties().get(libcamera::properties::ScalerCropMaximum);
-		int x = roi_x * sensor_area.width;
-		int y = roi_y * sensor_area.height;
-		int w = roi_width * sensor_area.width;
-		int h = roi_height * sensor_area.height;
+		int x = this->option->roi_left * sensor_area.width;
+		int y = this->option->roi_top * sensor_area.height;
+		int w = this->option->roi_width * sensor_area.width;
+		int h = this->option->roi_height * sensor_area.height;
 		libcamera::Rectangle crop(x, y, w, h);
 		crop.translateBy(sensor_area.topLeft());
 		log_debug("Using crop %s\n", crop.toString());
@@ -2413,40 +2455,86 @@ void Picam::StartCamera()
 		}
 	}
 
-	// Previously option
-	float shutter = 0;
-	float gain = 0;
-	int metering_index = libcamera::controls::MeteringCentreWeighted;
-	int exposure_index = libcamera::controls::ExposureNormal;
-	float ev = 0;
-	int awb_index = libcamera::controls::AwbAuto;
-	float awb_gain_r = 0;
-	float awb_gain_b = 0;
-	float brightness = 0;
-	float contrast = 1.0;
-	float saturation = 1.0;
-	float sharpness = 1.0;
+	// Shutter speed
+	float shutter;
+	if (this->option->manual_exposure_shutter_speed) {
+		shutter = this->option->exposure_shutter_speed;
+	} else {
+		shutter = 0;
+	}
+	// if (!controls_.contains(libcamera::controls::ExposureTime) && shutter)
+	controls_.set(libcamera::controls::ExposureTime, shutter);
 
-	if (!controls_.contains(libcamera::controls::ExposureTime) && shutter)
-		controls_.set(libcamera::controls::ExposureTime, shutter);
+	// Analogue gain
+	float gain = 0;
 	if (!controls_.contains(libcamera::controls::AnalogueGain) && gain)
 		controls_.set(libcamera::controls::AnalogueGain, gain);
-	if (!controls_.contains(libcamera::controls::AeMeteringMode))
-		controls_.set(libcamera::controls::AeMeteringMode, metering_index);
-	if (!controls_.contains(libcamera::controls::AeExposureMode))
-		controls_.set(libcamera::controls::AeExposureMode, exposure_index);
+
+	// Auto exposure metering mode
+	// int metering_index = libcamera::controls::MeteringCentreWeighted;
+	// if (!controls_.contains(libcamera::controls::AeMeteringMode))
+	// 	controls_.set(libcamera::controls::AeMeteringMode, metering_index);
+	if (this->camera_set_ae_metering_mode(this->option->exposure_metering) != 0) {
+    exit(EXIT_FAILURE);
+	}
+
+	// Exposure mode
+	// int exposure_index = libcamera::controls::ExposureLong;
+	// if (!controls_.contains(libcamera::controls::AeExposureMode))
+	// 	controls_.set(libcamera::controls::AeExposureMode, exposure_index);
+	// if (controls_.contains(libcamera::controls::AeExposureMode)) {
+	// 	log_debug("xxx contains exposure mode\n");
+	// } else {
+	// 	log_debug("xxx does not contain exposure mode\n");
+	// }
+	if (this->camera_set_exposure_control(this->option->exposure_control) != 0) {
+    exit(EXIT_FAILURE);
+  }
+	// if (controls_.contains(libcamera::controls::AeExposureMode)) {
+	// 	log_debug("xxxb contains exposure mode\n");
+	// } else {
+	// 	log_debug("xxxb does not contain exposure mode\n");
+	// }
+
+	// Exposure value
+	float ev = 0;
 	if (!controls_.contains(libcamera::controls::ExposureValue))
 		controls_.set(libcamera::controls::ExposureValue, ev);
-	if (!controls_.contains(libcamera::controls::AwbMode))
-		controls_.set(libcamera::controls::AwbMode, awb_index);
-	if (!controls_.contains(libcamera::controls::ColourGains) && awb_gain_r && awb_gain_b)
-		controls_.set(libcamera::controls::ColourGains, { awb_gain_r, awb_gain_b });
+
+	// Auto white balance
+	// int awb_index = libcamera::controls::AwbAuto;
+	// if (!controls_.contains(libcamera::controls::AwbMode))
+	// 	controls_.set(libcamera::controls::AwbMode, awb_index);
+	if (this->camera_set_white_balance(this->option->white_balance) != 0) {
+    exit(EXIT_FAILURE);
+  }
+
+	// AWB gain red and blue
+	// float awb_gain_r = 0;
+	// float awb_gain_b = 0;
+	// if (!controls_.contains(libcamera::controls::ColourGains) && awb_gain_r && awb_gain_b)
+	// 	controls_.set(libcamera::controls::ColourGains, { awb_gain_r, awb_gain_b });
+	if (this->camera_set_custom_awb_gains() != 0) {
+    exit(EXIT_FAILURE);
+  }
+
+	// Brightness
+	float brightness = 0;
 	if (!controls_.contains(libcamera::controls::Brightness))
 		controls_.set(libcamera::controls::Brightness, brightness);
+
+	// Contrast
+	float contrast = 1.0;
 	if (!controls_.contains(libcamera::controls::Contrast))
 		controls_.set(libcamera::controls::Contrast, contrast);
+
+	// Saturation
+	float saturation = 1.0;
 	if (!controls_.contains(libcamera::controls::Saturation))
 		controls_.set(libcamera::controls::Saturation, saturation);
+
+	// Sharpness
+	float sharpness = 1.0;
 	if (!controls_.contains(libcamera::controls::Sharpness))
 		controls_.set(libcamera::controls::Sharpness, sharpness);
 
