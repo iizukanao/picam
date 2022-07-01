@@ -71,6 +71,94 @@ static void check_camera_stack()
 	exit(-1);
 }
 
+void Picam::set_exposure_to_auto() {
+  log_debug("exposure mode: auto\n");
+	controls_.set(libcamera::controls::AeExposureMode, libcamera::controls::ExposureNormal);
+
+  // OMX_CONFIG_EXPOSURECONTROLTYPE exposure_type;
+  // OMX_ERRORTYPE error;
+
+  // memset(&exposure_type, 0, sizeof(OMX_CONFIG_EXPOSURECONTROLTYPE));
+  // exposure_type.nSize = sizeof(OMX_CONFIG_EXPOSURECONTROLTYPE);
+  // exposure_type.nVersion.nVersion = OMX_VERSION;
+  // exposure_type.nPortIndex = OMX_ALL;
+  // exposure_type.eExposureControl = OMX_ExposureControlAuto;
+
+  // error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
+  //     OMX_IndexConfigCommonExposure, &exposure_type);
+  // if (error != OMX_ErrorNone) {
+  //   log_error("error: failed to set camera exposure to auto: 0x%x\n", error);
+  // }
+  current_exposure_mode = EXPOSURE_AUTO;
+}
+
+void Picam::set_exposure_to_night() {
+  log_debug("exposure mode: night\n");
+	controls_.set(libcamera::controls::AeExposureMode, libcamera::controls::ExposureLong);
+
+  // OMX_CONFIG_EXPOSURECONTROLTYPE exposure_type;
+  // OMX_ERRORTYPE error;
+
+  // memset(&exposure_type, 0, sizeof(OMX_CONFIG_EXPOSURECONTROLTYPE));
+  // exposure_type.nSize = sizeof(OMX_CONFIG_EXPOSURECONTROLTYPE);
+  // exposure_type.nVersion.nVersion = OMX_VERSION;
+  // exposure_type.nPortIndex = OMX_ALL;
+  // exposure_type.eExposureControl = OMX_ExposureControlNight;
+
+  // error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
+  //     OMX_IndexConfigCommonExposure, &exposure_type);
+  // if (error != OMX_ErrorNone) {
+  //   log_error("error: failed to set camera exposure to night: 0x%x\n", error);
+  // }
+  current_exposure_mode = EXPOSURE_NIGHT;
+}
+
+void Picam::auto_select_exposure(int width, int height, uint8_t *data, float fps) {
+  const int width32 = ((width + 31) & ~31); // nearest smaller number that is multiple of 32
+  const int height16 = ((height + 15) & ~15); // nearest smaller number that is multiple of 16
+  int i = width32 * height16; // Size of Y plane
+  uint8_t *py = data;
+  int total_y = 0;
+  int read_width = 0;
+  int line_num = 1;
+  int count = 0;
+	// Take Y sample once every 2 pixels
+  while (i -= 2) {
+    total_y += *py++;
+    count++;
+    if (++read_width >= width) {
+      if (width32 > width) {
+        py += width32 - width;
+      }
+      read_width = 0;
+      if (++line_num > height) {
+        break;
+      }
+    }
+  }
+  if (count == 0) {
+    return;
+  }
+  float average_y = (float)total_y / (float)count;
+
+  // Approximate exposure time
+  float msec_per_frame = 1000.0f / fps;
+  float y_per_10msec = average_y * 10.0f / msec_per_frame;
+  // log_debug("total_y=%d count=%d average_y=%.1f fps=%.1f y_per_10msec=%.1f\n",
+	// 	total_y, count, average_y, fps, y_per_10msec);
+  if (y_per_10msec < this->option->auto_exposure_threshold) { // in the dark
+    if (current_exposure_mode == EXPOSURE_AUTO) {
+      log_debug(" ");
+      this->set_exposure_to_night();
+    }
+  } else if (y_per_10msec >= this->option->auto_exposure_threshold) { // in the light
+    if (current_exposure_mode == EXPOSURE_NIGHT) {
+      log_debug(" ");
+      this->set_exposure_to_auto();
+    }
+  }
+}
+
 Picam::Picam() {
 	check_camera_stack();
 
@@ -219,6 +307,18 @@ void Picam::modifyBuffer(CompletedRequestPtr &completed_request)
 		// 	// show subtitle for 7 seconds
 		// 	subtitle_show(replaced_text, text_len, duration);
 		// }
+
+		// Exposure calculation must be done before drawing text
+		if (this->frame_count_since_keyframe == 0 &&
+			this->option->is_auto_exposure_enabled &&
+			this->current_real_fps > 0.0f) {
+				this->auto_select_exposure(
+					this->option->video_width,
+					this->option->video_height,
+					(uint8_t *)mem,
+					this->current_real_fps
+				);
+		}
 
 		// 640x480 -> max 100 fps
 		// 1920x1080 -> max 40 fps
@@ -1555,28 +1655,13 @@ void Picam::videoEncodeDoneCallback(void *mem, size_t size, int64_t timestamp_us
 
 		// calculate FPS and display it
 		if (tsBegin.tv_sec != 0 && tsBegin.tv_nsec != 0) {
-			struct timespec tsEnd, tsDiff;
+			float fps = this->calc_current_real_fps();
 			keyframes_count++;
-			clock_gettime(CLOCK_MONOTONIC, &tsEnd);
-			timespec_subtract(&tsDiff, &tsEnd, &tsBegin);
-			uint64_t wait_nsec = tsDiff.tv_sec * INT64_C(1000000000) + tsDiff.tv_nsec;
-			float divisor = (float)wait_nsec / (float)frame_count_since_keyframe / 1000000000;
-			float fps;
-			if (divisor == 0.0f) { // This won't cause SIGFPE because of float, but just to be safe.
-			fps = 99999.0f;
-			} else {
-			fps = 1.0f / divisor;
-			}
 			log_debug(" %5.2f fps k=%d", fps, keyframes_count);
 			if (log_get_level() <= LOG_LEVEL_DEBUG) {
 				print_audio_timing();
 			}
 			frame_count_since_keyframe = 0;
-
-			// if (is_auto_exposure_enabled) {
-			// 	auto_select_exposure(video_width, video_height, last_video_buffer, fps);
-			// }
-
 			log_debug("\n");
 		}
 		clock_gettime(CLOCK_MONOTONIC, &tsBegin);
@@ -1608,6 +1693,23 @@ void Picam::videoEncodeDoneCallback(void *mem, size_t size, int64_t timestamp_us
 	// // Save timestamps to a file, if that was requested.
 	// if (fp_timestamps_)
 	// 	fprintf(fp_timestamps_, "%" PRId64 ".%03" PRId64 "\n", last_timestamp_ / 1000, last_timestamp_ % 1000);
+}
+
+float Picam::calc_current_real_fps()
+{
+	struct timespec tsEnd, tsDiff;
+	clock_gettime(CLOCK_MONOTONIC, &tsEnd);
+	timespec_subtract(&tsDiff, &tsEnd, &tsBegin);
+	uint64_t wait_nsec = tsDiff.tv_sec * INT64_C(1000000000) + tsDiff.tv_nsec;
+	float divisor = (float)wait_nsec / (float)frame_count_since_keyframe / 1000000000;
+	float fps;
+	if (divisor == 0.0f) { // This won't cause SIGFPE because of float, but just to be safe.
+		fps = 99999.0f;
+	} else {
+		fps = 1.0f / divisor;
+	}
+	this->current_real_fps = fps;
+	return fps;
 }
 
 void Picam::queryCameras()

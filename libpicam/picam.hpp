@@ -21,6 +21,10 @@
 
 #define ENABLE_AUTO_GOP_SIZE_CONTROL_FOR_VFR 1
 
+// enum
+#define EXPOSURE_AUTO 0
+#define EXPOSURE_NIGHT 1
+
 typedef std::function<void(void *, size_t, int64_t, bool)> EncodeOutputReadyCallback;
 
 // Pace of PTS
@@ -264,6 +268,13 @@ private:
 	void stopPreview();
 	void previewThread();
 	void configureDenoise(const std::string &denoise_mode);
+
+	void auto_select_exposure(int width, int height, uint8_t *data, float fps);
+	void set_exposure_to_night();
+	void set_exposure_to_auto();
+	float calc_current_real_fps();
+	int current_exposure_mode = EXPOSURE_AUTO;
+	float current_real_fps = -1.0f;
 
 	std::unique_ptr<libcamera::CameraManager> camera_manager_;
 	std::shared_ptr<libcamera::Camera> camera_;
