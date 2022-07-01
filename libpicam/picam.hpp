@@ -275,6 +275,7 @@ private:
 	float calc_current_real_fps();
 	int current_exposure_mode = EXPOSURE_AUTO;
 	float current_real_fps = -1.0f;
+	int64_t keyframes_since_exposure_selection = 0;
 
 	std::unique_ptr<libcamera::CameraManager> camera_manager_;
 	std::shared_ptr<libcamera::Camera> camera_;

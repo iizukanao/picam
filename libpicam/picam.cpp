@@ -116,26 +116,29 @@ void Picam::set_exposure_to_night() {
 void Picam::auto_select_exposure(int width, int height, uint8_t *data, float fps) {
   const int width32 = ((width + 31) & ~31); // nearest smaller number that is multiple of 32
   const int height16 = ((height + 15) & ~15); // nearest smaller number that is multiple of 16
-  int i = width32 * height16; // Size of Y plane
+  int yplane_size = width32 * height16; // Size of Y plane
   uint8_t *py = data;
   int total_y = 0;
   int read_width = 0;
   int line_num = 1;
   int count = 0;
-	// Take Y sample once every 2 pixels
-  while (i -= 2) {
-    total_y += *py++;
+	// Take samples of Y (luminance) once every 2 pixels
+	const int step = 2;
+	for (int i = 0; i < yplane_size; i += step) {
+		total_y += *py;
+		py += step;
     count++;
-    if (++read_width >= width) {
-      if (width32 > width) {
-        py += width32 - width;
+		read_width += step;
+    if (read_width >= width) {
+      if (width32 != read_width) {
+        py += width32 - read_width;
       }
       read_width = 0;
       if (++line_num > height) {
         break;
       }
     }
-  }
+	}
   if (count == 0) {
     return;
   }
@@ -143,7 +146,12 @@ void Picam::auto_select_exposure(int width, int height, uint8_t *data, float fps
 
   // Approximate exposure time
   float msec_per_frame = 1000.0f / fps;
+	if (fps < 14) {
+		// At lower fps, camera adjusts the luminance of video frame to higher level
+		msec_per_frame /= 1.4;
+	}
   float y_per_10msec = average_y * 10.0f / msec_per_frame;
+  log_debug(" y=%.1f", y_per_10msec);
   // log_debug("total_y=%d count=%d average_y=%.1f fps=%.1f y_per_10msec=%.1f\n",
 	// 	total_y, count, average_y, fps, y_per_10msec);
   if (y_per_10msec < this->option->auto_exposure_threshold) { // in the dark
@@ -312,12 +320,15 @@ void Picam::modifyBuffer(CompletedRequestPtr &completed_request)
 		if (this->frame_count_since_keyframe == 0 &&
 			this->option->is_auto_exposure_enabled &&
 			this->current_real_fps > 0.0f) {
-				this->auto_select_exposure(
-					this->option->video_width,
-					this->option->video_height,
-					(uint8_t *)mem,
-					this->current_real_fps
-				);
+				if (++this->keyframes_since_exposure_selection >= 2) {
+					this->auto_select_exposure(
+						this->option->video_width,
+						this->option->video_height,
+						(uint8_t *)mem,
+						this->current_real_fps
+					);
+					this->keyframes_since_exposure_selection = 0;
+				}
 		}
 
 		// 640x480 -> max 100 fps
