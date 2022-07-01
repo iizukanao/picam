@@ -320,6 +320,8 @@ void Picam::modifyBuffer(CompletedRequestPtr &completed_request)
 		if (this->frame_count_since_keyframe == 0 &&
 			this->option->is_auto_exposure_enabled &&
 			this->current_real_fps > 0.0f) {
+				// Wait for 2 keyframes after last auto exposure selection
+				// to prevent the exposure mode from flipping too fast.
 				if (++this->keyframes_since_exposure_selection >= 2) {
 					this->auto_select_exposure(
 						this->option->video_width,
