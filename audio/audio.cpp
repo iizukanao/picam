@@ -13,6 +13,21 @@ extern "C" {
 // ALSA buffer size for playback will be multiplied by this number (max: 16)
 #define ALSA_PLAYBACK_BUFFER_MULTIPLY 10
 
+// ALSA buffer size for capture will be multiplied by this number
+#define ALSA_BUFFER_MULTIPLY 50
+
+// sound
+static snd_pcm_t *capture_handle;
+static snd_pcm_t *audio_preview_handle;
+static snd_pcm_hw_params_t *alsa_hw_params;
+static AVFrame *av_frame;
+static int audio_fd_count;
+static struct pollfd *poll_fds; // file descriptors for polling audio
+static int is_first_audio;
+static int audio_buffer_size;
+
+static char errbuf[1024];
+
 Audio::Audio(PicamOption *option)
 	: option(option)
 {
@@ -33,36 +48,6 @@ void Audio::teardown()
     }
   }
 }
-
-// ALSA buffer size for capture will be multiplied by this number
-#define ALSA_BUFFER_MULTIPLY 50
-
-// static HTTPLiveStreaming *hls;
-
-// sound
-static snd_pcm_t *capture_handle;
-static snd_pcm_t *audio_preview_handle;
-static snd_pcm_hw_params_t *alsa_hw_params;
-static AVFrame *av_frame;
-static int audio_fd_count;
-static struct pollfd *poll_fds; // file descriptors for polling audio
-static int is_first_audio;
-// static int period_size;
-static int audio_buffer_size;
-// static int is_audio_preview_enabled;
-// static const int is_audio_preview_enabled_default = 0;
-// static int is_audio_preview_device_opened = 0;
-
-// static MpegTSCodecSettings codec_settings;
-
-// TODO: Make these values injectable from options
-// static unsigned int audio_sample_rate = 48000;
-// static int audio_channels = 1;
-// static const char *alsa_dev = "hw:2,0";
-// static int hls_number_of_segments = 3;
-// static long audio_bitrate = 40000;
-
-static char errbuf[1024];
 
 void Audio::teardown_audio_capture_device() {
   snd_pcm_close (capture_handle);
@@ -347,7 +332,6 @@ int Audio::configure_audio_capture_device() {
   // ALSA
   int err;
 
-  printf("step 0\n");
   // libavcodec
 #if AUDIO_ONLY
   AVCodecContext *ctx = this->hls->format_ctx->streams[0]->codec;
@@ -360,14 +344,8 @@ int Audio::configure_audio_capture_device() {
   snd_pcm_uframes_t real_buffer_size; // real buffer size in frames
   int dir;
 
-  printf("nb_channels=%d frame_size=%d format=%d\n",
-    ctx->ch_layout.nb_channels,
-    ctx->frame_size,
-    ctx->format
-  );
   buffer_size = av_samples_get_buffer_size(NULL, ctx->ch_layout.nb_channels,
       ctx->frame_size, (AVSampleFormat) ctx->format, 0);
-  printf("buffer_size: %d\n", buffer_size);
 
   // use mmap
   err = snd_pcm_hw_params_set_access(capture_handle, alsa_hw_params,
@@ -524,19 +502,6 @@ void Audio::setup(HTTPLiveStreaming *hls) {
   log_debug("audio setup\n");
   this->hls = hls;
 
-	// codec_settings.audio_sample_rate = audio_sample_rate;
-	// codec_settings.audio_bit_rate = audio_bitrate;
-	// codec_settings.audio_channels = audio_channels;
-	// codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
-
-// #if AUDIO_ONLY
-//   hls = hls_create_audio_only(hls_number_of_segments, &codec_settings); // 2 == num_recent_files
-// #else
-// 	printf("hls_create\n");
-//   hls = hls_create(hls_number_of_segments, &codec_settings); // 2 == num_recent_files
-// #endif
-
-//   this->setup_av_frame(hls->format_ctx);
   this->setup_av_frame(hls->format_ctx);
 
   if (this->option->disable_audio_capturing) {
@@ -544,14 +509,14 @@ void Audio::setup(HTTPLiveStreaming *hls) {
     clock_gettime(CLOCK_MONOTONIC, &ts);
     audio_start_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
   } else {
-    printf("configuring audio capture device\n");
+    log_debug("configuring audio capture device\n");
     int ret = this->configure_audio_capture_device();
     if (ret != 0) {
       log_fatal("error: configure_audio_capture_device: ret=%d\n", ret);
       exit(EXIT_FAILURE);
     }
   }
-	printf("audio device configured\n");
+	log_debug("audio device configured\n");
 }
 
 void Audio::stop() {
@@ -625,58 +590,8 @@ int Audio::wait_for_poll(snd_pcm_t *device, struct pollfd *target_fds, unsigned 
   }
 }
 
-// int64_t Audio::get_next_audio_pts() {
-//   int64_t pts;
-//   this->audio_frame_count++;
-
-//   // We use audio timing as the base clock,
-//   // so we do not modify PTS here.
-//   pts = this->audio_current_pts + this->audio_pts_step_base;
-
-//   this->audio_current_pts = pts;
-
-//   return pts;
-// }
-
-// void Audio::send_audio_frame(uint8_t *databuf, int databuflen, int64_t pts) {
-//   if (this->is_rtspout_enabled) {
-//     int payload_size = databuflen + 7;  // +1(packet type) +6(pts)
-//     int total_size = payload_size + 3;  // more 3 bytes for payload length
-//     uint8_t *sendbuf = (uint8_t *)malloc(total_size);
-//     if (sendbuf == NULL) {
-//       log_error("error: cannot allocate memory for audio sendbuf: size=%d", total_size);
-//       return;
-//     }
-//     // payload header
-//     sendbuf[0] = (payload_size >> 16) & 0xff;
-//     sendbuf[1] = (payload_size >> 8) & 0xff;
-//     sendbuf[2] = payload_size & 0xff;
-//     // payload
-//     sendbuf[3] = 0x03;  // packet type (0x03 == audio data)
-//     sendbuf[4] = (pts >> 40) & 0xff;
-//     sendbuf[5] = (pts >> 32) & 0xff;
-//     sendbuf[6] = (pts >> 24) & 0xff;
-//     sendbuf[7] = (pts >> 16) & 0xff;
-//     sendbuf[8] = (pts >> 8) & 0xff;
-//     sendbuf[9] = pts & 0xff;
-//     memcpy(sendbuf + 10, databuf, databuflen);
-//     printf("[debug] send is disabled\n");
-//     // if (send(sockfd_audio, sendbuf, total_size, 0) == -1) {
-//     //   perror("send audio data");
-//     // }
-//     free(sendbuf);
-//   } // if (is_rtspout_enabled)
-// }
-
 void Audio::encode_and_send_audio() {
   int ret;
-  // int64_t pts;
-
-#if AUDIO_ONLY
-  AVCodecContext *ctx = this->hls->format_ctx->streams[0]->codec;
-#else
-  // AVCodecParameters *ctx = this->hls->format_ctx->streams[1]->codecpar;
-#endif
 
   this->audio_frame_count++;
 
@@ -687,55 +602,6 @@ void Audio::encode_and_send_audio() {
   }
   pkt->data = NULL; // packet data will be allocated by the encoder
   pkt->size = 0;
-
-  // const AVCodec *codec = avcodec_find_encoder_by_name("libfdk_aac");
-  // if (!codec) {
-  //   fprintf(stderr, "codec not found\n");
-  //   exit(EXIT_FAILURE);
-  // }
-
-  // AVCodecContext *codec_ctx = avcodec_alloc_context3(codec);
-  // if (codec_ctx == NULL) {
-  //   log_error("avcodec_alloc_context3 failed\n");
-  //   exit(EXIT_FAILURE);
-  // }
-  // avcodec_parameters_to_context(codec_ctx, ctx);
-  // ret = avcodec_open2(codec_ctx, codec, NULL);
-  // if (ret < 0) {
-  //   av_strerror(ret, errbuf, sizeof(errbuf));
-  //   log_error("avcodec_open2 failed: %s\n", errbuf);
-  //   exit(EXIT_FAILURE);
-  // }
-  // printf("codec_id=%d buf=%p samples=%p\n", ctx->codec_id, (void *)av_frame->buf, (void *)this->samples);
-  // printf("sample_rate=%d bit_rate=%lld nb_channels=%d\n", ctx->sample_rate, ctx->bit_rate, ctx->ch_layout.nb_channels);
-  // av_frame->pts = 1000;
-  // printf("av_frame->nb_samples=%d ctx->frame_size=%d av_frame->ch=%d linesize=%d pts=%lld frameformat=%d ctxformat=%d\n", av_frame->nb_samples, ctx->frame_size, av_frame->ch_layout.nb_channels, av_frame->linesize[0], av_frame->pts, av_frame->format, ctx->format);
-
-  // uint8_t *audiobuf = (uint8_t *)av_malloc(2048);
-  // if (audiobuf == NULL) {
-  //   log_error("av_malloc failed\n");
-  //   exit(EXIT_FAILURE);
-  // }
-  // memset(audiobuf, 0, 2048);
-  // printf("avcodec_fill_audio_frame\n");
-  // ret = avcodec_fill_audio_frame(av_frame, ctx->ch_layout.nb_channels, (AVSampleFormat)ctx->format, audiobuf,
-  //                         2048, 0);
-  // if (ret < 0) {
-  //   av_strerror(ret, errbuf, sizeof(errbuf));
-  //   log_error("avcodec_fill_audio_frame failed: %s\n", errbuf);
-  //   exit(EXIT_FAILURE);
-  // }
-
-  // av_frame_make_writable does not work
-//   printf("av_frame_make_writable\n");
-// #if LIBAVCODEC_VERSION_MAJOR >= 55
-//   ret = av_frame_make_writable(av_frame);
-//   if (ret < 0) {
-//     av_strerror(ret, errbuf, sizeof(errbuf));
-//     log_error("av_frame_make_writable failed: %s\n", errbuf);
-//     exit(EXIT_FAILURE);
-//   }
-// #endif
 
   // encode the samples
   ret = avcodec_send_frame(this->hls->audio_ctx, av_frame);
@@ -750,23 +616,12 @@ void Audio::encode_and_send_audio() {
     log_error("avcodec_receive_packet failed: %s\n", errbuf);
     exit(EXIT_FAILURE);
   }
-  // avcodec_free_context(&codec_ctx);
   if (ret == 0) {
-#if AUDIO_ONLY
-    pkt.stream_index = hls->format_ctx->streams[0]->index; // This must be done after avcodec_encode_audio2
-#else
-    pkt->stream_index = hls->format_ctx->streams[1]->index; // This must be done after avcodec_encode_audio2
-#endif // AUDIO_ONLY
-
-    // pts = get_next_audio_pts();
-
-    // send_audio_frame(pkt->data, pkt->size, pts);
+    pkt->stream_index = hls->format_ctx->streams[1]->index; // This must be done after encoding an audio
 
 #if ENABLE_PTS_WRAP_AROUND
     pts = pts % PTS_MODULO;
 #endif
-    // last_pts = pts;
-    // pkt->pts = pkt->dts = pts;
 
     if (this->encode_callback) {
       this->encode_callback(
@@ -777,51 +632,7 @@ void Audio::encode_and_send_audio() {
           pkt->flags);
     }
 
-    // We have to copy AVPacket before av_write_frame()
-    // because it changes internal data of the AVPacket.
-    // Otherwise av_write_frame() will fail with the error:
-    // "AAC bitstream not in ADTS format and extradata missing".
-
-    // if (is_recording) {
-    //   pthread_mutex_lock(&rec_mutex);
-    //   rec_thread_needs_write = 1;
-    //   pthread_cond_signal(&rec_cond);
-    //   pthread_mutex_unlock(&rec_mutex);
-    // }
-
-    // if (is_tcpout_enabled) {
-    //   // Setup AVPacket
-    //   AVPacket tcp_pkt;
-    //   av_init_packet(&tcp_pkt);
-    //   tcp_pkt.size = pkt.size;
-    //   tcp_pkt.data = av_malloc(pkt.size);
-    //   memcpy(tcp_pkt.data, pkt.data, pkt.size);
-    //   tcp_pkt.stream_index = pkt.stream_index;
-    //   tcp_pkt.pts = tcp_pkt.dts = pkt.pts;
-
-    //   // Send the AVPacket
-    //   pthread_mutex_lock(&tcp_mutex);
-    //   av_write_frame(tcp_ctx, &tcp_pkt);
-    //   pthread_mutex_unlock(&tcp_mutex);
-
-    //   av_freep(&tcp_pkt.data);
-    //   av_free_packet(&tcp_pkt);
-    // }
-
-    // if (is_hlsout_enabled) {
-    //   pthread_mutex_lock(&mutex_writing);
-    //   ret = hls_write_packet(hls, &pkt, 0);
-    //   pthread_mutex_unlock(&mutex_writing);
-    //   if (ret < 0) {
-    //     av_strerror(ret, errbuf, sizeof(errbuf));
-    //     log_error("audio frame write error (hls): %s\n", errbuf);
-    //     log_error("please check if the disk is full\n");
-    //   }
-    // }
-
     av_packet_unref(pkt);
-
-    // this->current_audio_frames++;
   } else {
     log_error("error: not getting audio output");
   }
@@ -887,7 +698,6 @@ int Audio::read_audio_poll_mmap() {
     frames = size; // expected number of frames to be processed
     // frames is a bidirectional variable, this means that the real number of frames processed is written
     // to this variable by the function.
-    // log_debug("snd_pcm_mmap_begin\n");
     if ((error = snd_pcm_mmap_begin (capture_handle, &my_areas, &offset, &frames)) < 0) {
       if ((error = xrun_recovery(capture_handle, error)) < 0) {
         log_fatal("microphone error: mmap begin: %s\n", snd_strerror(error));
@@ -896,14 +706,11 @@ int Audio::read_audio_poll_mmap() {
       is_first_audio = 1;
     }
     size_t copy_size = frames * sizeof(short) * this->get_audio_channels();
-    // printf("audio memcpy begin\n");
     memcpy(this_samples + read_size / sizeof(short),
       ((uint16_t *)my_areas[0].addr)+(offset*this->get_audio_channels()), // we don't need to multiply offset by sizeof(short) because of (uint16_t *) type
       copy_size);
-    // printf("audio memcpy end\n");
     read_size += copy_size;
 
-    // log_debug("snd_pcm_mmap_commit\n");
     commitres = snd_pcm_mmap_commit(capture_handle, offset, frames);
     if (commitres < 0 || (snd_pcm_uframes_t)commitres != frames) {
       if ((error = xrun_recovery(capture_handle, commitres >= 0 ? commitres : -EPIPE)) < 0) {

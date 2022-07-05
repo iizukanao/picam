@@ -273,6 +273,10 @@ void Muxer::onFrameArrive(EncodedPacket *encoded_packet) {
     pthread_mutex_unlock(&rec_mutex);
   }
 
+  // av_write_frame() may change the internal data of AVPacket.
+  // Otherwise av_write_frame() will fail with the error:
+  // "AAC bitstream not in ADTS format and extradata missing".
+
   AVPacket *pkt = av_packet_alloc();
   encoded_packet_to_avpacket(encoded_packet, pkt);
 
@@ -619,6 +623,7 @@ void Muxer::add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_
     perror("av_malloc for copied_data");
     exit(EXIT_FAILURE);
   }
+
   // If this part is not guarded by mutex, segmentation fault will happen
   // printf("add_encoded_packet memcpy begin\n");
   memcpy(copied_data, data, size);

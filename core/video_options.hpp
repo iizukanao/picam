@@ -85,8 +85,6 @@ struct VideoOptions : public Options
 		if (Options::Parse(argc, argv) == false)
 			return false;
 
-		printf("xxx flag1: %d\n", flag);
-		printf("xxx flag2: %d\n", flag2);
 		if (width == 0)
 			width = 640;
 		if (height == 0)

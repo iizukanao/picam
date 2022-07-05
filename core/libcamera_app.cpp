@@ -473,7 +473,7 @@ void LibcameraApp::StartCamera()
 
 void LibcameraApp::StopCamera()
 {
-	printf("StopCamera\n");
+	log_debug("StopCamera\n");
 	{
 		// We don't want QueueRequest to run asynchronously while we stop the camera.
 		std::lock_guard<std::mutex> lock(camera_stop_mutex_);

@@ -183,7 +183,7 @@ Picam::~Picam() {
 }
 
 void Picam::stopAudioThread() {
-	printf("stopAudioThread begin\n");
+	log_debug("stopAudioThread begin\n");
 	if (audioThread.joinable()) {
 		std::cout << "joinable" << std::endl;
 		audio->stop();
@@ -192,14 +192,14 @@ void Picam::stopAudioThread() {
 	}
 	audio->teardown();
 	delete audio;
-	printf("stopAudioThread end\n");
+	log_debug("stopAudioThread end\n");
 }
 
 void Picam::stopRecThread() {
-	printf("stopRecThread begin\n");
+	log_debug("stopRecThread begin\n");
 	this->muxer->prepareForDestroy();
 	// this->muxer->waitForExit();
-	printf("stopRecThread end\n");
+	log_debug("stopRecThread end\n");
 }
 
 void Picam::stopAllThreads() {
@@ -215,41 +215,6 @@ static int get_colourspace_flags(std::string const &codec)
 		return Picam::FLAG_VIDEO_NONE;
 }
 
-// void DumpHex(const void* data, size_t size) {
-// 	// char ascii[17];
-// 	// size_t i, j;
-// 	size_t i;
-// 	// ascii[16] = '\0';
-// 	for (i = 0; i < size; ++i) {
-// 		if (i % 8 == 0) {
-// 			printf("[%d] ", i);
-// 		}
-// 		printf("%02X ", ((unsigned char*)data)[i]);
-// 		// if (((unsigned char*)data)[i] >= ' ' && ((unsigned char*)data)[i] <= '~') {
-// 		// 	ascii[i % 16] = ((unsigned char*)data)[i];
-// 		// } else {
-// 		// 	ascii[i % 16] = '.';
-// 		// }
-// 		if ((i+1) % 8 == 0 || i+1 == size) {
-// 			printf(" ");
-// 			if ((i+1) % 16 == 0) {
-// 				// printf("|  %s \n", ascii);
-// 				printf("\n");
-// 			} else if (i+1 == size) {
-// 				// ascii[(i+1) % 16] = '\0';
-// 				// if ((i+1) % 16 <= 8) {
-// 				// 	printf(" ");
-// 				// }
-// 				// for (j = (i+1) % 16; j < 16; ++j) {
-// 				// 	printf("   ");
-// 				// }
-// 				// printf("|  %s \n", ascii);
-// 				printf("\n");
-// 			}
-// 		}
-// 	}
-// }
-
 void Picam::modifyBuffer(CompletedRequestPtr &completed_request)
 {
 	libcamera::Stream *stream = this->VideoStream();
@@ -257,65 +222,12 @@ void Picam::modifyBuffer(CompletedRequestPtr &completed_request)
 	libcamera::FrameBuffer *buffer = completed_request->buffers[stream];
 	libcamera::Span<uint8_t> span = this->Mmap(buffer)[0];
 	void *mem = span.data();
-	if (!buffer || !mem)
+	if (!buffer || !mem) {
 		throw std::runtime_error("no buffer to encode");
-	// int64_t timestamp_ns = completed_request->metadata.contains(libcamera::controls::SensorTimestamp)
-	// 						? completed_request->metadata.get(libcamera::controls::SensorTimestamp)
-	// 						: buffer->metadata().timestamp;
+	}
 
-	// static bool isWritten = false;
-	// if (!isWritten) {
-	// 	isWritten = true;
-	// 	std::cout << "width=" << info.width << " height=" << info.height << " stride=" << info.stride << std::endl;
-	// 	std::cout << "pixel dump (size=" << span.size() << "):" << std::endl;
-	// 	DumpHex(mem, span.size());
-	// }
-	// for (unsigned int row = 0; row < info.height; row++) {
-	// 	printf("%02x")
-	// 	uint8_t *pixels = (uint8_t *)mem;
-	// 	pixels[row * info.stride] = 255;
-	// }
-
-	const uint32_t FOURCC_YU12 = 0x32315559; // YU12
+	const uint32_t FOURCC_YU12 = 0x32315559; // "YU12" in reverse order
 	if (info.pixel_format.fourcc() == FOURCC_YU12) {
-
-		// subtitle test
-		// static bool isTextInited = false;
-		// if (!isTextInited) {
-		// 	isTextInited = true;
-		// 	float font_points = 28.0f;
-		// 	int font_dpi = 96;
-		// 	int color = 0xffffff;
-		// 	int stroke_color = 0x000000;
-		// 	float stroke_width = 1.0f;
-		// 	int in_preview = 1;
-		// 	int in_video = 1;
-		// 	int letter_spacing = 0;
-		// 	float line_height_multiply = 1.0f;
-		// 	float tab_scale = 1.0f;
-		// 	LAYOUT_ALIGN layout_align = (LAYOUT_ALIGN) (LAYOUT_ALIGN_BOTTOM | LAYOUT_ALIGN_CENTER);
-		// 	TEXT_ALIGN text_align = TEXT_ALIGN_CENTER;
-		// 	int horizontal_margin = 0;
-		// 	int vertical_margin = 35;
-		// 	float duration = 60.0f;
-		// 	const char *replaced_text = "Hello C+_+!";
-		// 	int text_len = strlen(replaced_text);
-		// 		subtitle_init_with_font_name(NULL, font_points, font_dpi);
-		// 	subtitle_set_color(color);
-		// 	subtitle_set_stroke_color(stroke_color);
-		// 	subtitle_set_stroke_width(stroke_width);
-		// 	subtitle_set_visibility(in_preview, in_video);
-		// 	subtitle_set_letter_spacing(letter_spacing);
-		// 	subtitle_set_line_height_multiply(line_height_multiply);
-		// 	subtitle_set_tab_scale(tab_scale);
-		// 	subtitle_set_layout(layout_align,
-		// 		horizontal_margin, vertical_margin);
-		// 	subtitle_set_align(text_align);
-
-		// 	// show subtitle for 7 seconds
-		// 	subtitle_show(replaced_text, text_len, duration);
-		// }
-
 		// Exposure calculation must be done before drawing text
 		if (this->frame_count_since_keyframe == 0 &&
 			this->option->is_auto_exposure_enabled &&
@@ -333,13 +245,14 @@ void Picam::modifyBuffer(CompletedRequestPtr &completed_request)
 				}
 		}
 
-		// 640x480 -> max 100 fps
-		// 1920x1080 -> max 40 fps
-		// 1280x720 -> max 47.5 fps
+		// [Note] Maximum fps from camera (without any image processing)
+		// 640x480 -> 100 fps
+		// 1920x1080 -> 40 fps
+		// 1280x720 -> 47.5 fps
+
 		timestamp_update();
 		subtitle_update();
 		text_draw_all((uint8_t *)mem, info.width, info.height, info.stride, 1); // is_video = 1
-		// std::cout << "is_text_changed: " << is_text_changed << std::endl;
 	}
 }
 
@@ -394,24 +307,6 @@ int Picam::camera_set_custom_awb_gains() {
 		this->option->awb_red_gain,
 		this->option->awb_blue_gain
 	});
-
-//   OMX_CONFIG_CUSTOMAWBGAINSTYPE custom_awb_gains;
-//   OMX_ERRORTYPE error;
-
-// // NOTE: OMX_IndexConfigCameraSettings is read-only
-
-//   memset(&custom_awb_gains, 0, sizeof(OMX_CONFIG_CUSTOMAWBGAINSTYPE));
-//   custom_awb_gains.nSize = sizeof(OMX_CONFIG_CUSTOMAWBGAINSTYPE);
-//   custom_awb_gains.nVersion.nVersion = OMX_VERSION;
-//   custom_awb_gains.xGainR = round(awb_red_gain * 65536); // Q16
-//   custom_awb_gains.xGainB = round(awb_blue_gain * 65536); // Q16
-
-//   error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
-//       OMX_IndexConfigCustomAwbGains, &custom_awb_gains);
-//   if (error != OMX_ErrorNone) {
-//     log_fatal("error: failed to set camera custom awb gains: 0x%x\n", error);
-//     return -1;
-//   }
 
   return 0;
 }
