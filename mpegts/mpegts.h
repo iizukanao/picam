@@ -13,6 +13,11 @@ typedef struct MpegTSCodecSettings {
   int audio_bit_rate;    // e.g. 24000
   int audio_channels;    // e.g. 1
   int audio_profile;     // e.g. FF_PROFILE_AAC_LOW
+  int video_profile;     // e.g. FF_PROFILE_H264_MAIN
+  int video_level;       // e.g. 41
+  long video_bitrate;
+  int video_width;
+  int video_height;
 } MpegTSCodecSettings;
 
 typedef struct MpegTSContext {

@@ -3,18 +3,9 @@
 
 #include "mpegts.h"
 
-static long video_bitrate;
-static int video_width;
-static int video_height;
 static char errbuf[1024];
 
-void mpegts_set_config(long bitrate, int width, int height) {
-  video_bitrate = bitrate;
-  video_width = width;
-  video_height = height;
-}
-
-AVCodecContext *setup_video_stream(AVFormatContext *format_ctx) {
+AVCodecContext *setup_video_stream(AVFormatContext *format_ctx, MpegTSCodecSettings *settings) {
   AVStream *video_stream;
   AVCodecContext *video_codec_ctx;
 
@@ -28,14 +19,14 @@ AVCodecContext *setup_video_stream(AVFormatContext *format_ctx) {
   const AVCodec *codec = avcodec_find_decoder(video_stream->codecpar->codec_id);
   video_codec_ctx = avcodec_alloc_context3(codec);
 
-  // video_codec_ctx                = video_stream->codec;
   video_codec_ctx->codec_id      = AV_CODEC_ID_H264;
   video_codec_ctx->codec_type    = AVMEDIA_TYPE_VIDEO;
   video_codec_ctx->codec_tag     = 0;
-  video_codec_ctx->bit_rate      = video_bitrate;
+  printf("creating video with bitrate=%ld width=%d height=%d profile=%d level=%d\n", settings->video_bitrate, settings->video_width, settings->video_height, settings->video_profile, settings->video_level);
+  video_codec_ctx->bit_rate      = settings->video_bitrate;
 
-  video_codec_ctx->profile       = FF_PROFILE_H264_MAIN;
-  video_codec_ctx->level         = 41;  // Level 4.1
+  video_codec_ctx->profile       = settings->video_profile;
+  video_codec_ctx->level         = settings->video_level;
 
   video_stream->time_base.num = 1;
   video_stream->time_base.den = 180000;
@@ -43,13 +34,12 @@ AVCodecContext *setup_video_stream(AVFormatContext *format_ctx) {
   video_codec_ctx->time_base.den = 180000;
   video_codec_ctx->ticks_per_frame = 2;
   video_codec_ctx->pix_fmt       = 0;
-  video_codec_ctx->width         = video_width;
-  video_codec_ctx->height        = video_height;
+  video_codec_ctx->width         = settings->video_width;
+  video_codec_ctx->height        = settings->video_height;
   video_codec_ctx->has_b_frames  = 0;
   video_codec_ctx->flags         |= AV_CODEC_FLAG_GLOBAL_HEADER;
 
   avcodec_parameters_from_context(video_stream->codecpar, video_codec_ctx);
-  // avcodec_free_context(&video_codec_ctx);
   return video_codec_ctx;
 }
 
@@ -73,7 +63,6 @@ AVCodecContext *setup_audio_stream(AVFormatContext *format_ctx, MpegTSCodecSetti
   int ret;
 
   aac_codec = avcodec_find_encoder_by_name("libfdk_aac");
-  // aac_codec = avcodec_find_encoder_by_name("aac");
   if (!aac_codec) {
     fprintf(stderr, "codec not found\n");
     exit(EXIT_FAILURE);
@@ -85,7 +74,6 @@ AVCodecContext *setup_audio_stream(AVFormatContext *format_ctx, MpegTSCodecSetti
     exit(EXIT_FAILURE);
   }
   audio_stream->id = format_ctx->nb_streams - 1;
-  // audio_codec_ctx = audio_stream->codec;
   audio_codec_ctx = avcodec_alloc_context3(aac_codec);
 
   audio_codec_ctx->sample_fmt = AV_SAMPLE_FMT_S16;
@@ -111,7 +99,6 @@ AVCodecContext *setup_audio_stream(AVFormatContext *format_ctx, MpegTSCodecSetti
     AVChannelLayout ch_layout = AV_CHANNEL_LAYOUT_MONO;
     audio_codec_ctx->ch_layout = ch_layout;
   }
-  // audio_codec_ctx->channels = av_get_channel_layout_nb_channels(audio_codec_ctx->channel_layout);
 
   ret = avcodec_open2(audio_codec_ctx, aac_codec, NULL);
   if (ret < 0) {
@@ -123,7 +110,6 @@ AVCodecContext *setup_audio_stream(AVFormatContext *format_ctx, MpegTSCodecSetti
   // This must be called after avcodec_open2()
   avcodec_parameters_from_context(audio_stream->codecpar, audio_codec_ctx);
 
-  // avcodec_free_context(&audio_codec_ctx);
   return audio_codec_ctx;
 }
 
@@ -217,7 +203,7 @@ MpegTSContext _mpegts_create_context(int use_video, int use_audio, MpegTSCodecSe
 
 #if !(AUDIO_ONLY)
   if (use_video) {
-    codec_context_video = setup_video_stream(format_ctx);
+    codec_context_video = setup_video_stream(format_ctx, settings);
   }
 #endif
   if (use_audio) {

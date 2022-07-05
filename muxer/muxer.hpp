@@ -35,7 +35,6 @@ class Muxer
     void write_frame(AVPacket *pkt);
     void add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_index, int flags);
     void prepare_encoded_packets(float video_fps, float audio_fps);
-    // void waitForExit();
     void stop_record();
     void onFrameArrive(EncodedPacket *encoded_packet);
     void prepareForDestroy();
@@ -51,7 +50,6 @@ class Muxer
 
   private:
     PicamOption *option;
-    // std::thread recThread;
     pthread_t rec_thread;
     int is_disk_almost_full();
     void free_encoded_packets();

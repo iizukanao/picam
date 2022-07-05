@@ -146,7 +146,7 @@ private:
 	Audio *audio;
 	HTTPLiveStreaming *hls;
 	uint8_t *sps_pps = NULL; // Stores H.264 SPS (NAL unit type 7) and PPS (NAL unit type 8) as a single byte array
-	size_t sps_pps_size; // Byte size of sps_pps
+	size_t sps_pps_size; // Size of sps_pps in bytes
 	int audio_min_value;
 	int audio_max_value;
 	PicamOption *option;
@@ -301,8 +301,8 @@ private:
 	std::mutex control_mutex_;
 	libcamera::ControlList controls_;
 	// Other:
-	uint64_t last_timestamp_;
-	uint64_t sequence_ = 0;
+	// uint64_t last_timestamp_;
+	// uint64_t sequence_ = 0;
 	// PostProcessor post_processor_;
     // <<< libcamera_app.hpp
 

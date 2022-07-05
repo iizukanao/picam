@@ -64,20 +64,6 @@ VideoEncoder::VideoEncoder(PicamOption const *options, StreamInfo const &info)
 		throw std::runtime_error("failed to set bitrate");
 	}
 
-	// if (!options->profile.empty())
-	// {
-	// 	static const std::map<std::string, int> profile_map =
-	// 		{ { "baseline", V4L2_MPEG_VIDEO_H264_PROFILE_BASELINE },
-	// 		  { "main", V4L2_MPEG_VIDEO_H264_PROFILE_MAIN },
-	// 		  { "high", V4L2_MPEG_VIDEO_H264_PROFILE_HIGH } };
-	// 	auto it = profile_map.find(options->profile);
-	// 	if (it == profile_map.end())
-	// 		throw std::runtime_error("no such profile " + options->profile);
-	// 	ctrl.id = V4L2_CID_MPEG_VIDEO_H264_PROFILE;
-	// 	ctrl.value = it->second;
-	// 	if (xioctl(fd_, VIDIOC_S_CTRL, &ctrl) < 0)
-	// 		throw std::runtime_error("failed to set profile");
-	// }
 	ctrl.id = V4L2_CID_MPEG_VIDEO_H264_PROFILE;
 	v4l2_mpeg_video_h264_profile profile = V4L2_MPEG_VIDEO_H264_PROFILE_CONSTRAINED_BASELINE;
   for (unsigned int i = 0; i < sizeof(video_avc_profile_options) / sizeof(video_avc_profile_option); i++) {
@@ -91,20 +77,6 @@ VideoEncoder::VideoEncoder(PicamOption const *options, StreamInfo const &info)
 		throw std::runtime_error("failed to set profile");
 	}
 
-	// if (!options->level.empty())
-	// {
-	// 	static const std::map<std::string, int> level_map =
-	// 		{ { "4", V4L2_MPEG_VIDEO_H264_LEVEL_4_0 },
-	// 		  { "4.1", V4L2_MPEG_VIDEO_H264_LEVEL_4_1 },
-	// 		  { "4.2", V4L2_MPEG_VIDEO_H264_LEVEL_4_2 } };
-	// 	auto it = level_map.find(options->level);
-	// 	if (it == level_map.end())
-	// 		throw std::runtime_error("no such level " + options->level);
-	// 	ctrl.id = V4L2_CID_MPEG_VIDEO_H264_LEVEL;
-	// 	ctrl.value = it->second;
-	// 	if (xioctl(fd_, VIDIOC_S_CTRL, &ctrl) < 0)
-	// 		throw std::runtime_error("failed to set level");
-	// }
 	ctrl.id = V4L2_CID_MPEG_VIDEO_H264_LEVEL;
 	v4l2_mpeg_video_h264_level level = V4L2_MPEG_VIDEO_H264_LEVEL_4_1;
   for (unsigned int i = 0; i < sizeof(video_avc_level_options) / sizeof(video_avc_level_option); i++) {
@@ -117,14 +89,6 @@ VideoEncoder::VideoEncoder(PicamOption const *options, StreamInfo const &info)
 	if (xioctl(fd_, VIDIOC_S_CTRL, &ctrl) < 0) {
 		throw std::runtime_error("failed to set level");
 	}
-
-	// if (options->intra)
-	// {
-	// 	ctrl.id = V4L2_CID_MPEG_VIDEO_H264_I_PERIOD;
-	// 	ctrl.value = options->intra;
-	// 	if (xioctl(fd_, VIDIOC_S_CTRL, &ctrl) < 0)
-	// 		throw std::runtime_error("failed to set intra period");
-	// }
 
 	this->setGopSize(options->video_gop_size);
 
@@ -285,82 +249,6 @@ void VideoEncoder::EncodeBuffer(int fd, size_t size, void *mem, StreamInfo const
 {
 	// mem is a YUV frame
 
-	// const uint32_t FOURCC_YU12 = 0x32315559; // YU12
-	// // std::cout << "size=" << size << " width=" << info.width << " height=" << info.height
-	// // 	<< " stride=" << info.stride << " fourcc=" << info.pixel_format.fourcc()
-	// // 	<< std::endl;
-	// if (info.pixel_format.fourcc() == FOURCC_YU12) {
-	// 	// std::cout << "Y+100" << std::endl;
-	// 	// for (size_t i = 0; i < info.width * info.height; i++) {
-	// 	// 	((char *)mem)[i] += 100;
-	// 	// }
-
-	// 	// unsigned int yOffset = 0;
-	// 	// unsigned int uOffset = info.width * info.height;
-	// 	// unsigned int vOffset = uOffset + uOffset / 4;
-	// 	// std::cout << " u=" << uOffset << " v=" << vOffset << " size=" << size << std::endl;
-	// 	// for (size_t i = uOffset; i < size; i++) {
-	// 	// 	((char *)mem)[i] = 128;
-	// 	// }
-
-	// 	static bool isTextInited = false;
-	// 	if (!isTextInited) {
-	// 		isTextInited = true;
-	// 		float font_points = 28.0f;
-	// 	    int font_dpi = 96;
-	// 	    int color = 0xffffff;
-	// 		int stroke_color = 0x000000;
-	// 		float stroke_width = 1.0f;
-	// 		int in_preview = 1;
-	// 		int in_video = 1;
-	// 		int letter_spacing = 0;
-	// 		float line_height_multiply = 1.0f;
-	// 		float tab_scale = 1.0f;
-	// 		LAYOUT_ALIGN layout_align = (LAYOUT_ALIGN) (LAYOUT_ALIGN_BOTTOM | LAYOUT_ALIGN_CENTER);
-	// 	    TEXT_ALIGN text_align = TEXT_ALIGN_CENTER;
-	// 		int horizontal_margin = 0;
-	// 		int vertical_margin = 35;
-	// 	    float duration = 2.0f;
-	// 		const char *replaced_text = "Hello C+_+!";
-	// 		int text_len = strlen(replaced_text);
-	//         subtitle_init_with_font_name(NULL, font_points, font_dpi);
-	// 		subtitle_set_color(color);
-	// 		subtitle_set_stroke_color(stroke_color);
-	// 		subtitle_set_stroke_width(stroke_width);
-	// 		subtitle_set_visibility(in_preview, in_video);
-	// 		subtitle_set_letter_spacing(letter_spacing);
-	// 		subtitle_set_line_height_multiply(line_height_multiply);
-	// 		subtitle_set_tab_scale(tab_scale);
-	// 		subtitle_set_layout(layout_align,
-	// 			horizontal_margin, vertical_margin);
-	// 		subtitle_set_align(text_align);
-
-	// 		// show subtitle for 7 seconds
-	// 		subtitle_show(replaced_text, text_len, duration);
-	// 	}
-
-	// 	// 640x480 -> max 100 fps
-	// 	// 1920x1080 -> max 40 fps
-	// 	// 1280x720 -> max 47.5 fps
-	// 	timestamp_update();
-	// 	subtitle_update();
-	// 	text_draw_all((uint8_t *)mem, info.width, info.height, 1); // is_video = 1
-	// 	// std::cout << "is_text_changed: " << is_text_changed << std::endl;
-	// }
-
-	// static bool isWritten = false;
-	// if (!isWritten) {
-	// 	isWritten = true;
-	// 	// uint8_t *dest = (uint8_t *)malloc(size);
-	// 	// yuv420p
-	// 	// memcpy(dest, mem, size);
-	// 	std::ofstream fp;
-	// 	fp.open("out.yuv", std::ios::out | std::ios::binary);
-	// 	fp.write((char *)mem, size);
-	// 	std::cout << "written to out.yuv" << std::endl;
-	// }
-
-	// std::cout << "h264_EncodeBuffer fd=" << fd << " size=" << size << " mem=" << mem << std::endl;
 	int index;
 	{
 		// We need to find an available output buffer (input to the codec) to
@@ -478,10 +366,6 @@ void VideoEncoder::outputThread()
 				if (!output_queue_.empty())
 				{
 					item = output_queue_.front();
-					// FIXME: Process encoded frame (item.mem and item.bytes_used)
-					// std::cout << "item bytes_used=" << item.bytes_used << " length=" << item.length
-					// 	<< " index=" << item.index << " keyframe=" << item.keyframe
-					// 	<< " timestamp_us=" << item.timestamp_us << std::endl;
 					output_queue_.pop();
 					break;
 				}

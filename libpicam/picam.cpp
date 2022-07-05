@@ -1,8 +1,6 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
- * Copyright (C) 2020, Raspberry Pi (Trading) Ltd.
- *
- * libcamera_vid.cpp - libcamera video record app.
+ * Based on libcamera_vid.cpp - Copyright (C) 2020, Raspberry Pi (Trading) Ltd.
  */
 
 #include <chrono>
@@ -16,7 +14,7 @@
 #include <libcamera/transform.h>
 #include <libcamera/control_ids.h>
 
-#include "core/frame_info.hpp"
+// #include "core/frame_info.hpp"
 #include "output/output.hpp"
 #include "timestamp/timestamp.h"
 #include "subtitle/subtitle.h"
@@ -1329,6 +1327,21 @@ void Picam::event_loop()
 		codec_settings.audio_channels = this->option->audio_channels;
 		codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
 	}
+	codec_settings.video_bitrate = this->option->video_bitrate;
+	codec_settings.video_width = this->option->video_width;
+	codec_settings.video_height = this->option->video_height;
+  for (unsigned int i = 0; i < sizeof(video_avc_profile_options) / sizeof(video_avc_profile_option); i++) {
+    if (strcmp(video_avc_profile_options[i].name, this->option->video_avc_profile) == 0) {
+      codec_settings.video_profile = video_avc_profile_options[i].ff_profile;
+      break;
+    }
+  }
+  for (unsigned int i = 0; i < sizeof(video_avc_level_options) / sizeof(video_avc_level_option); i++) {
+    if (strcmp(video_avc_level_options[i].name, this->option->video_avc_level) == 0) {
+      codec_settings.video_level = video_avc_level_options[i].ff_level;
+      break;
+    }
+  }
 
 	hls = hls_create(this->option->hls_number_of_segments, &codec_settings);
 
@@ -1466,7 +1479,6 @@ int Picam::run(int argc, char *argv[])
 			return EXIT_SUCCESS;
 		}
     this->setOption(&option);
-		mpegts_set_config(option.video_bitrate, option.video_width, option.video_height);
 
 		struct sigaction int_handler;
 		int_handler.sa_handler = stopSignalHandler;
@@ -1883,7 +1895,7 @@ void Picam::StartCamera()
 		throw std::runtime_error("failed to start camera");
 	controls_.clear();
 	camera_started_ = true;
-	last_timestamp_ = 0;
+	// last_timestamp_ = 0;
 
 	camera_->requestCompleted.connect(this, &Picam::requestComplete);
 
@@ -2110,7 +2122,7 @@ void Picam::requestComplete(libcamera::Request *request)
 	if (request->status() == libcamera::Request::RequestCancelled)
 		return;
 
-	CompletedRequest *r = new CompletedRequest(sequence_++, request);
+	CompletedRequest *r = new CompletedRequest(0, request); // We don't use the sequence parameter
 	CompletedRequestPtr payload(r, [this](CompletedRequest *cr) { this->queueRequest(cr); });
 	{
 		std::lock_guard<std::mutex> lock(completed_requests_mutex_);
@@ -2120,14 +2132,14 @@ void Picam::requestComplete(libcamera::Request *request)
 	// We calculate the instantaneous framerate in case anyone wants it.
 	// Use the sensor timestamp if possible as it ought to be less glitchy than
 	// the buffer timestamps.
-	uint64_t timestamp = payload->metadata.contains(libcamera::controls::SensorTimestamp)
-							? payload->metadata.get(libcamera::controls::SensorTimestamp)
-							: payload->buffers.begin()->second->metadata().timestamp;
-	if (last_timestamp_ == 0 || last_timestamp_ == timestamp)
-		payload->framerate = 0;
-	else
-		payload->framerate = 1e9 / (timestamp - last_timestamp_);
-	last_timestamp_ = timestamp;
+	// uint64_t timestamp = payload->metadata.contains(libcamera::controls::SensorTimestamp)
+	// 						? payload->metadata.get(libcamera::controls::SensorTimestamp)
+	// 						: payload->buffers.begin()->second->metadata().timestamp;
+	// if (last_timestamp_ == 0 || last_timestamp_ == timestamp)
+	// 	payload->framerate = 0;
+	// else
+	// 	payload->framerate = 1e9 / (timestamp - last_timestamp_);
+	// last_timestamp_ = timestamp;
 
 	this->msg_queue_.Post(Msg(MsgType::RequestComplete, std::move(payload)));
 }
@@ -2195,9 +2207,9 @@ void Picam::previewThread()
 		libcamera::Span span = Mmap(buffer)[0];
 
 		// Fill the frame info with the ControlList items and ancillary bits.
-		FrameInfo frame_info(item.completed_request->metadata);
-		frame_info.fps = item.completed_request->framerate;
-		frame_info.sequence = item.completed_request->sequence;
+		// FrameInfo frame_info(item.completed_request->metadata);
+		// frame_info.fps = item.completed_request->framerate;
+		// frame_info.sequence = item.completed_request->sequence;
 
 		int fd = buffer->planes()[0].fd.get();
 		{
