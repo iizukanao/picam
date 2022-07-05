@@ -12,8 +12,6 @@
 // Include libcamera stuff before X11, as X11 #defines both Status and None
 // which upsets the libcamera headers.
 
-//#include "core/options.hpp"
-
 #include "preview.hpp"
 
 #include <libdrm/drm_fourcc.h>

@@ -13,7 +13,6 @@
 static pthread_mutex_t rec_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t rec_write_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t rec_cond = PTHREAD_COND_INITIALIZER;
-// static pthread_mutex_t encoded_packet_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static char errbuf[1024];
 
@@ -32,19 +31,6 @@ Muxer::~Muxer() {
 void Muxer::setup(MpegTSCodecSettings *codec_settings, HTTPLiveStreaming *hls) {
   this->codec_settings = codec_settings;
   this->hls = hls;
-
-	// MpegTSContext rec_ctx = mpegts_create_context(codec_settings);
-	// char recording_tmp_filepath[256];
-  //   time_t rawtime;
-	// struct tm *timeinfo;
-	// time(&rawtime);
-	// timeinfo = localtime(&rawtime);
-	// char recording_basename[256];
-	// char *rec_tmp_dir = "rec/tmp";
-  // strftime(recording_basename, sizeof(recording_basename), "%Y-%m-%d_%H-%M-%S", timeinfo);
-	// snprintf(recording_tmp_filepath, sizeof(recording_tmp_filepath),
-	// 	"%s/%s", rec_tmp_dir, recording_basename);
-	// mpegts_open_stream(rec_ctx.format_context, recording_tmp_filepath, 0);
 }
 
 void *Muxer::rec_thread_stop(int skip_cleanup) {
@@ -205,10 +191,6 @@ int Muxer::is_disk_almost_full() {
   }
 }
 
-// void start_rec_thread(Muxer *muxer, RecSettings rec_settings) {
-//   muxer->rec_start();
-// }
-
 void *rec_thread_start(void *self) {
   Muxer *muxer = reinterpret_cast<Muxer *>(self);
   return muxer->rec_start();
@@ -232,7 +214,6 @@ void Muxer::start_record(RecSettings settings) {
 
 void Muxer::setup_tcp_output()
 {
-  // avformat_network_init();
   MpegTSContext ts_ctx = mpegts_create_context(this->codec_settings);
   tcp_ctx = ts_ctx.format_context;
   mpegts_open_stream(tcp_ctx, this->option->tcp_output_dest, 0);
@@ -242,7 +223,6 @@ void Muxer::teardown_tcp_output() {
   log_debug("teardown_tcp_output\n");
   mpegts_close_stream(tcp_ctx);
   mpegts_destroy_context(tcp_ctx);
-  // avformat_network_deinit();
 }
 
 // Receives both video and audio frames.
@@ -567,7 +547,6 @@ void Muxer::add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_
   EncodedPacket *packet;
 
   pthread_mutex_lock(&rec_write_mutex);
-  // pthread_mutex_lock(&encoded_packet_mutex);
   if (++current_encoded_packet == encoded_packets_size) {
     current_encoded_packet = 0;
   }
@@ -577,9 +556,6 @@ void Muxer::add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_
     if (next_keyframe_pointer >= record_buffer_keyframes) {
       next_keyframe_pointer = 0;
     }
-    // log_debug("current_keyframe_pointer=%d current_encoded_packet=%d next_keyframe_pointer=%d keyframe_pointers[next]=%d\n",
-      // current_keyframe_pointer,
-      // current_encoded_packet, next_keyframe_pointer, keyframe_pointers[next_keyframe_pointer]);
     if (current_encoded_packet == keyframe_pointers[next_keyframe_pointer]) {
       log_warn("warning: Record buffer is starving. Recorded file may not start from keyframe. Try reducing the value of --gopsize.\n");
     }
@@ -607,7 +583,6 @@ void Muxer::add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_
   packet->size = size;
   packet->stream_index = stream_index;
   packet->flags = flags;
-  // pthread_mutex_unlock(&encoded_packet_mutex);
   pthread_mutex_unlock(&rec_write_mutex);
 
   this->onFrameArrive(packet);

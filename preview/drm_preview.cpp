@@ -15,7 +15,6 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
-// #include "core/options.hpp"
 #include "log/log.h"
 
 #include "preview.hpp"
@@ -90,8 +89,6 @@ void DrmPreview::findCrtc()
 
 	if (!conId_)
 	{
-		// log_debug("No connector ID specified.  Choosing default from list:\n");
-
 		for (i = 0; i < res->count_connectors; i++)
 		{
 			if (i == this->options_->preview_hdmi) {
@@ -116,7 +113,7 @@ void DrmPreview::findCrtc()
 				}
 			}
 
-			if (!conId_ && crtc) // TODO: Select connector by option
+			if (!conId_ && crtc)
 			{
 				conId_ = con->connector_id;
 				crtcId_ = crtc->crtc_id;
@@ -134,10 +131,6 @@ void DrmPreview::findCrtc()
 				con->connector_id, (crtc ? crtc->crtc_id : 0), con->connector_type, (crtc ? crtc->width : 0), (crtc ? crtc->height : 0),
 				(conId_ == (int)con->connector_id ? " (chosen)" : "")
 			);
-			// if (options_->verbose)
-			// 	std::cerr << "Connector " << con->connector_id << " (crtc " << (crtc ? crtc->crtc_id : 0) << "): type "
-			// 			  << con->connector_type << ", " << (crtc ? crtc->width : 0) << "x" << (crtc ? crtc->height : 0)
-			// 			  << (conId_ == (int)con->connector_id ? " (chosen)" : "") << std::endl; // TODO: (chosen) is wrong when connector is specified
 		}
 
 		if (!conId_)

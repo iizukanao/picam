@@ -32,17 +32,13 @@
 #include "rtsp/rtsp.h"
 #include "picam.hpp"
 
-// How much PTS difference between audio and video is
-// considered to be too large
+// If the difference between video PTS and audio PTS becomes
+// larger than this value, PTS will be reset
 #define PTS_DIFF_TOO_LARGE 45000  // 90000 == 1 second
 
 using namespace std::placeholders;
 
-// Some keypress/signal handling.
-
-// static int signal_received;
 static std::thread audioThread;
-// static int64_t video_timestamp_origin_us = -1;
 
 // hooks
 static pthread_t hooks_thread;
@@ -73,42 +69,12 @@ static void check_camera_stack()
 void Picam::set_exposure_to_auto() {
   log_debug("exposure mode: auto\n");
 	controls_.set(libcamera::controls::AeExposureMode, libcamera::controls::ExposureNormal);
-
-  // OMX_CONFIG_EXPOSURECONTROLTYPE exposure_type;
-  // OMX_ERRORTYPE error;
-
-  // memset(&exposure_type, 0, sizeof(OMX_CONFIG_EXPOSURECONTROLTYPE));
-  // exposure_type.nSize = sizeof(OMX_CONFIG_EXPOSURECONTROLTYPE);
-  // exposure_type.nVersion.nVersion = OMX_VERSION;
-  // exposure_type.nPortIndex = OMX_ALL;
-  // exposure_type.eExposureControl = OMX_ExposureControlAuto;
-
-  // error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
-  //     OMX_IndexConfigCommonExposure, &exposure_type);
-  // if (error != OMX_ErrorNone) {
-  //   log_error("error: failed to set camera exposure to auto: 0x%x\n", error);
-  // }
   current_exposure_mode = EXPOSURE_AUTO;
 }
 
 void Picam::set_exposure_to_night() {
   log_debug("exposure mode: night\n");
 	controls_.set(libcamera::controls::AeExposureMode, libcamera::controls::ExposureLong);
-
-  // OMX_CONFIG_EXPOSURECONTROLTYPE exposure_type;
-  // OMX_ERRORTYPE error;
-
-  // memset(&exposure_type, 0, sizeof(OMX_CONFIG_EXPOSURECONTROLTYPE));
-  // exposure_type.nSize = sizeof(OMX_CONFIG_EXPOSURECONTROLTYPE);
-  // exposure_type.nVersion.nVersion = OMX_VERSION;
-  // exposure_type.nPortIndex = OMX_ALL;
-  // exposure_type.eExposureControl = OMX_ExposureControlNight;
-
-  // error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
-  //     OMX_IndexConfigCommonExposure, &exposure_type);
-  // if (error != OMX_ErrorNone) {
-  //   log_error("error: failed to set camera exposure to night: 0x%x\n", error);
-  // }
   current_exposure_mode = EXPOSURE_NIGHT;
 }
 
@@ -151,8 +117,6 @@ void Picam::auto_select_exposure(int width, int height, uint8_t *data, float fps
 	}
   float y_per_10msec = average_y * 10.0f / msec_per_frame;
   log_debug(" y=%.1f", y_per_10msec);
-  // log_debug("total_y=%d count=%d average_y=%.1f fps=%.1f y_per_10msec=%.1f\n",
-	// 	total_y, count, average_y, fps, y_per_10msec);
   if (y_per_10msec < this->option->auto_exposure_threshold) { // in the dark
     if (current_exposure_mode == EXPOSURE_AUTO) {
       log_debug(" ");
@@ -168,9 +132,6 @@ void Picam::auto_select_exposure(int width, int height, uint8_t *data, float fps
 
 Picam::Picam() {
 	check_camera_stack();
-
-	// if (!options_)
-	// 	options_ = std::make_unique<Options>();
 }
 
 Picam::~Picam() {
@@ -197,7 +158,6 @@ void Picam::stopAudioThread() {
 void Picam::stopRecThread() {
 	log_debug("stopRecThread begin\n");
 	this->muxer->prepareForDestroy();
-	// this->muxer->waitForExit();
 	log_debug("stopRecThread end\n");
 }
 
@@ -254,8 +214,6 @@ void Picam::modifyBuffer(CompletedRequestPtr &completed_request)
 		text_draw_all((uint8_t *)mem, info.width, info.height, info.stride, 1); // is_video = 1
 	}
 }
-
-// The main event loop for the application.
 
 void audioLoop(Audio *audio)
 {
@@ -326,92 +284,10 @@ int Picam::camera_set_ae_metering_mode(char *mode) {
 int Picam::camera_set_exposure_value() {
 	log_debug("camera_set_exposure_value: %.1f\n", this->option->exposure_compensation);
 	controls_.set(libcamera::controls::ExposureValue, this->option->exposure_compensation);
-
-	// TODO: Implement this using libcamera
-
-  // OMX_CONFIG_EXPOSUREVALUETYPE exposure_value;
-  // OMX_ERRORTYPE error;
-  // int i;
-
-  // memset(&exposure_value, 0, sizeof(OMX_CONFIG_EXPOSUREVALUETYPE));
-  // exposure_value.nSize = sizeof(OMX_CONFIG_EXPOSUREVALUETYPE);
-  // exposure_value.nVersion.nVersion = OMX_VERSION;
-  // exposure_value.nPortIndex = OMX_ALL;
-
-  // error = OMX_GetParameter(ILC_GET_HANDLE(camera_component),
-  //     OMX_IndexConfigCommonExposureValue, &exposure_value);
-  // if (error != OMX_ErrorNone) {
-  //   log_fatal("error: failed to get camera exposure value: 0x%x\n", error);
-  //   exit(EXIT_FAILURE);
-  // }
-
-  // OMX_METERINGTYPE metering = OMX_EVModeMax;
-  // for (i = 0; i < sizeof(exposure_metering_options) / sizeof(exposure_metering_option); i++) {
-  //   if (strcmp(exposure_metering_options[i].name, exposure_metering) == 0) {
-  //     metering = exposure_metering_options[i].metering;
-  //     break;
-  //   }
-  // }
-  // if (metering == OMX_EVModeMax) {
-  //   log_error("error: invalid exposure metering value: %s\n", exposure_metering);
-  //   return -1;
-  // }
-  // // default: OMX_MeteringModeAverage
-  // exposure_value.eMetering = metering;
-
-  // if (manual_exposure_compensation) {
-  //   // OMX_S32 Q16; default: 0
-  //   exposure_value.xEVCompensation = round(exposure_compensation * 65536 / 6.0f);
-  // }
-
-  // if (manual_exposure_aperture) {
-  //   // Apparently this has no practical effect
-
-  //   // OMX_U32 Q16; default: 0
-  //   exposure_value.nApertureFNumber = round(exposure_aperture * 65536);
-  //   // default: OMX_FALSE
-  //   exposure_value.bAutoAperture = OMX_FALSE;
-  // }
-
-  // if (manual_exposure_shutter_speed) {
-  //   // OMX_U32; default: 0
-  //   exposure_value.nShutterSpeedMsec = exposure_shutter_speed;
-  //   // default: OMX_TRUE
-  //   exposure_value.bAutoShutterSpeed = OMX_FALSE;
-  // }
-
-  // if (manual_exposure_sensitivity) {
-  //   // OMX_U32; default: 0
-  //   exposure_value.nSensitivity = exposure_sensitivity;
-  //   // default: OMX_TRUE
-  //   exposure_value.bAutoSensitivity = OMX_FALSE;
-  // }
-
-  // log_debug("setting exposure:\n");
-  // log_debug("  eMetering: %d\n", exposure_value.eMetering);
-  // log_debug("  xEVCompensation: %d\n", exposure_value.xEVCompensation);
-  // log_debug("  nApertureFNumber: %u\n", exposure_value.nApertureFNumber);
-  // log_debug("  bAutoAperture: %u\n", exposure_value.bAutoAperture);
-  // log_debug("  nShutterSpeedMsec: %u\n", exposure_value.nShutterSpeedMsec);
-  // log_debug("  bAutoShutterSpeed: %u\n", exposure_value.bAutoShutterSpeed);
-  // log_debug("  nSensitivity: %u\n", exposure_value.nSensitivity);
-  // log_debug("  bAutoSensitivity: %u\n", exposure_value.bAutoSensitivity);
-
-  // error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
-  //     OMX_IndexConfigCommonExposureValue, &exposure_value);
-  // if (error != OMX_ErrorNone) {
-  //   log_fatal("error: failed to set camera exposure value: 0x%x\n", error);
-  //   return -1;
-  // }
-
   return 0;
 }
 
 int Picam::camera_set_white_balance(char *wb) {
-	// std::cout << "supported white balance modes:" << std::endl;
-	// for (size_t i = 0; i < libcamera::controls::AwbModeValues.size(); i++) {
-	// 	std::cout << libcamera::controls::AwbModeValues[i].toString() << std::endl;
-	// }
 	log_debug("camera_set_white_balance: %s\n", wb);
 	if (strncmp(wb, "off", 3) == 0) {
 		log_debug("disable AWB\n");
@@ -431,36 +307,6 @@ int Picam::camera_set_white_balance(char *wb) {
 		controls_.set(libcamera::controls::AwbEnable, true);
 		controls_.set(libcamera::controls::AwbMode, control);
 	}
-
-  // OMX_CONFIG_WHITEBALCONTROLTYPE whitebal;
-  // OMX_ERRORTYPE error;
-  // int i;
-
-  // memset(&whitebal, 0, sizeof(OMX_CONFIG_WHITEBALCONTROLTYPE));
-  // whitebal.nSize = sizeof(OMX_CONFIG_WHITEBALCONTROLTYPE);
-  // whitebal.nVersion.nVersion = OMX_VERSION;
-  // whitebal.nPortIndex = OMX_ALL;
-
-  // OMX_WHITEBALCONTROLTYPE control = OMX_WhiteBalControlMax;
-  // for (i = 0; i < sizeof(white_balance_options) / sizeof(white_balance_option); i++) {
-  //   if (strcmp(white_balance_options[i].name, wb) == 0) {
-  //     control = white_balance_options[i].control;
-  //     break;
-  //   }
-  // }
-  // if (control == OMX_WhiteBalControlMax) {
-  //   log_error("error: invalid white balance value: %s\n", wb);
-  //   return -1;
-  // }
-  // whitebal.eWhiteBalControl = control;
-
-  // error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
-  //     OMX_IndexConfigCommonWhiteBalance, &whitebal);
-  // if (error != OMX_ErrorNone) {
-  //   log_fatal("error: failed to set camera white balance: 0x%x\n", error);
-  //   return -1;
-  // }
-
   return 0;
 }
 
@@ -474,73 +320,8 @@ int Picam::camera_set_exposure_control(char *ex) {
     }
   }
 	controls_.set(libcamera::controls::AeExposureMode, control);
-
-  // OMX_CONFIG_EXPOSURECONTROLTYPE exposure_control_type;
-  // OMX_ERRORTYPE error;
-  // int i;
-
-  // memset(&exposure_control_type, 0, sizeof(OMX_CONFIG_EXPOSURECONTROLTYPE));
-  // exposure_control_type.nSize = sizeof(OMX_CONFIG_EXPOSURECONTROLTYPE);
-  // exposure_control_type.nVersion.nVersion = OMX_VERSION;
-  // exposure_control_type.nPortIndex = OMX_ALL;
-
-  // // Find out the value of eExposureControl
-  // OMX_EXPOSURECONTROLTYPE control = OMX_ExposureControlMax;
-  // for (i = 0; i < sizeof(exposure_control_options) / sizeof(exposure_control_option); i++) {
-  //   if (strcmp(exposure_control_options[i].name, ex) == 0) {
-  //     control = exposure_control_options[i].control;
-  //     break;
-  //   }
-  // }
-  // if (control == OMX_ExposureControlMax) {
-  //   log_error("error: invalid exposure control value: %s\n", ex);
-  //   return -1;
-  // }
-  // exposure_control_type.eExposureControl = control;
-
-  // log_debug("exposure control: %s\n", ex);
-  // error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
-  //     OMX_IndexConfigCommonExposure, &exposure_control_type);
-  // if (error != OMX_ErrorNone) {
-  //   log_error("error: failed to set camera exposure control: 0x%x\n", error);
-  //   return -1;
-  // }
-
-  // if (control == OMX_ExposureControlAuto) {
-  //   current_exposure_mode = EXPOSURE_AUTO;
-  // } else if (control == OMX_ExposureControlNight) {
-  //   current_exposure_mode = EXPOSURE_NIGHT;
-  // }
-
   return 0;
 }
-
-/* Set region of interest */
-// [[maybe_unused]] static int camera_set_input_crop(float left, float top, float width, float height) {
-	// TODO: Implement this using libcamera
-
-  // OMX_CONFIG_INPUTCROPTYPE input_crop_type;
-  // OMX_ERRORTYPE error;
-
-  // memset(&input_crop_type, 0, sizeof(OMX_CONFIG_INPUTCROPTYPE));
-  // input_crop_type.nSize = sizeof(OMX_CONFIG_INPUTCROPTYPE);
-  // input_crop_type.nVersion.nVersion = OMX_VERSION;
-  // input_crop_type.nPortIndex = OMX_ALL;
-  // input_crop_type.xLeft = round(left * 0x10000);
-  // input_crop_type.xTop = round(top * 0x10000);
-  // input_crop_type.xWidth = round(width * 0x10000);
-  // input_crop_type.xHeight = round(height * 0x10000);
-
-  // error = OMX_SetParameter(ILC_GET_HANDLE(camera_component),
-  //     OMX_IndexConfigInputCropPercentages, &input_crop_type);
-  // if (error != OMX_ErrorNone) {
-  //   log_fatal("error: failed to set camera input crop type: 0x%x\n", error);
-  //   log_fatal("hint: maybe --roi value is not acceptable to camera\n");
-  //   return -1;
-  // }
-
-//   return 0;
-// }
 
 /**
  * Reads a file and returns the contents.
@@ -1279,163 +1060,6 @@ int64_t Picam::get_next_audio_pts() {
   return pts;
 }
 
-// // This function is called after the video encoder produces each frame
-// static int video_encode_fill_buffer_done(OMX_BUFFERHEADERTYPE *out) {
-//   int nal_unit_type;
-//   uint8_t *buf;
-//   int buf_len;
-//   int is_endofnal = 1;
-//   uint8_t *concat_buf = NULL;
-//   struct timespec tsEnd, tsDiff;
-
-//   // out->nTimeStamp is useless as the value is always zero
-
-//   if (out == NULL) {
-//     log_error("error: cannot get output buffer from video_encode\n");
-//     return 0;
-//   }
-//   if (encbuf != NULL) {
-//     // merge the previous buffer
-//     concat_buf = realloc(encbuf, encbuf_size + out->nFilledLen);
-//     if (concat_buf == NULL) {
-//       log_fatal("error: cannot allocate memory for concat_buf (%d bytes)\n", encbuf_size + out->nFilledLen);
-//       free(encbuf);
-//       exit(EXIT_FAILURE);
-//     }
-//     memcpy(concat_buf + encbuf_size, out->pBuffer, out->nFilledLen);
-//     buf = concat_buf;
-//     buf_len = encbuf_size + out->nFilledLen;
-//   } else {
-//     buf = out->pBuffer;
-//     buf_len = out->nFilledLen;
-//   }
-//   if (!(out->nFlags & OMX_BUFFERFLAG_ENDOFFRAME) &&
-//       !(out->nFlags & OMX_BUFFERFLAG_CODECCONFIG)) {
-//     // There is remaining buffer for the current frame
-//     nal_unit_type = buf[4] & 0x1f;
-//     encbuf_size = buf_len;
-//     if (concat_buf != NULL) {
-//       encbuf = concat_buf;
-//       concat_buf = NULL;
-//     } else {
-//       encbuf = malloc(buf_len);
-//       if (encbuf == NULL) {
-//         log_fatal("error: cannot allocate memory for encbuf (%d bytes)\n", buf_len);
-//         exit(EXIT_FAILURE);
-//       }
-//       memcpy(encbuf, buf, buf_len);
-//     }
-//     is_endofnal = 0;
-//   } else {
-//     encbuf = NULL;
-//     encbuf_size = -1;
-
-//     nal_unit_type = buf[4] & 0x1f;
-//     if (nal_unit_type != 1 && nal_unit_type != 5) {
-//       log_debug("[NAL%d]", nal_unit_type);
-//     }
-//     if (out->nFlags != 0x480 && out->nFlags != 0x490 &&
-//         out->nFlags != 0x430 && out->nFlags != 0x410 &&
-//         out->nFlags != 0x400 && out->nFlags != 0x510 &&
-//         out->nFlags != 0x530) {
-//       log_warn("\nnew flag (%d,nal=%d)\n", out->nFlags, nal_unit_type);
-//     }
-//     if (out->nFlags & OMX_BUFFERFLAG_DATACORRUPT) {
-//       log_warn("\n=== OMX_BUFFERFLAG_DATACORRUPT ===\n");
-//     }
-//     if (out->nFlags & OMX_BUFFERFLAG_EXTRADATA) {
-//       log_warn("\n=== OMX_BUFFERFLAG_EXTRADATA ===\n");
-//     }
-//     if (out->nFlags & OMX_BUFFERFLAG_FRAGMENTLIST) {
-//       log_warn("\n=== OMX_BUFFERFLAG_FRAGMENTLIST ===\n");
-//     }
-//     if (out->nFlags & OMX_BUFFERFLAG_DISCONTINUITY) {
-//       log_warn("\n=== OMX_BUFFERFLAG_DISCONTINUITY ===\n");
-//     }
-//     if (out->nFlags & OMX_BUFFERFLAG_CODECCONFIG) {
-//       // Insert timing info to nal_unit_type 7
-//       codec_configs[n_codec_configs] = malloc(buf_len);
-//       if (codec_configs[n_codec_configs] == NULL) {
-//         log_fatal("error: cannot allocate memory for codec config (%d bytes)\n", buf_len);
-//         exit(EXIT_FAILURE);
-//       }
-//       codec_config_sizes[n_codec_configs] = buf_len;
-//       memcpy(codec_configs[n_codec_configs], buf, buf_len);
-
-//       codec_config_total_size += codec_config_sizes[n_codec_configs];
-//       n_codec_configs++;
-
-//       send_video_frame(buf, buf_len, 0);
-//     } else { // video frame
-//       frame_count++; // will be used for printing stats about FPS, etc.
-
-//       if (out->nFlags & OMX_BUFFERFLAG_SYNCFRAME) { // keyframe
-//         if (nal_unit_type != 5) {
-//           log_debug("SYNCFRAME nal_unit_type=%d len=%d\n", nal_unit_type, buf_len);
-//         }
-//         int consume_time = 0;
-//         if (nal_unit_type == 1 || nal_unit_type == 2 ||
-//             nal_unit_type == 3 || nal_unit_type == 4 ||
-//             nal_unit_type == 5) {
-//           consume_time = 1;
-//         } else {
-//           log_debug("(nosl)");
-//         }
-// #if !(AUDIO_ONLY)
-//         send_keyframe(buf, buf_len, consume_time);
-// #endif
-
-//         // calculate FPS and display it
-//         if (tsBegin.tv_sec != 0 && tsBegin.tv_nsec != 0) {
-//           keyframes_count++;
-//           clock_gettime(CLOCK_MONOTONIC, &tsEnd);
-//           timespec_subtract(&tsDiff, &tsEnd, &tsBegin);
-//           unsigned long long wait_nsec = tsDiff.tv_sec * INT64_C(1000000000) + tsDiff.tv_nsec;
-//           float divisor = (float)wait_nsec / (float)frame_count / 1000000000;
-//           float fps;
-//           if (divisor == 0.0f) { // This won't cause SIGFPE because of float, but just to be safe.
-//             fps = 99999.0f;
-//           } else {
-//             fps = 1.0f / divisor;
-//           }
-//           log_debug(" %5.2f fps k=%d", fps, keyframes_count);
-//           if (log_get_level() <= LOG_LEVEL_DEBUG) {
-//             print_audio_timing();
-//           }
-//           current_audio_frames = 0;
-//           frame_count = 0;
-
-//           if (is_auto_exposure_enabled) {
-//             auto_select_exposure(video_width, video_height, last_video_buffer, fps);
-//           }
-
-//           log_debug("\n");
-//         }
-//         clock_gettime(CLOCK_MONOTONIC, &tsBegin);
-//       } else { // inter frame
-//         if (nal_unit_type != 9) { // Exclude nal_unit_type 9 (Access unit delimiter)
-//           int consume_time = 0;
-//           if (nal_unit_type == 1 || nal_unit_type == 2 ||
-//               nal_unit_type == 3 || nal_unit_type == 4 ||
-//               nal_unit_type == 5) {
-//             consume_time = 1;
-//           } else {
-//             log_debug("(nosl)");
-//           }
-// #if !(AUDIO_ONLY)
-//           send_pframe(buf, buf_len, consume_time);
-// #endif
-//         }
-//       }
-//     }
-//   }
-//   if (concat_buf != NULL) {
-//     free(concat_buf);
-//   }
-
-//   return is_endofnal;
-// }
-
 void Picam::print_audio_timing() {
   struct timespec ts;
   clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -2068,9 +1692,8 @@ void Picam::ConfigureVideo(unsigned int flags)
 		transform = libcamera::Transform::VFlip * transform;
 	}
 
-	// NOTE: It seems that only 180 degrees is currently supported,
+	// NOTE: It seems that only 180 degree rotation is currently supported,
 	// so it is achievable with --hflip and --vflip.
-
 	// bool ok;
 	// libcamera::Transform rot = libcamera::transformFromRotation(this->option->video_rotation, &ok);
 	// if (!ok)
@@ -2169,16 +1792,11 @@ void Picam::StartCamera()
 		controls_.set(libcamera::controls::ScalerCrop, crop);
 	}
 
-	// controls_.set(libcamera::controls::FrameDuration, INT64_C(16666));
-
 	// Framerate is a bit weird. If it was set programmatically, we go with that, but
 	// otherwise it applies only to preview/video modes. For stills capture we set it
 	// as long as possible so that we get whatever the exposure profile wants.
 	if (!controls_.contains(libcamera::controls::FrameDurationLimits))
 	{
-		// if (StillStream())
-		// 	controls_.set(libcamera::controls::FrameDurationLimits, { INT64_C(100), INT64_C(1000000000) });
-		// else if (options_->framerate > 0)
 		if (this->option->is_vfr_enabled) {
 			float min_fps = this->option->min_fps;
 			if (min_fps == -1.0f) {
@@ -2207,7 +1825,6 @@ void Picam::StartCamera()
 	} else {
 		shutter = 0;
 	}
-	// if (!controls_.contains(libcamera::controls::ExposureTime) && shutter)
 	controls_.set(libcamera::controls::ExposureTime, shutter);
 
 	// Analogue gain
@@ -2216,30 +1833,14 @@ void Picam::StartCamera()
 		controls_.set(libcamera::controls::AnalogueGain, gain);
 
 	// Auto exposure metering mode
-	// int metering_index = libcamera::controls::MeteringCentreWeighted;
-	// if (!controls_.contains(libcamera::controls::AeMeteringMode))
-	// 	controls_.set(libcamera::controls::AeMeteringMode, metering_index);
 	if (this->camera_set_ae_metering_mode(this->option->exposure_metering) != 0) {
     exit(EXIT_FAILURE);
 	}
 
 	// Exposure mode
-	// int exposure_index = libcamera::controls::ExposureLong;
-	// if (!controls_.contains(libcamera::controls::AeExposureMode))
-	// 	controls_.set(libcamera::controls::AeExposureMode, exposure_index);
-	// if (controls_.contains(libcamera::controls::AeExposureMode)) {
-	// 	log_debug("xxx contains exposure mode\n");
-	// } else {
-	// 	log_debug("xxx does not contain exposure mode\n");
-	// }
 	if (this->camera_set_exposure_control(this->option->exposure_control) != 0) {
     exit(EXIT_FAILURE);
   }
-	// if (controls_.contains(libcamera::controls::AeExposureMode)) {
-	// 	log_debug("xxxb contains exposure mode\n");
-	// } else {
-	// 	log_debug("xxxb does not contain exposure mode\n");
-	// }
 
 	// Exposure value
 	if (this->option->manual_exposure_compensation) {
@@ -2249,18 +1850,11 @@ void Picam::StartCamera()
 	}
 
 	// Auto white balance
-	// int awb_index = libcamera::controls::AwbAuto;
-	// if (!controls_.contains(libcamera::controls::AwbMode))
-	// 	controls_.set(libcamera::controls::AwbMode, awb_index);
 	if (this->camera_set_white_balance(this->option->white_balance) != 0) {
     exit(EXIT_FAILURE);
   }
 
 	// AWB gain red and blue
-	// float awb_gain_r = 0;
-	// float awb_gain_b = 0;
-	// if (!controls_.contains(libcamera::controls::ColourGains) && awb_gain_r && awb_gain_b)
-	// 	controls_.set(libcamera::controls::ColourGains, { awb_gain_r, awb_gain_b });
 	if (this->camera_set_custom_awb_gains() != 0) {
     exit(EXIT_FAILURE);
   }
@@ -2290,8 +1884,6 @@ void Picam::StartCamera()
 	controls_.clear();
 	camera_started_ = true;
 	last_timestamp_ = 0;
-
-	// post_processor_.Start();
 
 	camera_->requestCompleted.connect(this, &Picam::requestComplete);
 
@@ -2536,11 +2128,6 @@ void Picam::requestComplete(libcamera::Request *request)
 	else
 		payload->framerate = 1e9 / (timestamp - last_timestamp_);
 	last_timestamp_ = timestamp;
-
-	// post_processor_.Process(payload); // post-processor can re-use our shared_ptr
-
-	// My test:
-	// [this](CompletedRequestPtr &r) { this->msg_queue_.Post(Msg(MsgType::RequestComplete, std::move(r))); }(payload);
 
 	this->msg_queue_.Post(Msg(MsgType::RequestComplete, std::move(payload)));
 }

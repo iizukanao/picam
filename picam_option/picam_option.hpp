@@ -16,19 +16,14 @@ typedef struct white_balance_option {
 } white_balance_option;
 const white_balance_option white_balance_options[] = {
   { "off",          libcamera::controls::AwbCustom },
-  { "custom",          libcamera::controls::AwbCustom },
+  { "custom",       libcamera::controls::AwbCustom },
   { "auto",         libcamera::controls::AwbAuto },
-  // { "sun",          OMX_WhiteBalControlSunLight },
   { "cloudy",       libcamera::controls::AwbCloudy },
-  // { "shade",        OMX_WhiteBalControlShade },
   { "tungsten",     libcamera::controls::AwbTungsten },
   { "fluorescent",  libcamera::controls::AwbFluorescent },
   { "incandescent", libcamera::controls::AwbIncandescent },
-  // { "flash",        OMX_WhiteBalControlFlash },
-  // { "horizon",      OMX_WhiteBalControlHorizon },
-  // { "greyworld",    OMX_WhiteBalControlGreyWorld },
-  { "indoor", libcamera::controls::AwbIndoor },
-  { "daylight", libcamera::controls::AwbDaylight },
+  { "indoor",       libcamera::controls::AwbIndoor },
+  { "daylight",     libcamera::controls::AwbDaylight },
 };
 
 typedef struct exposure_control_option {
@@ -36,24 +31,10 @@ typedef struct exposure_control_option {
   libcamera::controls::AeExposureModeEnum control;
 } exposure_control_option;
 const exposure_control_option exposure_control_options[] = {
-  { "custom",           libcamera::controls::ExposureCustom },
-  { "normal",           libcamera::controls::ExposureNormal },
-  { "short",           libcamera::controls::ExposureShort },
-  { "long",           libcamera::controls::ExposureLong },
-  // { "auto",          libcamera::controls::ExposureAuto },
-  // { "night",         OMX_ExposureControlNight },
-  // { "nightpreview",  OMX_ExposureControlNightWithPreview },
-  // { "backlight",     OMX_ExposureControlBackLight },
-  // { "spotlight",     OMX_ExposureControlSpotLight },
-  // { "sports",        OMX_ExposureControlSports },
-  // { "snow",          OMX_ExposureControlSnow },
-  // { "beach",         OMX_ExposureControlBeach },
-  // { "verylong",      OMX_ExposureControlVeryLong },
-  // { "fixedfps",      OMX_ExposureControlFixedFps },
-  // { "antishake",     OMX_ExposureControlAntishake },
-  // { "fireworks",     OMX_ExposureControlFireworks },
-  // { "largeaperture", OMX_ExposureControlLargeAperture },
-  // { "smallaperture", OMX_ExposureControlSmallAperture },
+  { "custom", libcamera::controls::ExposureCustom },
+  { "normal", libcamera::controls::ExposureNormal },
+  { "short",  libcamera::controls::ExposureShort },
+  { "long",   libcamera::controls::ExposureLong },
 };
 
 typedef struct exposure_metering_option {
@@ -62,11 +43,9 @@ typedef struct exposure_metering_option {
 } exposure_metering_option;
 const exposure_metering_option exposure_metering_options[] = {
   { "center", libcamera::controls::MeteringCentreWeighted },
-  // { "average", OMX_MeteringModeAverage },
-  { "spot",    libcamera::controls::MeteringSpot },
-  { "matrix",  libcamera::controls::MeteringMatrix },
-  { "custom",  libcamera::controls::MeteringCustom },
-  // { "backlit", OMX_MeteringModeBacklit },
+  { "spot",   libcamera::controls::MeteringSpot },
+  { "matrix", libcamera::controls::MeteringMatrix },
+  { "custom", libcamera::controls::MeteringCustom },
 };
 
 typedef struct video_avc_profile_option {
@@ -87,11 +66,11 @@ typedef struct video_avc_level_option {
 const video_avc_level_option video_avc_level_options[] = {
   // Level < 3.0 is not supported by the encoder
   { "3",   V4L2_MPEG_VIDEO_H264_LEVEL_3_0 },
-  { "3.0",   V4L2_MPEG_VIDEO_H264_LEVEL_3_0 },
+  { "3.0", V4L2_MPEG_VIDEO_H264_LEVEL_3_0 },
   { "3.1", V4L2_MPEG_VIDEO_H264_LEVEL_3_1 },
   { "3.2", V4L2_MPEG_VIDEO_H264_LEVEL_3_2 },
   { "4",   V4L2_MPEG_VIDEO_H264_LEVEL_4_0 },
-  { "4.0",   V4L2_MPEG_VIDEO_H264_LEVEL_4_0 },
+  { "4.0", V4L2_MPEG_VIDEO_H264_LEVEL_4_0 },
   { "4.1", V4L2_MPEG_VIDEO_H264_LEVEL_4_1 },
   { "4.2", V4L2_MPEG_VIDEO_H264_LEVEL_4_2 },
   // Level >= 5.0 is not supported by the encoder

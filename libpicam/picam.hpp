@@ -141,10 +141,6 @@ protected:
 	std::unique_ptr<VideoEncoder> encoder_;
     // <<< libcamera_encoder.hpp
 
-	// >>> libcamera_app.hpp
-	// std::unique_ptr<Options> options_;
-	// <<< libcamera_app.hpp
-
 private:
 	Muxer *muxer;
 	Audio *audio;
@@ -159,10 +155,6 @@ private:
 	int64_t last_pts = 0;
 	int64_t time_for_last_pts = 0; // Used in VFR mode
 	pts_mode_t pts_mode = PTS_SPEED_NORMAL;
-
-	// debug
-	// int64_t time_at_last_video = -1;
-	// int64_t time_at_last_audio = -1;
 
 #if ENABLE_AUTO_GOP_SIZE_CONTROL_FOR_VFR
 	// Variables for variable frame rate
