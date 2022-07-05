@@ -84,7 +84,7 @@ void DrmPreview::findCrtc()
 
 	max_image_width_ = res->max_width;
 	max_image_height_ = res->max_height;
-	printf("preview: count_crtcs=%d count_encoders=%d count_connectors=%d count_fbs=%d max_image_width=%u max_image_height=%u\n",
+	log_debug("preview: count_crtcs=%d count_encoders=%d count_connectors=%d count_fbs=%d max_image_width=%u max_image_height=%u\n",
 	res->count_crtcs, res->count_encoders, res->count_connectors, res->count_fbs,
 	max_image_width_, max_image_height_);
 
@@ -100,7 +100,7 @@ void DrmPreview::findCrtc()
 				log_debug("preview: CRTC connector %d: skipped because preview_hdmi=%d is specified\n", i, this->options_->preview_hdmi);
 				continue;
 			}
-			printf("preview: inspecting connector: %d\n", i);
+			log_debug("preview: inspecting connector: %d\n", i);
 			drmModeConnector *con = drmModeGetConnector(drmfd_, res->connectors[i]);
 			drmModeEncoder *enc = NULL;
 			drmModeCrtc *crtc = NULL;
@@ -108,11 +108,11 @@ void DrmPreview::findCrtc()
 			if (con->encoder_id)
 			{
 				enc = drmModeGetEncoder(drmfd_, con->encoder_id);
-				printf("preview: set encoder\n");
+				log_debug("preview: set enc\n");
 				if (enc->crtc_id)
 				{
 					crtc = drmModeGetCrtc(drmfd_, enc->crtc_id);
-					printf("preview: set crtc\n");
+					log_debug("preview: set crtc\n");
 				}
 			}
 
@@ -120,14 +120,14 @@ void DrmPreview::findCrtc()
 			{
 				conId_ = con->connector_id;
 				crtcId_ = crtc->crtc_id;
-				printf("preview: set conId_=%d crtcId_=%u\n", conId_, crtcId_);
+				log_debug("preview: set conId_=%d crtcId_=%u\n", conId_, crtcId_);
 			}
 
 			if (crtc)
 			{
 				screen_width_ = crtc->width;
 				screen_height_ = crtc->height;
-				printf("preview: crtc screen_width_=%u screen_height_=%u\n", screen_width_, screen_height_);
+				log_debug("preview: crtc screen_width_=%u screen_height_=%u\n", screen_width_, screen_height_);
 			}
 
 			log_debug("Connector %u (crtc %u): type %u, %ux%u %s",
@@ -190,7 +190,7 @@ void DrmPreview::findCrtc()
 		y_ = crtc->y;
 		width_ = crtc->width;
 		height_ = crtc->height;
-		printf("preview: crtc x_=%u y_=%u width_=%u height_=%u\n", x_, y_, width_, height_);
+		log_debug("preview: crtc x_=%u y_=%u width_=%u height_=%u\n", x_, y_, width_, height_);
 		drmModeFreeCrtc(crtc);
 	}
 }
@@ -261,7 +261,7 @@ DrmPreview::DrmPreview(PicamOption const *options) : Preview(options), last_fd_(
 	height_ = options_->preview_height;
 	screen_width_ = 0;
 	screen_height_ = 0;
-	printf("preview: ctor: x_=%u y_=%u width_=%u height_=%u\n", x_, y_, width_, height_);
+	log_debug("preview: ctor: x_=%u y_=%u width_=%u height_=%u\n", x_, y_, width_, height_);
 
 	try
 	{
@@ -286,7 +286,7 @@ DrmPreview::DrmPreview(PicamOption const *options) : Preview(options), last_fd_(
 		x_ = y_ = 0;
 		width_ = screen_width_;
 		height_ = screen_height_;
-		printf("preview: default behavior: x_=%u y_=%u width_=%u height_=%u\n", x_, y_, width_, height_);
+		log_debug("preview: default behavior: x_=%u y_=%u width_=%u height_=%u\n", x_, y_, width_, height_);
 	}
 }
 
@@ -448,11 +448,6 @@ void DrmPreview::makeBuffer(int fd, size_t size, StreamInfo const &info, Buffer 
 		info.stride / 2 // stride (== width) of V plane
 		};
 	uint32_t bo_handles[4] = { buffer.bo_handle, buffer.bo_handle, buffer.bo_handle };
-	// printf("makeBuffer: stride=%u width=%u height=%u pitches[0]=%u [1]=%u [2]=%u [3]=%u offsets[0]=%u [1]=%u [2]=%u [3]=%u\n",
-	// 	info.stride, info.width, info.height,
-	// 	pitches[0], pitches[1], pitches[2], pitches[3],
-	// 	offsets[0], offsets[1], offsets[2], offsets[3]
-	// );
 
 	if (drmModeAddFB2(drmfd_, info.width, info.height, out_fourcc_, bo_handles, pitches, offsets, &buffer.fb_handle, 0))
 		throw std::runtime_error("drmModeAddFB2 failed: " + std::string(ERRSTR));
@@ -464,53 +459,32 @@ void DrmPreview::Show(int fd, libcamera::Span<uint8_t> span, StreamInfo const &i
 	if (buffer.fd == -1) {
 		makeBuffer(fd, span.size(), info, buffer);
 	}
-	// printf("DrmPreview::Show fd=%d last_fd=%d size=%u width=%u height=%u stride=%u buffer.width=%d buffer.height=%d\n",
-	// 	fd, last_fd_, span.size(), info.width, info.height, info.stride, buffer.info.width, buffer.info.height);
 
-	// info.width = 1920 (camera capture width)
-	// info.height = 1080 (camera capture height)
-	// info.stride = 1920 (camera capture stride)
-	// buffer.info.width = 1920 (this buffer frame width)
-	// buffer.info.height = 1080 (this buffer frame height)
-	// x_ = 100 (requested preview offset x)
-	// y_ = 200 (requested preview offset y)
-	// width_ = 300 (requested preview width)
-	// height_ = 400 (requested preview height)
+	// info.width -> camera capture width
+	// info.height -> camera capture height
+	// info.stride -> camera capture stride
+	// buffer.info.width -> frame width of this buffer
+	// buffer.info.height -> frame height of this buffer
+	// x_ -> requested preview offset x
+	// y_ -> requested preview offset y
+	// width_ -> requested preview width
+	// height_ -> requested preview height
+
 	int x_off = 0, y_off = 0;
 	unsigned int w = width_, h = height_;
-	// if (info.width * height_ > width_ * info.height) {
-	// 	h = width_ * info.height / info.width, y_off = (height_ - h) / 2;
-	// 	printf("h=%u width_=%u y_off=%d height_=%u\n", h, width_, y_off, height_);
-	// } else {
-	// 	w = height_ * info.width / info.height, x_off = (width_ - w) / 2;
-	// 	printf("w=%u width_=%u x_off=%d height_=%u\n", w, width_, x_off, height_);
-	// }
 
 	unsigned int crtc_x;
 	unsigned int crtc_y;
 	if (x_off < 0 && x_off + (int)x_ < 0) {
 		crtc_x = 0;
-		printf("reset crtc_x to 0\n");
 	} else {
 		crtc_x = x_off + x_;
 	}
 	if (y_off < 0 && y_off + (int)y_ < 0) {
 		crtc_y = 0;
-		printf("reset crtc_y to 0\n");
 	} else {
 		crtc_y = y_off + y_;
 	}
-	// printf("drmfd_=%d planeId=%u crtcId_=%u fb_id=%u crtc_x=%d crtc_y=%d crtc_w=%u crtc_h=%u src_x=%u src_y=%u src_w=%u src_h=%u src_w<<16=%u src_h<<16=%u\n",
-	// 	drmfd_, planeId_, crtcId_, buffer.fb_handle,
-	// 	crtc_x, // crtc_x
-	// 	crtc_y, // crtc_y
-	// 	w, // crtc_w
-	// 	h, // crtc_h
-	// 	0 << 16, // src_x in Q16.16
-	// 	0 << 16, // src_y in Q16.16
-	// 	buffer.info.width, // src_w in Q16.16
-	// 	buffer.info.height, // src_h in Q16.16
-	// 	buffer.info.width << 16, buffer.info.height << 16);
 	if (drmModeSetPlane(drmfd_, planeId_, crtcId_, buffer.fb_handle,
 		0, // flags
 		crtc_x,

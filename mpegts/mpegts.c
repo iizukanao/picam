@@ -194,24 +194,20 @@ MpegTSContext _mpegts_create_context(int use_video, int use_audio, MpegTSCodecSe
   AVCodecContext *codec_context_video;
   AVCodecContext *codec_context_audio;
 
-  printf("av_guess_format\n");
   guessed_fmt = av_guess_format("mpegts", NULL, NULL);
   if (!guessed_fmt) {
     fprintf(stderr, "av_guess_format failed\n");
     exit(EXIT_FAILURE);
   }
-  printf("malloc for out_fmt\n");
   out_fmt = malloc(sizeof(AVOutputFormat));
   if (out_fmt == NULL) {
     fprintf(stderr, "out_fmt malloc failed\n");
     exit(EXIT_FAILURE);
   }
-  printf("memcpy in mpegts\n");
   memcpy(out_fmt, guessed_fmt, sizeof(AVOutputFormat));
 
   out_fmt->flags |= ~AVFMT_GLOBALHEADER;
 
-  printf("avformat_alloc_context\n");
   format_ctx = avformat_alloc_context();
   if (!format_ctx) {
     fprintf(stderr, "avformat_alloc_context failed\n");
@@ -221,12 +217,10 @@ MpegTSContext _mpegts_create_context(int use_video, int use_audio, MpegTSCodecSe
 
 #if !(AUDIO_ONLY)
   if (use_video) {
-    printf("setup_video_stream\n");
     codec_context_video = setup_video_stream(format_ctx);
   }
 #endif
   if (use_audio) {
-    printf("setup_audio_stream\n");
     codec_context_audio = setup_audio_stream(format_ctx, settings);
   }
 

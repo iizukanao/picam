@@ -16,7 +16,6 @@
 #include <libcamera/transform.h>
 #include <libcamera/control_ids.h>
 
-// #include "core/libcamera_encoder.hpp"
 #include "core/frame_info.hpp"
 #include "output/output.hpp"
 #include "timestamp/timestamp.h"
@@ -185,10 +184,10 @@ Picam::~Picam() {
 void Picam::stopAudioThread() {
 	log_debug("stopAudioThread begin\n");
 	if (audioThread.joinable()) {
-		std::cout << "joinable" << std::endl;
+		log_debug("joining audio thread\n");
 		audio->stop();
 		audioThread.join();
-		std::cout << "joined" << std::endl;
+		log_debug("joined audio thread\n");
 	}
 	audio->teardown();
 	delete audio;
@@ -692,7 +691,6 @@ void on_file_create(char *filename, char *content) {
 }
 
 void Picam::handleHook(char *filename, char *content) {
-	printf("handleHook: filename=%s content=%s\n", filename, content);
   if (strcmp(filename, "start_record") == 0) {
     char buf[269]; // sizeof(hooks_dir) + strlen("/start_record")
 
@@ -1531,19 +1529,6 @@ void Picam::videoEncodeDoneCallback(void *mem, size_t size, int64_t timestamp_us
 		memcpy(complete_mem + access_unit_delimiter_length + this->sps_pps_size, bytes, size);
 	}
 
-	// timestamp_us is not correct
-
-	// printf("outputReady size=%d timestamp=%lld keyframe=%d\n", size, timestamp_us, keyframe);
-	// if (video_timestamp_origin_us == -1) {
-	// 	video_timestamp_origin_us = timestamp_us;
-	// 	printf("xxx set video_timestamp_origin_us=%lld\n", video_timestamp_origin_us);
-
-	// 	// Without the casting (int64_t), we will going to get the wrong result
-	// 	video_timestamp_origin_us -= (int64_t)std::round(1000000 / video_fps);
-
-	// 	printf("1000000 / video_fps = %f (%lld)\n", 1000000 / video_fps, (int64_t)(1000000 / video_fps));
-	// 	printf("xxx adjusted video_timestamp_origin_us=%lld\n", video_timestamp_origin_us);
-	// }
 	int flags = 0;
 	if (keyframe) {
 		flags |= AV_PKT_FLAG_KEY;
@@ -1552,15 +1537,9 @@ void Picam::videoEncodeDoneCallback(void *mem, size_t size, int64_t timestamp_us
 		this->is_video_started = true;
 		this->check_video_and_audio_started();
 	}
-	// muxer->add_encoded_packet(std::round((timestamp_us - video_timestamp_origin_us) / (1000000 / 90000)), (uint8_t *)mem, size, hls->format_ctx->streams[0]->index, flags);
-	int64_t pts = this->get_next_video_pts();
 
-	// struct timespec ts;
-	// clock_gettime(CLOCK_MONOTONIC, &ts);
-	// int64_t this_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
-	// int64_t diff_from_prev = this_time - this->time_at_last_video;
-	// log_debug("%lld (diff=%lld) v%lld\n", this_time, diff_from_prev, pts);
-	// this->time_at_last_video = this_time;
+	// Since timestamp_us is incorrect, we cannot use it to calculate PTS.
+	int64_t pts = this->get_next_video_pts();
 
 #if ENABLE_AUTO_GOP_SIZE_CONTROL_FOR_VFR
   if (this->option->is_vfr_enabled) {
@@ -1629,29 +1608,6 @@ void Picam::videoEncodeDoneCallback(void *mem, size_t size, int64_t timestamp_us
 	if (complete_mem != bytes) {
 		free(complete_mem);
 	}
-
-	// // std::cout << "### OutputReady" << std::endl;
-	// // When output is enabled, we may have to wait for the next keyframe.
-	// uint32_t flags = keyframe ? FLAG_KEYFRAME : FLAG_NONE;
-	// if (!enable_)
-	// 	state_ = DISABLED;
-	// else if (state_ == DISABLED)
-	// 	state_ = WAITING_KEYFRAME;
-	// if (state_ == WAITING_KEYFRAME && keyframe)
-	// 	state_ = RUNNING, flags |= FLAG_RESTART;
-	// if (state_ != RUNNING)
-	// 	return;
-
-	// // Frig the timestamps to be continuous after a pause.
-	// if (flags & FLAG_RESTART)
-	// 	time_offset_ = timestamp_us - last_timestamp_;
-	// last_timestamp_ = timestamp_us - time_offset_;
-
-	// outputBuffer(mem, size, last_timestamp_, flags);
-
-	// // Save timestamps to a file, if that was requested.
-	// if (fp_timestamps_)
-	// 	fprintf(fp_timestamps_, "%" PRId64 ".%03" PRId64 "\n", last_timestamp_ / 1000, last_timestamp_ % 1000);
 }
 
 float Picam::calc_current_real_fps()
@@ -1731,7 +1687,7 @@ void Picam::event_loop()
 	this->SetEncodeOutputReadyCallback(std::bind(&Picam::videoEncodeDoneCallback, this, _1, _2, _3, _4));
 
 	// audio->preconfigure() has to be executed before using codec_settings
-	// because it adjusts the number of audio channels.
+	// because it adjusts this->option->audio_channels
 	audio = new Audio(this->option);
 	audio->preconfigure();
 
@@ -1750,11 +1706,7 @@ void Picam::event_loop()
 		codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
 	}
 
-#if AUDIO_ONLY
-  hls = hls_create_audio_only(hls_number_of_segments, &codec_settings); // 2 == num_recent_files
-#else
-	hls = hls_create(this->option->hls_number_of_segments, &codec_settings); // 2 == num_recent_files
-#endif
+	hls = hls_create(this->option->hls_number_of_segments, &codec_settings);
 
 	if (this->option->is_hlsout_enabled) {
 		hls->dir = this->option->hls_output_dir;
@@ -1788,14 +1740,10 @@ void Picam::event_loop()
 
 	log_debug("configuring devices\n");
 
-	std::cout << "### OpenCamera" << std::endl;
 	this->OpenCamera();
-	std::cout << "### ConfigureVideo" << std::endl;
   const char *codec = "h264";
 	this->ConfigureVideo(get_colourspace_flags(codec));
-	std::cout << "### StartEncoder" << std::endl;
 	this->StartEncoder();
-	std::cout << "### StartCamera" << std::endl;
 	this->StartCamera();
 	
 	state_default_dir("state");
@@ -1817,69 +1765,24 @@ void Picam::event_loop()
 		int64_t audio_pts = this->get_next_audio_pts();
 		// Add audio packet
 		this->muxer->add_encoded_packet(audio_pts, data, size, stream_index, flags);
-
-    // struct timespec ts;
-    // clock_gettime(CLOCK_MONOTONIC, &ts);
-		// int64_t this_time = ts.tv_sec * INT64_C(1000000000) + ts.tv_nsec;
-		// int64_t diff_from_prev = this_time - this->time_at_last_audio;
-		// log_debug("%lld (diff=%lld) a%lld\n", this_time, diff_from_prev, audio_pts);
-		// this->time_at_last_audio = this_time;
 	});
 
 	this->muxer->prepare_encoded_packets(this->option->video_fps, audio->get_fps());
-
-	// pollfd p[1] = { { STDIN_FILENO, POLLIN, 0 } };
-	// uint64_t lastTimestamp = 0;
-
-	// timestamp test
-	// float timestamp_font_points = 14.0f;
-	// int timestamp_font_dpi = 96;
-	// const char *timestamp_format = "%a %b %d %l:%M:%S %p";
-	// const LAYOUT_ALIGN timestamp_layout = (LAYOUT_ALIGN) (LAYOUT_ALIGN_BOTTOM | LAYOUT_ALIGN_RIGHT);
-	// int timestamp_horizontal_margin = 10;
-	// int timestamp_vertical_margin = 10;
-	// const TEXT_ALIGN timestamp_text_align = TEXT_ALIGN_LEFT;
-	// const int timestamp_color = 0xffffff;
-	// const int timestamp_stroke_color = 0x000000;
-	// const float timestamp_stroke_width = 1.3f;
-	// const int timestamp_letter_spacing = 0;
-	// // std::cout << "width=" << options->width << " height=" << options->height << std::endl;
-	// int video_width_32 = (option->video_width+31)&~31;
-	// int video_height_16 = (option->video_height+15)&~15;
-
-	// // std::cout << "width_32=" << video_width_32 << " height_16=" << video_height_16 << std::endl;
-	// timestamp_init_with_font_name(NULL,
-	// 	timestamp_font_points, timestamp_font_dpi);
-	// timestamp_set_format(timestamp_format);
-	// timestamp_set_layout(timestamp_layout,
-	// 	timestamp_horizontal_margin, timestamp_vertical_margin);
-	// timestamp_set_align(timestamp_text_align);
-	// timestamp_set_color(timestamp_color);
-	// timestamp_set_stroke_color(timestamp_stroke_color);
-	// timestamp_set_stroke_width(timestamp_stroke_width);
-	// timestamp_set_letter_spacing(timestamp_letter_spacing);
-	// timestamp_fix_position(video_width_32, video_height_16);
 
 	audioThread = std::thread(audioLoop, audio);
 
 	while (true)
 	{
 		Picam::Msg msg = this->Wait();
-		if (msg.type == Picam::MsgType::RequestComplete) {
-			// std::cout << "Msg RequestComplete" << std::endl;
-		} else if (msg.type == Picam::MsgType::Quit) {
-			std::cout << "Msg Quit" << std::endl;
-		}
-		if (msg.type == Picam::MsgType::Quit)
-			return;
-		else if (msg.type != Picam::MsgType::RequestComplete)
+		if (msg.type == Picam::MsgType::Quit) {
+			this->stop();
+		} else if (msg.type != Picam::MsgType::RequestComplete) {
 			throw std::runtime_error("unrecognised message!");
+		}
 
 		if (!this->keepRunning)
 		{
-			// if (timeout)
-			// 	std::cerr << "Halting: reached timeout of " << timeout_ms << " milliseconds.\n";
-			std::cerr << "Halting" << std::endl;
+			log_debug("Halting\n");
 			this->StopCamera(); // stop complains if encoder very slow to close
 			this->StopEncoder();
 			this->stopAllThreads();
@@ -1891,13 +1794,9 @@ void Picam::event_loop()
 
 		this->modifyBuffer(completed_request);
 
-		// NOTE: If Raspberry Pi is connected to a monitor, EncodeBuffer() will
-		// take some time and fps will drop
-		// auto start = std::chrono::high_resolution_clock::now();
+		// NOTE: If Raspberry Pi is connected to a monitor,
+		// EncodeBuffer() will take some time and fps will drop
 		this->EncodeBuffer(completed_request, this->VideoStream());
-    // auto stop = std::chrono::high_resolution_clock::now();
-		// auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
-		// std::cout << "time " << duration.count() << std::endl;
 
 		this->ShowPreview(completed_request, this->VideoStream());
 	}
@@ -1927,7 +1826,7 @@ int Picam::run(int argc, char *argv[])
   // Turn off buffering for stdout
   setvbuf(stdout, NULL, _IONBF, 0);
 
-  log_set_level(LOG_LEVEL_DEBUG); // Log level will be changed later by PicamOption::parse()
+  log_set_level(LOG_LEVEL_INFO); // Log level will be changed later by PicamOption::parse()
   log_set_stream(stdout);
   av_log_set_level(AV_LOG_ERROR);
 
@@ -2049,38 +1948,6 @@ int Picam::run(int argc, char *argv[])
 // >>> libcamera_app.cpp
 void Picam::OpenCamera()
 {
-	// char previewRect[128];
-	// Make a preview window.
-	// Options previewOptions;
-	// previewOptions.width = this->option->video_width;
-	// previewOptions.height = this->option->video_height;
-	// previewOptions.framerate = this->option->video_fps;
-	// previewOptions.nopreview = !this->option->is_preview_enabled;
-	// previewOptions.qt_preview = false; // This is always false as QT preview works only if X is running
-	// previewOptions.verbose = log_get_level() >= LOG_LEVEL_DEBUG;
-	// if (this->option->is_previewrect_enabled) {
-	// 	previewOptions.fullscreen = false;
-	// 	previewOptions.preview_x = this->option->preview_x;
-	// 	previewOptions.preview_y = this->option->preview_y;
-	// 	previewOptions.preview_width = this->option->preview_width;
-	// 	previewOptions.preview_height = this->option->preview_height;
-	// 	snprintf(
-	// 		previewRect,
-	// 		sizeof(previewRect)-1,
-	// 		"%d,%d,%d,%d",
-	// 		this->option->preview_x,
-	// 		this->option->preview_y,
-	// 		this->option->preview_width,
-	// 		this->option->preview_height);
-	// 	previewOptions.preview = previewRect;
-	// } else {
-	// 	previewOptions.fullscreen = true;
-	// 	previewOptions.preview_x = 0;
-	// 	previewOptions.preview_y = 0;
-	// 	previewOptions.preview_width = 0;
-	// 	previewOptions.preview_height = 0;
-	// }
-	// fullscreen=false, x=100 y=200 width=300 height=400 にすると画面が暗くなる
 	preview_ = std::unique_ptr<Preview>(make_preview(this->option));
 	preview_->SetDoneCallback(std::bind(&Picam::previewDoneCallback, this, std::placeholders::_1));
 
@@ -2114,13 +1981,6 @@ void Picam::OpenCamera()
 	camera_acquired_ = true;
 
 	log_debug("Acquired camera %d\n", cam_id);
-
-	// if (!options_->post_process_file.empty())
-	// 	post_processor_.Read(options_->post_process_file);
-
-	// The queue takes over ownership from the post-processor.
-	// post_processor_.SetCallback(
-	// 	[this](CompletedRequestPtr &r) { this->msg_queue_.Post(Msg(MsgType::RequestComplete, std::move(r))); });
 }
 
 void Picam::CloseCamera()
@@ -2197,12 +2057,6 @@ void Picam::ConfigureVideo(unsigned int flags)
 	else
 		cfg.colorSpace = libcamera::ColorSpace::Smpte170m;
 
-	// TODO
-
-	// configuration_->transform = options_->transform;
-
-	// post_processor_.AdjustConfig("video", &configuration_->at(0));
-
 	// Previously option
 	Mode mode;
 	bool rawfull = false;
@@ -2213,11 +2067,16 @@ void Picam::ConfigureVideo(unsigned int flags)
 	if (this->option->video_vflip) {
 		transform = libcamera::Transform::VFlip * transform;
 	}
+
+	// NOTE: It seems that only 180 degrees is currently supported,
+	// so it is achievable with --hflip and --vflip.
+
 	// bool ok;
 	// libcamera::Transform rot = libcamera::transformFromRotation(this->option->video_rotation, &ok);
 	// if (!ok)
 	// 	throw std::runtime_error("illegal rotation value");
 	// transform = rot * transform;
+
 	if (!!(transform & libcamera::Transform::Transpose))
 		throw std::runtime_error("transforms requiring transpose not supported");
 	std::string denoise = "auto";
@@ -2255,22 +2114,15 @@ void Picam::ConfigureVideo(unsigned int flags)
 	if (have_lores_stream)
 		streams_["lores"] = configuration_->at(lores_index).stream();
 
-	// post_processor_.Configure();
-
 	log_debug("Video setup complete\n");
 }
 
 void Picam::Teardown()
 {
-	printf("stopPreview begin\n");
 	stopPreview();
-	printf("stopPreview end\n");
-
-	// post_processor_.Teardown();
 
 	log_debug("Tearing down requests, buffers and configuration\n");
 
-	printf("clearing mapped_buffers_\n");
 	for (auto &iter : mapped_buffers_)
 	{
 		// assert(iter.first->planes().size() == iter.second.size());
@@ -2279,20 +2131,15 @@ void Picam::Teardown()
 			munmap(span.data(), span.size());
 	}
 	mapped_buffers_.clear();
-	printf("cleared mapped_buffers_\n");
 
 	delete allocator_;
 	allocator_ = nullptr;
 
-	printf("configuration reset\n");
 	configuration_.reset();
 
-	printf("frame buffers clear\n");
 	frame_buffers_.clear();
 
-	printf("streams clear\n");
 	streams_.clear();
-	printf("Teardown end\n");
 
 	if (this->sps_pps != NULL) {
 		free(this->sps_pps);
@@ -2459,7 +2306,7 @@ void Picam::StartCamera()
 
 void Picam::StopCamera()
 {
-	printf("StopCamera\n");
+	log_debug("StopCamera\n");
 	{
 		// We don't want QueueRequest to run asynchronously while we stop the camera.
 		std::lock_guard<std::mutex> lock(camera_stop_mutex_);
@@ -2564,14 +2411,12 @@ std::vector<libcamera::Span<uint8_t>> Picam::Mmap(libcamera::FrameBuffer *buffer
 
 void Picam::ShowPreview(CompletedRequestPtr &completed_request, libcamera::Stream *stream)
 {
-	// printf("preview: ShowPreview begin\n");
 	std::lock_guard<std::mutex> lock(preview_item_mutex_);
 	if (!preview_item_.stream)
 		preview_item_ = PreviewItem(completed_request, stream); // copy the shared_ptr here
 	else
 		preview_frames_dropped_++;
 	preview_cond_var_.notify_one();
-	// printf("preview: ShowPreview end\n");
 }
 
 StreamInfo Picam::GetStreamInfo(libcamera::Stream const *stream) const
@@ -2702,28 +2547,26 @@ void Picam::requestComplete(libcamera::Request *request)
 
 void Picam::previewDoneCallback(int fd)
 {
-	// printf("preview: previewDoneCallback begin\n");
 	std::lock_guard<std::mutex> lock(preview_mutex_);
 	auto it = preview_completed_requests_.find(fd);
 	if (it == preview_completed_requests_.end())
 		throw std::runtime_error("previewDoneCallback: missing fd " + std::to_string(fd));
 	preview_completed_requests_.erase(it); // drop shared_ptr reference
-	// printf("preview: previewDoneCallback end\n");
 }
 
 void Picam::startPreview()
 {
-	printf("preview: startPreview begin\n");
+	log_debug("preview: startPreview begin\n");
 	preview_abort_ = false;
 	preview_thread_ = std::thread(&Picam::previewThread, this);
-	printf("preview: startPreview end\n");
+	log_debug("preview: startPreview end\n");
 }
 
 void Picam::stopPreview()
 {
-	printf("preview: stopPreview begin\n");
+	log_debug("preview: stopPreview begin\n");
 	if (!preview_thread_.joinable()) {
-		printf("preview: preview_thread is not joinable\n");
+		log_debug("preview: preview_thread is not joinable\n");
 		// in case never started
 		return;
 	}
@@ -2735,7 +2578,7 @@ void Picam::stopPreview()
 	}
 	preview_thread_.join();
 	preview_item_ = PreviewItem();
-	printf("preview: stopPreview end\n");
+	log_debug("preview: stopPreview end\n");
 }
 
 void Picam::previewThread()
@@ -2782,11 +2625,6 @@ void Picam::previewThread()
 		}
 		preview_frames_displayed_++;
 		preview_->Show(fd, span, info);
-		// if (!options_->info_text.empty())
-		// {
-		// 	std::string s = frame_info.ToString(options_->info_text);
-		// 	preview_->SetInfoText(s);
-		// }
 	}
 }
 

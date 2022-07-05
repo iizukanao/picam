@@ -47,14 +47,6 @@ void Muxer::setup(MpegTSCodecSettings *codec_settings, HTTPLiveStreaming *hls) {
 	// mpegts_open_stream(rec_ctx.format_context, recording_tmp_filepath, 0);
 }
 
-// void Muxer::waitForExit() {
-//   if (this->recThread.joinable()) {
-//     printf("joining recThread\n");
-//     this->recThread.join();
-//     printf("joined recThread\n");
-//   }
-// }
-
 void *Muxer::rec_thread_stop(int skip_cleanup) {
   FILE *fsrc, *fdest;
   int read_len;
@@ -161,7 +153,6 @@ void Muxer::stop_record() {
 }
 
 void Muxer::prepareForDestroy() {
-  printf("prepareForDestroy: is_recording=%d\n", this->is_recording);
   if (this->is_recording) {
     this->rec_thread_needs_write = 1;
     pthread_cond_signal(&rec_cond);
@@ -237,12 +228,6 @@ void Muxer::start_record(RecSettings settings) {
   this->rec_thread_needs_exit = 0;
   this->rec_settings = settings;
   pthread_create(&this->rec_thread, NULL, rec_thread_start, this);
-  // if (this->recThread.joinable()) {
-  //   log_debug("recThread is joinable\n");
-  //   this->recThread.join();
-  // }
-  // log_debug("creating recThread\n");
-	// this->recThread = std::thread(start_rec_thread, this, settings);
 }
 
 void Muxer::setup_tcp_output()
@@ -440,9 +425,7 @@ void *Muxer::rec_start() {
   }
 
   rec_thread_frame = keyframe_pointers[start_keyframe_pointer];
-  printf("start_keyframe_pointer=%d rec_thread_frame=%d\n", start_keyframe_pointer, rec_thread_frame);
   enc_pkt = encoded_packets[rec_thread_frame];
-  printf("enc_pkt: %p\n", (void *)enc_pkt);
   if (enc_pkt) {
     rec_start_pts = enc_pkt->pts;
     write_encoded_packets(REC_CHASE_PACKETS, rec_start_pts);
@@ -454,9 +437,7 @@ void *Muxer::rec_start() {
   while (!this->rec_thread_needs_exit) {
     pthread_mutex_lock(&rec_mutex);
     while (!this->rec_thread_needs_write) {
-      // printf("rec_cond wait\n");
       pthread_cond_wait(&rec_cond, &rec_mutex);
-      // printf("rec_cond waited\n");
     }
     pthread_mutex_unlock(&rec_mutex);
 
@@ -585,12 +566,6 @@ void Muxer::mark_keyframe_packet() {
 void Muxer::add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_index, int flags) {
   EncodedPacket *packet;
 
-  // printf("add stream=%d pts=%lld size=%d flags=%d", stream_index, pts, size, flags);
-  // if (stream_index == 0 && flags) {
-  //   printf(" (keyframe)");
-  // }
-  // printf("\n");
-
   pthread_mutex_lock(&rec_write_mutex);
   // pthread_mutex_lock(&encoded_packet_mutex);
   if (++current_encoded_packet == encoded_packets_size) {
@@ -626,9 +601,7 @@ void Muxer::add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_
   }
 
   // If this part is not guarded by mutex, segmentation fault will happen
-  // printf("add_encoded_packet memcpy begin\n");
   memcpy(copied_data, data, size);
-  // printf("add_encoded_packet memcpy end\n");
   packet->pts = pts;
   packet->data = copied_data;
   packet->size = size;

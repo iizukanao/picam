@@ -124,21 +124,19 @@ public:
 		encoder_->EncodeBuffer(buffer->planes()[0].fd.get(), span.size(), mem, info, timestamp_ns / 1000);
 	}
 	// VideoOptions *GetOptions() const { return static_cast<VideoOptions *>(options_.get()); }
-	void StopEncoder() { printf("StopEncoder\n"); encoder_.reset(); }
+	void StopEncoder() { encoder_.reset(); }
 		// <<< libcamera_encoder.hpp
 
 protected:
     // >>> libcamera_encoder.hpp
 	void createEncoder()
 	{
-		std::cout << "createEncoder" << std::endl;
 		StreamInfo info;
 		VideoStream(&info);
 		if (!info.width || !info.height || !info.stride) {
 			throw std::runtime_error("video steam is not configured");
         }
 		encoder_ = std::unique_ptr<VideoEncoder>(new VideoEncoder(this->option, info));
-		std::cout << "encoder_ set" << std::endl;
 	}
 	std::unique_ptr<VideoEncoder> encoder_;
     // <<< libcamera_encoder.hpp

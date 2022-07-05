@@ -26,7 +26,6 @@ Preview *make_preview(PicamOption const *options)
 // #if QT_PRESENT
 // 	else if (options->qt_preview)
 // 	{
-// 		printf("preview: make_qt_preview\n");
 // 		Preview *p = make_qt_preview(options);
 // 		if (p)
 // 			std::cerr << "Made QT preview window" << std::endl;
@@ -41,8 +40,9 @@ Preview *make_preview(PicamOption const *options)
 			// EGL is used when X Window System is running.
 			// DRM cannot be used if X is running.
 			Preview *p = make_egl_preview(options);
-			if (p)
-				std::cerr << "Made X/EGL preview window" << std::endl;
+			if (p) {
+				log_debug("Made X/EGL preview window\n");
+			}
 			return p;
 #else
 			throw std::runtime_error("egl libraries unavailable.");
@@ -50,14 +50,15 @@ Preview *make_preview(PicamOption const *options)
 		}
 		catch (std::exception const &e)
 		{
-			std::cerr << "make_egl_preview error: " << e.what() << std::endl;
+			log_debug("make_egl_preview error: %s\n", e.what());
 			try
 			{
 #if LIBDRM_PRESENT
 				// DRM (Direct Rendering Mangaer) is used when X is not running.
 				Preview *p = make_drm_preview(options);
-				if (p)
-					std::cerr << "Made DRM preview window" << std::endl;
+				if (p) {
+					log_debug("Made DRM preview window\n");
+				}
 				return p;
 #else
 				throw std::runtime_error("drm libraries unavailable.");

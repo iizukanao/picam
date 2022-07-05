@@ -785,8 +785,6 @@ int Audio::read_audio_poll_mmap() {
 void Audio::loop() {
   int avail_flags;
 
-  std::cout << "Audio::loop" << std::endl;
-
   while (this->keepRunning) {
     if (this->option->disable_audio_capturing) {
       this->encode_and_send_audio();
