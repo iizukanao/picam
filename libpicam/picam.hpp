@@ -214,6 +214,7 @@ private:
 	void queryCameras();
 	int camera_set_exposure_control(char *ex);
 	int camera_set_ae_metering_mode(char *mode);
+	int camera_set_exposure_value();
 	int camera_set_white_balance(char *wb);
 	int camera_set_custom_awb_gains();
 

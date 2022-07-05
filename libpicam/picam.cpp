@@ -324,7 +324,10 @@ int Picam::camera_set_ae_metering_mode(char *mode) {
 	return 0;
 }
 
-[[maybe_unused]] static int camera_set_exposure_value() {
+int Picam::camera_set_exposure_value() {
+	log_debug("camera_set_exposure_value: %.1f\n", this->option->exposure_compensation);
+	controls_.set(libcamera::controls::ExposureValue, this->option->exposure_compensation);
+
 	// TODO: Implement this using libcamera
 
   // OMX_CONFIG_EXPOSUREVALUETYPE exposure_value;
@@ -2392,9 +2395,11 @@ void Picam::StartCamera()
 	// }
 
 	// Exposure value
-	float ev = 0;
-	if (!controls_.contains(libcamera::controls::ExposureValue))
-		controls_.set(libcamera::controls::ExposureValue, ev);
+	if (this->option->manual_exposure_compensation) {
+		if (this->camera_set_exposure_value() != 0) {
+			exit(EXIT_FAILURE);
+		}
+	}
 
 	// Auto white balance
 	// int awb_index = libcamera::controls::AwbAuto;

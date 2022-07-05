@@ -274,7 +274,8 @@ void Muxer::onFrameArrive(EncodedPacket *encoded_packet) {
   }
 
   // av_write_frame() may change the internal data of AVPacket.
-  // Otherwise av_write_frame() will fail with the error:
+  // av_write_frame() may fail with the following error if
+  // internal data is in invalid state.
   // "AAC bitstream not in ADTS format and extradata missing".
 
   AVPacket *pkt = av_packet_alloc();

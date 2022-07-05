@@ -111,7 +111,7 @@ void PicamOption::print_usage() {
   log_info("                        spot: Spot metering mode\n");
   log_info("                        matrix: Matrix metering mode\n");
   log_info("                        custom: Custom metering mode\n");
-  // log_info("  --evcomp <num>      Set Exposure Value compensation (-24..24) (default: 0)\n");
+  log_info("  --evcomp <num>      Set Exposure Value compensation (-24..24) (default: 0)\n");
 //  log_info("  --aperture <num>    Set aperture f-stop. Use 2 for f/2. (default: not set)\n");
 //  log_info("                      * Not sure if this has practical effect.\n");
   log_info("  --shutter <num>     Set shutter speed in microseconds (default: auto).\n");
