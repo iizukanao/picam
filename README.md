@@ -543,7 +543,7 @@ To upload streams from picam to YouTube, take the following steps.
 
     $ ffmpeg -i tcp://127.0.0.1:8181?listen -c:v copy -c:a aac -strict -2 -ar 44100 -ab 40000 -f flv YOUR_STREAM_URL/YOUR_STREAM_KEY
 
-<img src="https://github.com/iizukanao/picam/raw/master/images/youtube.png" alt="YouTube Live console" style="max-width:100%;" width="600" height="459">
+<img src="https://raw.githubusercontent.com/iizukanao/picam/libcamera/images/youtube.png" alt="YouTube Live console" style="max-width:100%;" width="600" height="459">
 
 Then, run picam to start streaming.
 
