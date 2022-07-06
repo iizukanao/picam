@@ -17,6 +17,7 @@
 *.out
 *.app
 picam
+build/
 
 *~
 *.sw[po]
