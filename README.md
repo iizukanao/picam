@@ -31,7 +31,7 @@ If you want to build picam yourself, see [BUILDING.md](BUILDING.md).
 
 The fastest way to use picam is to use a binary release. To set up and use it, run the following commands on your Raspberry Pi (Raspbian). It will set up picam in `~/picam/`.
 
-```bash
+```sh
 # If you have not enabled camera, enable it with raspi-config then reboot
 sudo raspi-config
 
@@ -106,46 +106,56 @@ Result:
 
 First, find ALSA device name of your microphone.
 
-    $ arecord -l
-    **** List of CAPTURE Hardware Devices ****
-    card 1: Device [USB PnP Sound Device], device 0: USB Audio [USB Audio]
-      Subdevices: 1/1
-      Subdevice #0: subdevice #0
+```sh
+$ arecord -l
+**** List of CAPTURE Hardware Devices ****
+card 1: Device [USB PnP Sound Device], device 0: USB Audio [USB Audio]
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+```
 
 ALSA device name is consisted of `hw:<card>,<device>`. In the above example, the ALSA device name is `hw:1,0`.
 
 If you got `no soundcards found` error, try `sudo arecord -l`. If that output looks good, you might want to add your user to `audio` group.
 
-    $ sudo usermod -a -G audio $USER
-    (once logout, then login)
-    $ groups
-    wheel audio pi  <-- (make sure that 'audio' is in the list)
-    $ arecord -l
-    **** List of CAPTURE Hardware Devices ****
-    card 1: Device [USB PnP Sound Device], device 0: USB Audio [USB Audio]
-      Subdevices: 1/1
-      Subdevice #0: subdevice #0
+```sh
+$ sudo usermod -a -G audio $USER
+(once logout, then login)
+$ groups
+wheel audio pi  <-- (make sure that 'audio' is in the list)
+$ arecord -l
+**** List of CAPTURE Hardware Devices ****
+card 1: Device [USB PnP Sound Device], device 0: USB Audio [USB Audio]
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+```
 
 #### Starting picam
 
 Run picam with your ALSA device name.
 
-    $ ./picam --alsadev hw:1,0
-    configuring devices
-    capturing started
+```sh
+$ ./picam --alsadev hw:1,0
+configuring devices
+capturing started
+```
 
 
 #### Recording
 
 To start recording, create a file named `hooks/start_record` while picam command is running.
 
-    $ touch hooks/start_record
+```sh
+$ touch hooks/start_record
+```
 
 You will see smth like `disk_usage=23% start rec to rec/archive/2017-08-05_16-41-52.ts` in the picam command output.
 
 To stop recording, create a file named `hooks/stop_record`.
 
-    $ touch hooks/stop_record
+```sh
+$ touch hooks/stop_record
+```
 
 You will see `stop rec` in the picam command output.
 
@@ -153,21 +163,25 @@ The recorded MPEG-TS file is in `rec/archive/` directory.
 
 To convert MPEG-TS to MP4, run:
 
-```bash
-ffmpeg -i test.ts -c:v copy -c:a copy -bsf:a aac_adtstoasc test.mp4
+```sh
+$ ffmpeg -i test.ts -c:v copy -c:a copy -bsf:a aac_adtstoasc test.mp4
 # or
-avconv -i test.ts -c:v copy -c:a copy -bsf:a aac_adtstoasc test.mp4
+$ avconv -i test.ts -c:v copy -c:a copy -bsf:a aac_adtstoasc test.mp4
 ```
 
 #### Mute/Unmute
 
 To mute microphone temporarily, create a file named `hooks/mute`.
 
-    $ touch hooks/mute
+```sh
+$ touch hooks/mute
+```
 
 To unmute microphone, create a file named `hooks/unmute`.
 
-    $ touch hooks/unmute
+```sh
+$ touch hooks/unmute
+```
 
 #### Command options
 
@@ -324,7 +338,9 @@ Camera white balance can be set either via command line option (e.g. `--wb fluor
 
 For example, the following command will dynamically change the white balance to **fluorescent**.
 
-    $ touch hooks/wb_fluorescent
+```sh
+$ touch hooks/wb_fluorescent
+```
 
 For the list of available white balance modes, see `picam --help`.
 
@@ -335,7 +351,9 @@ Camera exposure control can be set either via command line option (e.g. `--ex lo
 
 For example, the following command will dynamically change the exposure control to **long**.
 
-    $ touch hooks/ex_long
+```sh
+$ touch hooks/ex_long
+```
 
 For the list of available exposure control values, see `picam --help`.
 
@@ -354,7 +372,7 @@ There are two types of recordbuf; global and per-recording. Global recordbuf is 
 
 Global recordbuf can be specified by either `--recordbuf` option or hooks/set_recordbuf.
 
-```bash
+```sh
 # Set global recordbuf to 30
 echo 30 > hooks/set_recordbuf
 ```
@@ -363,8 +381,10 @@ echo 30 > hooks/set_recordbuf
 
 Per-recording recordbuf has a default value which is the same value as global recordbuf. Per-recording recordbuf can be specified via `hooks/start_record`.
 
-    # Start recording with per-recording recordbuf set to 2
-    $ echo recordbuf=2 > hooks/start_record
+```sh
+# Start recording with per-recording recordbuf set to 2
+$ echo recordbuf=2 > hooks/start_record
+```
 
 #### Overlaying text (subtitle)
 
@@ -372,7 +392,9 @@ Per-recording recordbuf has a default value which is the same value as global re
 
 picam can display text with correct ligatures and kerning, with a font of your choice. To display a text, create hooks/subtitle.
 
-    $ echo 'text=Houston, we have a problem' > hooks/subtitle
+```sh
+$ echo 'text=Houston, we have a problem' > hooks/subtitle
+```
 
 [<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_intro_small.png" alt="Subtitle example image" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_intro.png)
 
@@ -405,43 +427,51 @@ NOTE: On the first generation models of Raspberry Pi (before Pi 2), subtitles ca
 
 ##### Examples
 
-    $ cat example1
-    text=What goes up\nmust come down\nfinally floor AV Wa
-    font_name=serif
-    pt=40
-    $ cat example1 > hooks/subtitle
+```sh
+$ cat example1
+text=What goes up\nmust come down\nfinally floor AV Wa
+font_name=serif
+pt=40
+$ cat example1 > hooks/subtitle
+```
 
 [<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_example1_small.png" alt="Subtitle example 1" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_example1.png)
 
-    $ cat example2
-    text=お気の毒ですが\n冒険の書は\n消えちゃいました☆
-    font_file=/home/pi/uzura.ttf
-    pt=46
-    $ cat example2 > hooks/subtitle
+```sh
+$ cat example2
+text=お気の毒ですが\n冒険の書は\n消えちゃいました☆
+font_file=/home/pi/uzura.ttf
+pt=46
+$ cat example2 > hooks/subtitle
+```
 
 [<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_example2_small.png" alt="Subtitle example 2" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_example2.png)
 
-    $ cat example3
-    text=♨☀♻♥⚠
-    font_file=/home/pi/NotoSansCJKjp-Regular.otf
-    pt=120
-    layout_align=middle,center
-    letter_spacing=40
-    $ cat example3 > hooks/subtitle
+```sh
+$ cat example3
+text=♨☀♻♥⚠
+font_file=/home/pi/NotoSansCJKjp-Regular.otf
+pt=120
+layout_align=middle,center
+letter_spacing=40
+$ cat example3 > hooks/subtitle
+```
 
 [<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_example3_small.png" alt="Subtitle example 3" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_example3.png)
 
-    $ cat example4
-    text=●REC
-    font_name=FreeSans
-    pt=40
-    layout_align=top,right
-    horizontal_margin=30
-    vertical_margin=30
-    color=000000
-    stroke_width=0
-    duration=0
-    $ cat example4 > hooks/subtitle
+```sh
+$ cat example4
+text=●REC
+font_name=FreeSans
+pt=40
+layout_align=top,right
+horizontal_margin=30
+vertical_margin=30
+color=000000
+stroke_width=0
+duration=0
+$ cat example4 > hooks/subtitle
+```
 
 [<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_example4_small.png" alt="Subtitle example 4" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_example4.png)
 
@@ -451,8 +481,10 @@ NOTE: On the first generation models of Raspberry Pi (before Pi 2), subtitles ca
 
 To change the directory and/or filename for the recorded file, specify `dir` and/or `filename` parameters in `hooks/start_record`.
 
-    # Start recording to /tmp/myout.ts
-    $ echo -e "dir=/tmp\nfilename=myout.ts" > hooks/start_record
+```sh
+# Start recording to /tmp/myout.ts
+$ echo -e "dir=/tmp\nfilename=myout.ts" > hooks/start_record
+```
 
 #### Determine the length of a recorded file
 
@@ -460,9 +492,11 @@ To change the directory and/or filename for the recorded file, specify `dir` and
 
 The file state/*recorded_filename* has some info about the recording.
 
-    $ cat state/2015-11-19_01-18-09.ts
-    duration_pts=2083530
-    duration_sec=23.150333
+```sh
+$ cat state/2015-11-19_01-18-09.ts
+duration_pts=2083530
+duration_sec=23.150333
+```
 
 You can remove `state/*.ts` files if you do not need them.
 
@@ -471,16 +505,18 @@ You can remove `state/*.ts` files if you do not need them.
 
 HTTP Live Streaming is disabled by default. To enable HTTP Live Streaming and generate files in /run/shm/hls, run:
 
-    $ ./picam -o /run/shm/hls
+```sh
+$ ./picam -o /run/shm/hls
+```
 
 #### Serving HLS
 
 [Set up nginx](https://www.raspberrypi.org/documentation/remote-access/web-server/nginx.md) (ignore "Additional - Install PHP" step), then open */etc/nginx/sites-available/default* with a text editor and add the following code inside `server { ... }` block.
 
-```
-	location /hls/ {
-		root /run/shm;
-	}
+```txt
+location /hls/ {
+	root /run/shm;
+}
 ```
 
 Restart the nginx server with `sudo service nginx restart` then run picam with `-o /run/shm/hls` option. The HLS will be available at http://YOUR-PI-IP/hls/index.m3u8
@@ -496,13 +532,17 @@ Optionally you can enable encryption for HTTP Live Streaming. We will use the fo
 
 First you have to create a file named `enc.key` which contains 16-byte encryption key. To create such file, run:
 
-    $ echo -n $'\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff' > enc.key
+```sh
+$ echo -n $'\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff' > enc.key
+```
 
 Put `enc.key` in `/run/shm/hls/` directory. Then, run picam with the following options:
 
-    $ ./picam -o /run/shm/hls --hlsenc --hlsenckeyuri enc.key \
-      --hlsenckey f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff \
-      --hlsenciv 000102030405060708090a0b0c0d0e0f
+```sh
+$ ./picam -o /run/shm/hls --hlsenc --hlsenckeyuri enc.key \
+  --hlsenckey f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff \
+  --hlsenciv 000102030405060708090a0b0c0d0e0f
+```
 
 You can watch the HTTP Live Streaming by accessing `/run/shm/hls/index.m3u8` via HTTP or HTTPS with QuickTime Player.
 
@@ -511,25 +551,29 @@ You can watch the HTTP Live Streaming by accessing `/run/shm/hls/index.m3u8` via
 
 To use picam with [nginx-rtmp-module](https://github.com/arut/nginx-rtmp-module), add the following lines to `nginx.conf`:
 
-    rtmp {
-        server {
-            listen 1935;
-            chunk_size 4000;
-            application webcam {
-                live on;
+```txt
+rtmp {
+    server {
+        listen 1935;
+        chunk_size 4000;
+        application webcam {
+            live on;
 
-                exec_static /path/to/ffmpeg -i tcp://127.0.0.1:8181?listen
-                                            -c:v copy -ar 44100 -ab 40000
-                                            -f flv rtmp://localhost:1935/webcam/mystream;
-            }
+            exec_static /path/to/ffmpeg -i tcp://127.0.0.1:8181?listen
+                                        -c:v copy -ar 44100 -ab 40000
+                                        -f flv rtmp://localhost:1935/webcam/mystream;
         }
     }
+}
+```
 
 Note that `/path/to/ffmpeg` should be replaced with the actual absolute path to ffmpeg command.
 
 Start nginx server, then run:
 
-    $ ./picam --tcpout tcp://127.0.0.1:8181
+```sh
+$ ./picam --tcpout tcp://127.0.0.1:8181
+```
 
 You can access your live stream at `rtmp://YOUR_RASPBERRYPI_IP/webcam/mystream`.
 
@@ -541,13 +585,17 @@ To upload streams from picam to YouTube, take the following steps.
 1. Open [YouTube Studio](https://studio.youtube.com/) and click on the top-right corner **CREATE** button &rarr; **Go live**.
 2. When streaming console appears, copy the "Stream URL" and "Stream key" and run the following ffmpeg command.
 
-    $ ffmpeg -i tcp://127.0.0.1:8181?listen -c:v copy -c:a aac -strict -2 -ar 44100 -ab 40000 -f flv YOUR_STREAM_URL/YOUR_STREAM_KEY
+```sh
+$ ffmpeg -i tcp://127.0.0.1:8181?listen -c:v copy -c:a copy -f flv STREAM_URL/STREAM_KEY
+```
 
 <img src="https://raw.githubusercontent.com/iizukanao/picam/libcamera/images/youtube.png" alt="YouTube Live console" style="max-width:100%;" width="600">
 
 Then, run picam to start streaming.
 
-    $ picam --tcpout tcp://127.0.0.1:8181
+```sh
+$ picam --tcpout tcp://127.0.0.1:8181
+```
 
 
 ### Recommended hardware
