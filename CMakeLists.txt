@@ -3,12 +3,15 @@ cmake_minimum_required(VERSION 3.6)
 # set the project name
 project(picam)
 
- if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
-     if (NOT CMAKE_BUILD_TYPE)
-         set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
-         message(STATUS "No previous build - default to Release build")
-     endif()
- endif()
+if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
+    if (NOT CMAKE_BUILD_TYPE)
+        set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
+        message(STATUS "No previous build - default to Release build")
+    endif()
+endif()
+
+set(CMAKE_CXX_FLAGS_DEBUG "-g")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set (CMAKE_CXX_STANDARD 17)
