@@ -101,8 +101,8 @@ public:
 
     int log_level = LOG_LEVEL_INFO;
     int sensor_mode = -1;
-    int video_width = 1280;
-    int video_height = 720;
+    int video_width = 1920;
+    int video_height = 1080;
     float video_fps = 30.0f;
     float min_fps = -1.0f;
     float max_fps = -1.0f;
@@ -114,8 +114,8 @@ public:
     // int video_rotation = 0;
     int video_hflip = 0;
     int video_vflip = 0;
-    long video_bitrate = 2000 * 1000; // 2 Mbps
-    char video_avc_profile[21] = "constrained_baseline";
+    long video_bitrate = 4500 * 1000; // 4.5 Mbps
+    char video_avc_profile[21] = "baseline";
     char video_avc_level[4] = "4.1";
     int video_qp_min = -1;
     int video_qp_max = -1;

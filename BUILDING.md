@@ -1,6 +1,6 @@
 # picam build instructions
 
-This file explains how to build picam yourself. The whole process takes under an hour on Raspberry Pi 2 or 3. For Raspberry Pi 1 or Zero users, please do [cross compiling](CROSS_COMPILING.md) instead, because build process takes too long on those hardware.
+This file explains how to build picam yourself. The whole process takes under an hour on Raspberry Pi 2 or 3.
 
 
 # Steps
@@ -16,11 +16,12 @@ $ sudo apt-get install git libasound2-dev libssl-dev libfontconfig1-dev libharfb
 
 ## Build and install fdk-aac
 
-Download [fdk-aac-2.0.1.tar.gz](https://sourceforge.net/projects/opencore-amr/files/fdk-aac/) (or the latest version) and run the following commands.
+Install [fdk-aac](https://sourceforge.net/projects/opencore-amr/files/fdk-aac/) with the following commands.
 
 ```sh
-$ tar zxvf fdk-aac-2.0.1.tar.gz
-$ cd fdk-aac-2.0.1
+$ wget https://downloads.sourceforge.net/project/opencore-amr/fdk-aac/fdk-aac-2.0.2.tar.gz
+$ tar zxvf fdk-aac-2.0.2.tar.gz
+$ cd fdk-aac-2.0.2
 $ ./configure
 $ make -j4
 (takes 3-4 minutes)
@@ -37,18 +38,11 @@ Download ffmpeg source and configure it:
 ```sh
 $ git clone https://git.ffmpeg.org/ffmpeg.git
 $ cd ffmpeg
-# NOTE: for extra hw acceleration, include these flags in your ./configure below:
-#         --enable-mmal
-#         --enable-omx
-#         --enable-omx-rpi
 $ ./configure --enable-libfdk-aac
 (takes about one minute)
 ```
 
-In the output of `configure`, make sure that:
-
-- There is `alsa` in `Enabled indevs`
-- There is `libfdk_aac` in `Enabled encoders`
+In the output of `configure`, make sure that there is `libfdk_aac` in `Enabled encoders`.
 
 Run the following commands to build and install ffmpeg.
 
@@ -65,19 +59,14 @@ $ sudo ldconfig
 ```
 
 
-## Build libilclient
-
-```sh
-$ cd /opt/vc/src/hello_pi/libs/ilclient
-$ make
-```
-
-
 ## Build picam
 
 ```sh
 $ git clone https://github.com/iizukanao/picam.git
 $ cd picam
+$ mkdir build
+$ cd build
+$ cmake ..
 $ make -j4
 ```
 

@@ -1,6 +1,41 @@
 Change Log
 ==========
 
+Version 2.0.0 *(2022-07-06)*
+----------------------------
+
+- Built with libcamera and removed legacy camera libraries (OpenMAX IL and MMAL).
+- Now supports up to video resolution 1920x1080 at 30 fps.
+- Removed the following command line options due to technical limitations:
+  + `--rotation` (For 180 degree rotation, use `--hflip --vflip` instead)
+  + `--qpmin`
+  + `--qpmax`
+  + `--qpinit`
+  + `--dquant`
+  + `--aperture`
+  + `--iso`
+  + `--opacity` (Preview window opacity)
+  + `--blank`
+  + `--mode`
+- Added the following command line options:
+  + `--hdmi` (Selects HDMI connector to show preview. Only works in console mode.
+- Changed the default values for the command line options:
+  + `-w, --width` default is 1920 (previously 1280)
+  + `-h, --height` default is 1080 (previously 720)
+  + `-v, --videobitrate` default is 4500000 (previously 2000000)
+  + `--avcprofile` default is `main` (previously `constrained_baseline`)
+  + `--avclevel` default is `4.1` (previously `3.1`)
+- Changed available values for the following command line options:
+  + `--wb`
+  + `--metering`
+  + `--ex`
+- For NoIR camera users, `--wb greyworld` option is no longer available. Instead, pass `LIBCAMERA_RPI_TUNING_FILE` environment variable when running picam: `LIBCAMERA_RPI_TUNING_FILE=/usr/share/libcamera/ipa/raspberrypi/ov5647_noir.json ./picam`
+
+## Known issues
+
+- There are some noise in audio preview (`--audiopreview` option) if video resolution is 1920x1080.
+- If X Window System (desktop environment) is running, fps will drop due to system load.
+
 Version 1.4.11 *(2021-04-29)*
 -----------------------------
 

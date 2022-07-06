@@ -7,46 +7,22 @@
 - Add timestamp
 - Display Unicode text with arbitrary font
 
-### Performance (Latency)
-
-Time from real motion to playback on Strobe Media Player over RTMP:
-
-| Video bitrate | Minimum latency |
-| ------------: | --------------: |
-| 300 Kbps      |         0.3 sec |
-| 500 Kbps      |         0.6 sec |
-|   1 Mbps      |         0.8 sec |
-|   2 Mbps      |         1.0 sec |
-|   3 Mbps      |         1.3 sec |
-
-**In HTTP Live Streaming (HLS), the latency will never go below 3-4 seconds.** This limitation stems from the design of HLS.
-
-The above results were tested with:
-
-- Video: 1280x720, 30 fps, GOP size 30
-- Audio: 48 Khz mono, 40 Kbps
-- RTMP Server: [node-rtsp-rtmp-server](https://github.com/iizukanao/node-rtsp-rtmp-server)
-- Client: Flash Player 14,0,0,145 on Firefox 31.0 for Mac, using [test/strobe_media_playback.html](https://github.com/iizukanao/picam/blob/master/test/strobe_media_playback.html)
-- Network: Wi-Fi network created by a USB dongle attached to Raspberry Pi
-
 
 ### Required hardware
 
-- Raspberry Pi
-- Raspberry Pi Camera Board v1 or v2
+- Raspberry Pi (4B is recommended)
+- Raspberry Pi Camera Board (v1 or v2) or compatible cameras
 - (optionally) USB microphone or Wolfson Audio Card
 
 
 ### Supported operating systems
 
-- Raspbian
+- Raspberry Pi OS
 - Arch Linux
 
 ### Installation
 
 Binary release is available at https://github.com/iizukanao/picam/releases/latest
-
-Also, out-of-the-box SD card image for live streaming (picam + Raspbian + live streaming server) is available at https://github.com/iizukanao/picam-streamer
 
 If you want to build picam yourself, see [BUILDING.md](BUILDING.md).
 
@@ -344,42 +320,24 @@ Options:
 
 #### White balance
 
-Camera white balance can be set either via command line option (e.g. `--wb sun`) or hooks. To change the white balance while picam is running, create `hooks/wb_<value>`, where `<value>` is the name of white balance.
+Camera white balance can be set either via command line option (e.g. `--wb fluorescent`) or hooks. To change the white balance while picam is running, create `hooks/wb_<value>`, where `<value>` is the name of white balance.
 
-For example, the following command will dynamically change the white balance to **sun**.
+For example, the following command will dynamically change the white balance to **fluorescent**.
 
-    $ touch hooks/wb_sun
+    $ touch hooks/wb_fluorescent
 
-Available white balance modes are: **off**, **auto**, **sun**, **cloudy**, **shade**, **tungsten**, **fluorescent**, **incandescent**, **flash**, and **horizon**.
+For the list of available white balance modes, see `picam --help`.
 
 
 #### Exposure Control
 
-Camera exposure control can be set either via command line option (e.g. `--ex night`) or hooks. To change the exposure control while picam is running, start picam with `--vfr` or `--ex` option, then create `hooks/ex_<value>`, where `<value>` is the name of exposure control.
+Camera exposure control can be set either via command line option (e.g. `--ex long`) or hooks. To change the exposure control while picam is running, start picam with `--vfr` or `--ex` option, then create `hooks/ex_<value>`, where `<value>` is the name of exposure control.
 
-For example, the following command will dynamically change the exposure control to **night**.
+For example, the following command will dynamically change the exposure control to **long**.
 
-    $ touch hooks/ex_night
+    $ touch hooks/ex_long
 
 For the list of available exposure control values, see `picam --help`.
-
-| Value | Description |
-| ----- | ----------- |
-| `off` | Disable exposure control |
-| `auto` | Automatic exposure |
-| `night` | Exposure at night |
-| `nightpreview` | Shorter exposure than `night` |
-| `backlight` | Exposure with backlight illuminating the subject |
-| `spotlight` | Exposure with a spotlight illuminating the subject |
-| `sports` | Exposure for sports |
-| `snow` | Exposure for the subject in snow |
-| `beach` | Exposure for the subject at a beach |
-| `verylong` | Long exposure |
-| `fixedfps` | Constrain FPS to a fixed value |
-| `antishake` | Antishake mode |
-| `fireworks` | Optimized for fireworks |
-| `largeaperture` | Exposure when using a large aperture on the camera |
-| `smallaperture` | Exposure when using a small aperture on the camera |
 
 
 #### Recordbuf
@@ -576,11 +534,14 @@ Start nginx server, then run:
 You can access your live stream at `rtmp://YOUR_RASPBERRYPI_IP/webcam/mystream`.
 
 
-### Publishing to Ustream
+### Publishing live stream to YouTube
 
-To upload streams from picam to Ustream, run ffmpeg with the following options. `RTMP_URL` and `STREAM_KEY` can be obtained from Ustream's Channel settings &rarr; Broadcast settings &rarr; Encoder settings.
+To upload streams from picam to YouTube, take the following steps.
 
-    $ ffmpeg -i tcp://127.0.0.1:8181?listen -c:v copy -c:a aac -strict -2 -ar 44100 -ab 40000 -f flv RTMP_URL/STREAM_KEY
+1. Open [YouTube Studio](https://studio.youtube.com/) and click on the top-right corner **CREATE** button &rarr; **Go live**.
+2. When streaming console appears, copy the "Stream URL" and "Stream key" and run the following ffmpeg command.
+
+    $ ffmpeg -i tcp://127.0.0.1:8181?listen -c:v copy -c:a aac -strict -2 -ar 44100 -ab 40000 -f flv YOUR_STREAM_URL/YOUR_STREAM_KEY
 
 <img src="https://github.com/iizukanao/picam/raw/master/images/ustream.png" alt="Encoder settings on Ustream" style="max-width:100%;" width="600" height="459">
 
