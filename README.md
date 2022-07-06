@@ -10,7 +10,7 @@
 
 ### Required hardware
 
-- Raspberry Pi (4B is recommended)
+- Raspberry Pi
 - Raspberry Pi Camera Board (v1 or v2) or compatible cameras
 - (optionally) USB microphone or Wolfson Audio Card
 
@@ -29,15 +29,15 @@ If you want to build picam yourself, see [BUILDING.md](BUILDING.md).
 
 ### Using a binary release
 
-The fastest way to use picam is to use a binary release. To set up and use it, run the following commands on your Raspberry Pi (Raspbian). It will set up picam in `~/picam/`.
+The fastest way to use picam is to use a binary release. To set up and use it, run the following commands on your Raspberry Pi OS. It will set up picam in `~/picam/`.
 
 ```sh
-# If you have not enabled camera, enable it with raspi-config then reboot
+# If you have enabled legacy camera support, disable it with raspi-config then reboot
 sudo raspi-config
 
 # Install dependencies
-sudo apt-get update
-sudo apt-get install libharfbuzz0b libfontconfig1
+sudo apt update
+sudo apt install libharfbuzz libfontconfig
 
 # Create directories and symbolic links
 cat > make_dirs.sh <<'EOF'
@@ -63,9 +63,9 @@ chmod +x make_dirs.sh
 alsamixer
 
 # Install picam binary
-wget https://github.com/iizukanao/picam/releases/download/v1.4.11/picam-1.4.11-binary.tar.xz
-tar xvf picam-1.4.11-binary.tar.xz
-cp picam-1.4.11-binary/picam ~/picam/
+wget https://github.com/iizukanao/picam/releases/download/v2.0.0/picam-2.0.0-`uname -m`.tar.xz
+tar xvf picam-2.0.0-*.tar.xz
+cp picam-2.0.0-*/picam ~/picam/
 
 # Run picam
 cd ~/picam
@@ -185,40 +185,35 @@ $ touch hooks/unmute
 
 #### Command options
 
-```
-picam version 1.4.11
+```txt
+picam version 2.0.0
 Usage: picam [options]
 
 Options:
  [video]
-  -w, --width <num>   Width in pixels (default: 1280)
-  -h, --height <num>  Height in pixels (default: 720)
-  -v, --videobitrate <num>  Video bit rate (default: 2000000)
+  -w, --width <num>   Width in pixels (default: 1920)
+  -h, --height <num>  Height in pixels (default: 1080)
+  -v, --videobitrate <num>  Video bit rate (default: 4500000)
                       Set 0 to disable rate control
   -f, --fps <num>     Frame rate (default: 30.0)
   -g, --gopsize <num>  GOP size (default: same value as fps)
   --vfr               Enable variable frame rate. GOP size will be
                       dynamically controlled.
   --minfps <num>      Minimum frames per second. Implies --vfr.
-                      It might not work if width / height >= 1.45.
   --maxfps <num>      Maximum frames per second. Implies --vfr.
-                      It might not work if width / height >= 1.45.
-  --rotation <num>    Image rotation in clockwise degrees
-                      (0, 90, 180, 270)
   --hflip             Flip image horizontally
   --vflip             Flip image vertically
   --avcprofile <str>  Set AVC/H.264 profile to one of:
                       constrained_baseline/baseline/main/high
-                      (default: constrained_baseline)
-  --avclevel <value>  Set AVC/H.264 level (default: 3.1)
-  --qpmin <num>       Minimum quantization level (0..51)
-  --qpmax <num>       Maximum quantization level (0..51)
-  --qpinit <num>      Initial quantization level
-  --dquant <num>      Slice DQuant level
+                      (default: baseline)
+  --avclevel <value>  Set AVC/H.264 level (default: 4.1)
  [audio]
   -c, --channels <num>  Audio channels (1=mono, 2=stereo)
                       Default is mono. If it fails, stereo is used.
   -r, --samplerate <num>  Audio sample rate (default: 48000)
+                      The sample rates supported by libfdk_aac encoder are:
+                      8000, 11025, 12000, 16000, 22050, 24000,
+                      32000, 44100, 48000, 64000, 88200, 96000
   -a, --audiobitrate <num>  Audio bit rate (default: 40000)
   --alsadev <dev>     ALSA microphone device (default: hw:0,0)
   --volume <num>      Amplify audio by multiplying the volume by <num>
@@ -260,42 +255,36 @@ Options:
                       If --verbose option is enabled as well, average value of
                       Y is printed like y=28.0.
   --ex <value>        Set camera exposure. Implies --vfr. <value> is one of:
-                        off auto night nightpreview backlight spotlight sports
-                        snow beach verylong fixedfps antishake fireworks
-                        largeaperture smallaperture
+                        normal short long custom
   --wb <value>        Set white balance. <value> is one of:
-                        off: Disable white balance control
-                        auto: Automatic white balance control (default)
-                        sun: The sun provides the light source
-                        cloudy: The sun provides the light source through clouds
-                        shade: Light source is the sun and scene is in the shade
-                        tungsten: Light source is tungsten
-                        fluorescent: Light source is fluorescent
-                        incandescent: Light source is incandescent
-                        flash: Light source is a flash
-                        horizon: Light source is the sun on the horizon
-                        greyworld: AWB for NoIR camera
+                        off: Disable auto white balance control
+                        auto: Search over the whole colour temperature range (default)
+                        incandescent: Incandescent AWB lamp mode
+                        tungsten: Tungsten AWB lamp mode
+                        fluorescent: Fluorescent AWB lamp mode
+                        indoor: Indoor AWB lighting mode
+                        daylight: Daylight AWB lighting mode
+                        cloudy: Cloudy AWB lighting mode
+                        custom: Custom AWB mode
   --wbred <num>       Red gain. Implies "--wb off". (0.0 .. 8.0)
   --wbblue <num>      Blue gain. Implies "--wb off". (0.0 .. 8.0)
   --metering <value>  Set metering type. <value> is one of:
-                        average: Center weight average metering (default)
-                        spot: Spot (partial) metering
-                        matrix: Matrix or evaluative metering
-                        backlit: Assume a backlit image
+                        center: Center-weighted metering mode (default)
+                        spot: Spot metering mode
+                        matrix: Matrix metering mode
+                        custom: Custom metering mode
   --evcomp <num>      Set Exposure Value compensation (-24..24) (default: 0)
   --shutter <num>     Set shutter speed in microseconds (default: auto).
                       Implies --vfr.
-  --iso <num>         Set ISO sensitivity (100..800) (default: auto)
-  --roi <x,y,w,h>     Set region of interest (crop rect) in ratio (0.0-1.0)
+  --roi <x,y,w,h>     Set region of interest (crop rect) in ratio (0.0-1.0).
                       (default: 0,0,1,1)
+                      --roi affects performance and may reduce fps.
   -p, --preview       Display fullscreen preview
   --previewrect <x,y,width,height>
                       Display preview window at specified position
-  --opacity           Preview window opacity
-                      (0=transparent..255=opaque; default=255)
-  --blank[=0xAARRGGBB]  Set the video background color to black (or optional ARGB value)
+  --hdmi              Preview output HDMI port (0 or 1; default=0)
+                      HDMI port selection only works in console mode (when X is not running)
   --query             Query camera capabilities then exit
-  --mode             Specify the camera sensor mode (values depend on the camera hardware)
  [timestamp] (may be a bit heavy on Raspberry Pi 1)
   --time              Enable timestamp
   --timeformat <spec>  Timestamp format (see "man strftime" for spec)
@@ -346,10 +335,25 @@ For the list of available white balance modes, see `picam --help`.
 
 #### NoIR camera
 
-picam versions prior to 2.0.0 had `--wb greyworld` option but it is no longer available. Instead, use `LIBCAMERA_RPI_TUNING_FILE` environment variable.
+picam versions prior to 2.0.0 had `--wb greyworld` option for NoIR camera, but it is no longer available. Instead, use `LIBCAMERA_RPI_TUNING_FILE` environment variable to specify a correct tuning file that corresponds to the camera sensor.
 
+Example for NoIR camera v1:
 ```sh
 LIBCAMERA_RPI_TUNING_FILE=/usr/share/libcamera/ipa/raspberrypi/ov5647_noir.json ./picam
+```
+
+To find out the name of camera sensor, run `picam --query`. In the following case, `imx219` is the sensor name.
+
+```sh
+$ ./picam --query
+[0:37:47.327293801] [2412]  INFO Camera camera_manager.cpp:293 libcamera v0.0.0+3700-f30ad033
+[0:37:47.366360221] [2413]  WARN RPI raspberrypi.cpp:1252 Mismatch between Unicam and CamHelper for embedded data usage!
+[0:37:47.367038208] [2413]  INFO RPI raspberrypi.cpp:1368 Registered camera /base/soc/i2c0mux/i2c@1/imx219@10 to Unicam device /dev/media0 and ISP device /dev/media1
+Available cameras
+-----------------
+0 : imx219 [3280x2464] (/base/soc/i2c0mux/i2c@1/imx219@10)
+    Modes: 'SRGGB10_CSI2P' : 640x480 1640x1232 1920x1080 3280x2464
+           'SRGGB8' : 640x480 1640x1232 1920x1080 3280x2464
 ```
 
 
