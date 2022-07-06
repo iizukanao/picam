@@ -344,6 +344,14 @@ $ touch hooks/wb_fluorescent
 
 For the list of available white balance modes, see `picam --help`.
 
+#### NoIR camera
+
+picam versions prior to 2.0.0 had `--wb greyworld` option but it is no longer available. Instead, use `LIBCAMERA_RPI_TUNING_FILE` environment variable.
+
+```sh
+LIBCAMERA_RPI_TUNING_FILE=/usr/share/libcamera/ipa/raspberrypi/ov5647_noir.json ./picam
+```
+
 
 #### Exposure Control
 

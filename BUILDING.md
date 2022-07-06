@@ -8,7 +8,7 @@ This file explains how to build picam yourself. The whole process takes under an
 ## Install required packages
 
 ```sh
-$ sudo apt-get install git libasound2-dev libssl-dev libfontconfig1-dev libharfbuzz-dev
+$ sudo apt-get install git cmake libcamera-dev libharfbuzz-dev libfontconfig-dev libasound-dev libdrm-dev libegl-dev libepoxy-dev libssl-dev liblzma-dev
 ```
 
 (NOTE: `$` denotes command prompt. Do not enter `$` when entering commands.)

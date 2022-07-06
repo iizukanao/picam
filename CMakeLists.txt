@@ -58,7 +58,7 @@ message(STATUS "    libraries: ${LIBCAMERA_LINK_LIBRARIES}")
 message(STATUS "    include path: ${LIBCAMERA_INCLUDE_DIRS}")
 include_directories(${CMAKE_SOURCE_DIR} ${LIBCAMERA_INCLUDE_DIRS} /usr/include/freetype2 /usr/include/harfbuzz /usr/include/fontconfig)
 
-add_subdirectory(core)
+#add_subdirectory(core)
 #add_subdirectory(encoder)
 add_subdirectory(video_encoder)
 # add_subdirectory(image)

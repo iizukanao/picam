@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.6)
 
 include(GNUInstallDirs)
 
-find_package(Boost REQUIRED COMPONENTS program_options)
+#find_package(Boost REQUIRED COMPONENTS program_options)
 
 #add_library(libpicam picam.cpp)
 #find_package(PkgConfig)

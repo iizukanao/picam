@@ -3,6 +3,7 @@
  * Based on libcamera_vid.cpp - Copyright (C) 2020, Raspberry Pi (Trading) Ltd.
  */
 
+#include <iostream>
 #include <chrono>
 #include <poll.h>
 #include <signal.h>
@@ -14,7 +15,6 @@
 #include <libcamera/transform.h>
 #include <libcamera/control_ids.h>
 
-#include "output/output.hpp"
 #include "timestamp/timestamp.h"
 #include "subtitle/subtitle.h"
 #include "text/text.h"
@@ -1631,6 +1631,19 @@ void Picam::CloseCamera()
 
 	log_debug("Camera closed\n");
 }
+
+struct Mode
+{
+	Mode() : Mode(0, 0, 0, false) {}
+	Mode(unsigned int w, unsigned int h, unsigned int b, bool p) : width(w), height(h), bit_depth(b), packed(p) {}
+	Mode(std::string const &mode_string);
+	unsigned int width;
+	unsigned int height;
+	unsigned int bit_depth;
+	bool packed;
+	libcamera::Size Size() const { return libcamera::Size(width, height); }
+	std::string ToString() const;
+};
 
 static libcamera::PixelFormat mode_to_pixel_format(Mode const &mode)
 {
