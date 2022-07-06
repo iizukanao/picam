@@ -152,6 +152,8 @@ int Audio::open_audio_preview_device() {
   }
 
   // set the buffer size
+  log_debug("setting audio preview buffer size to %d (audio_buffer_size=%d ALSA_PLAYBACK_BUFFER_MULTIPLY=%d)\n", audio_buffer_size * ALSA_PLAYBACK_BUFFER_MULTIPLY,
+    audio_buffer_size, ALSA_PLAYBACK_BUFFER_MULTIPLY);
   err = snd_pcm_hw_params_set_buffer_size(audio_preview_handle, audio_preview_params,
       audio_buffer_size * ALSA_PLAYBACK_BUFFER_MULTIPLY);
   if (err < 0) {
@@ -388,6 +390,7 @@ int Audio::configure_audio_capture_device() {
 
   // set the buffer size
   int alsa_buffer_multiply = ALSA_BUFFER_MULTIPLY;
+  log_debug("setting microphone buffer size to %d (buffer_size=%d alsa_buffer_multiply=%d)\n", buffer_size * alsa_buffer_multiply, buffer_size, alsa_buffer_multiply);
   err = snd_pcm_hw_params_set_buffer_size(capture_handle, alsa_hw_params,
       buffer_size * alsa_buffer_multiply);
   while (err < 0) {

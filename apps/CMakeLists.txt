@@ -14,7 +14,7 @@ cmake_minimum_required(VERSION 3.6)
 
 project(picam)
 # find_package(PkgConfig)
-# pkg_check_modules(LIBAV REQUIRED harfbuzz fontconfig libavformat libavcodec)
+# pkg_check_modules(LIBAV REQUIRED libavformat libavcodec)
 # include_directories(${LIBAV_INCLUDE_DIRS})
 add_executable(picam main.cpp)
 # target_link_libraries(picam libcamera_app encoders outputs timestamp audio log httplivestreaming muxer libstate libhook asound ${LIBAV_LIBRARIES} lzma)

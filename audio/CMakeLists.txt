@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.6)
 
 include(GNUInstallDirs)
 
-add_library(audio audio.cpp)
+add_library(audio STATIC audio.cpp)
 # If asound is not linked, snd_pcm_hw_params_get_rate() will silently fail
 target_link_libraries(audio asound)
 

@@ -7,7 +7,6 @@
 
 #include <iostream>
 
-// #include "core/options.hpp"
 #include "log/log.h"
 
 #include "preview.hpp"

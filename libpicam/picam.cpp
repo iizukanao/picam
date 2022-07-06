@@ -14,7 +14,6 @@
 #include <libcamera/transform.h>
 #include <libcamera/control_ids.h>
 
-// #include "core/frame_info.hpp"
 #include "output/output.hpp"
 #include "timestamp/timestamp.h"
 #include "subtitle/subtitle.h"
@@ -26,7 +25,6 @@
 #include "libstate/state.h"
 #include "libhook/hook.h"
 #include "preview/preview.hpp"
-#include "core/options.hpp"
 #include "rtsp/rtsp.h"
 #include "picam.hpp"
 

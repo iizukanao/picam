@@ -15,7 +15,6 @@
 #include "video_encoder/video_encoder.hpp"
 #include "preview/preview.hpp"
 #include "picam_option/picam_option.hpp"
-#include "core/video_options.hpp"
 #include "muxer/muxer.hpp"
 #include "audio/audio.hpp"
 

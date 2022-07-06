@@ -5,7 +5,6 @@ extern "C" {
 }
 #include <alsa/asoundlib.h>
 #include "httplivestreaming/httplivestreaming.h"
-#include "core/video_options.hpp"
 #include "muxer/muxer.hpp"
 #include "picam_option/picam_option.hpp"
 

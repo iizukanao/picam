@@ -5,4 +5,4 @@ include(GNUInstallDirs)
 add_library(dispmanx dispmanx.c)
 target_link_libraries(dispmanx)
 
-install(TARGETS muxer LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
+install(TARGETS dispmanx LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR} ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR})
