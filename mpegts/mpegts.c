@@ -22,7 +22,6 @@ AVCodecContext *setup_video_stream(AVFormatContext *format_ctx, MpegTSCodecSetti
   video_codec_ctx->codec_id      = AV_CODEC_ID_H264;
   video_codec_ctx->codec_type    = AVMEDIA_TYPE_VIDEO;
   video_codec_ctx->codec_tag     = 0;
-  printf("creating video with bitrate=%ld width=%d height=%d profile=%d level=%d\n", settings->video_bitrate, settings->video_width, settings->video_height, settings->video_profile, settings->video_level);
   video_codec_ctx->bit_rate      = settings->video_bitrate;
 
   video_codec_ctx->profile       = settings->video_profile;
