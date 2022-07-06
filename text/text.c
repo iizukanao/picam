@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <math.h>
 #include <time.h> // clock()
+#include <inttypes.h>
 #include "log/log.h"
 
 // FreeType
@@ -208,7 +209,7 @@ int text_create(const char *font_file, long face_index, float point, int dpi) {
     max_text_id++;
     textdata_list = realloc(textdata_list, sizeof(TextData) * max_text_id);
     if (textdata_list == NULL) {
-      fprintf(stderr, "cannot allocate memory for textdata_list: %d bytes\n",
+      fprintf(stderr, "cannot allocate memory for textdata_list: %" PRIuPTR " bytes\n",
           sizeof(TextData) * max_text_id);
       exit(EXIT_FAILURE);
     }
@@ -217,7 +218,7 @@ int text_create(const char *font_file, long face_index, float point, int dpi) {
 
   TextData *textdata = malloc(sizeof(TextData));
   if (textdata == NULL) {
-    fprintf(stderr, "cannot allocate memory for textdata: %d bytes\n",
+    fprintf(stderr, "cannot allocate memory for textdata: %" PRIuPTR " bytes\n",
         sizeof(TextData));
     exit(EXIT_FAILURE);
   }
@@ -471,7 +472,7 @@ int text_set_text(int text_id, const char *utf8_text, const size_t text_bytes) {
   textdata->text = malloc(text_bytes);
   if (textdata->text == NULL) {
     fprintf(stderr,
-        "cannot allocate memory for textdata->text: %d bytes\n",
+        "cannot allocate memory for textdata->text: %" PRIuPTR " bytes\n",
         text_bytes);
     exit(EXIT_FAILURE);
   }
@@ -798,7 +799,7 @@ static int draw_glyphs(TextData *textdata) {
   // count \n in the string
   int *line_start_pos = malloc(sizeof(int));
   if (line_start_pos == NULL) {
-    fprintf(stderr, "cannot allocate memory for line_start_pos: %d bytes\n",
+    fprintf(stderr, "cannot allocate memory for line_start_pos: %" PRIuPTR " bytes\n",
         sizeof(int));
     exit(EXIT_FAILURE);
   }
@@ -812,7 +813,7 @@ static int draw_glyphs(TextData *textdata) {
         int *more_line_start_pos = realloc(line_start_pos, sizeof(int) * (lines + 1));
         if (more_line_start_pos == NULL) {
           free(line_start_pos);
-          fprintf(stderr, "cannot allocate memory for line_start_pos: %d bytes\n",
+          fprintf(stderr, "cannot allocate memory for line_start_pos: %" PRIuPTR " bytes\n",
               sizeof(int) * (lines + 1));
           exit(EXIT_FAILURE);
         }
@@ -841,7 +842,7 @@ static int draw_glyphs(TextData *textdata) {
   text_bounds *text_bounds_list = NULL;
   text_bounds_list = calloc(1, sizeof(text_bounds) * lines);
   if (text_bounds_list == NULL) {
-    fprintf(stderr, "cannot allocate memory for text_bounds_list: %d bytes\n",
+    fprintf(stderr, "cannot allocate memory for text_bounds_list: %" PRIuPTR " bytes\n",
         sizeof(text_bounds) * lines);
     exit(EXIT_FAILURE);
   }
@@ -885,7 +886,7 @@ static int draw_glyphs(TextData *textdata) {
 
   TextData *tmp_textdata = malloc(sizeof(TextData));
   if (tmp_textdata == NULL) {
-    fprintf(stderr, "cannot allocate memory for textdata: %d bytes\n",
+    fprintf(stderr, "cannot allocate memory for textdata: %" PRIuPTR " bytes\n",
         sizeof(TextData));
     exit(EXIT_FAILURE);
   }
