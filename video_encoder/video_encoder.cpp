@@ -183,7 +183,7 @@ VideoEncoder::VideoEncoder(PicamOption const *options, StreamInfo const &info)
 	v4l2_buf_type type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
 	if (xioctl(fd_, VIDIOC_STREAMON, &type) < 0) {
 		if (strncmp(options->video_avc_level, "4", 1) != 0) {
-			throw std::runtime_error("Failed to start output streaming. Note that --avclevel below 4.0 may not work with larger resolutions.");
+			throw std::runtime_error("Failed to start output streaming. Note that --avclevel below 4.0 does not work with higher resolutions.");
 		}
 		throw std::runtime_error("Failed to start output streaming.");
 	}

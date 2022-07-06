@@ -6,7 +6,7 @@ Version 2.0.0 *(2022-07-06)*
 
 - Built with libcamera
 - Stopped using legacy camera libraries (OpenMAX IL and MMAL).
-- Added support for larger video resolutions up to 1920x1080 at 30 fps.
+- Added support for higher video resolutions up to 1920x1080 at 30 fps.
 - Changed the default values for the following options:
   + `-w, --width` default is `1920` (previously `1280`)
   + `-h, --height` default is `1080` (previously `720`)
