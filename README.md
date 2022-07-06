@@ -583,7 +583,7 @@ You can access your live stream at `rtmp://YOUR_RASPBERRYPI_IP/webcam/mystream`.
 To upload streams from picam to YouTube, take the following steps.
 
 1. Open [YouTube Studio](https://studio.youtube.com/) and click on the top-right corner **CREATE** button &rarr; **Go live**.
-2. When streaming console appears, copy the "Stream URL" and "Stream key" and run the following ffmpeg command.
+2. When streaming console appears, copy the "Stream URL" and "Stream key" and run the following ffmpeg command. Replace `STREAM_URL` and `STREAM_KEY` with the strings provided by YouTube.
 
 ```sh
 $ ffmpeg -i tcp://127.0.0.1:8181?listen -c:v copy -c:a copy -f flv STREAM_URL/STREAM_KEY
