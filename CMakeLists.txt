@@ -1,23 +1,19 @@
 cmake_minimum_required(VERSION 3.6)
 
 # set the project name
-project(picam2)
+project(picam)
 
-# add the executable
-# add_executable(picam2 stream.cpp)
-
-
-# if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
-#     if (NOT CMAKE_BUILD_TYPE)
-#         set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
-#         message(STATUS "No previous build - default to Release build")
-#     endif()
-# endif()
+ if (NOT EXISTS ${CMAKE_BINARY_DIR}/CMakeCache.txt)
+     if (NOT CMAKE_BUILD_TYPE)
+         set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
+         message(STATUS "No previous build - default to Release build")
+     endif()
+ endif()
 
 set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set (CMAKE_CXX_STANDARD 17)
-# add_compile_options(-Wall -Wextra -pedantic -Wno-unused-parameter -faligned-new -Werror -Wfatal-errors)
-add_compile_options(-Wall -Wextra -g -pedantic -Wno-unused-parameter -Werror -Wfatal-errors)
+#add_compile_options(-Wall -Wextra -pedantic -Wno-unused-parameter -faligned-new -Werror -Wfatal-errors)
+add_compile_options(-Wall -Wextra -pedantic -Wno-unused-parameter -Werror -Wfatal-errors)
 add_definitions(-D_FILE_OFFSET_BITS=64)
 
 if (CMAKE_COMPILER_IS_GNUCXX)
@@ -59,12 +55,8 @@ message(STATUS "    include path: ${LIBCAMERA_INCLUDE_DIRS}")
 include_directories(${CMAKE_SOURCE_DIR} ${LIBCAMERA_INCLUDE_DIRS} /usr/include/freetype2 /usr/include/harfbuzz /usr/include/fontconfig)
 
 #add_subdirectory(core)
-#add_subdirectory(encoder)
 add_subdirectory(video_encoder)
-# add_subdirectory(image)
-# add_subdirectory(output)
 add_subdirectory(preview)
-# add_subdirectory(post_processing_stages)
 add_subdirectory(text)
 add_subdirectory(subtitle)
 add_subdirectory(timestamp)
@@ -77,6 +69,5 @@ add_subdirectory(libstate)
 add_subdirectory(libhook)
 add_subdirectory(picam_option)
 add_subdirectory(libpicam)
-# add_subdirectory(dispmanx)
+#add_subdirectory(dispmanx)
 add_subdirectory(rtsp)
-#add_subdirectory(apps)

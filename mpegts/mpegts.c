@@ -176,8 +176,8 @@ MpegTSContext _mpegts_create_context(int use_video, int use_audio, MpegTSCodecSe
   AVFormatContext *format_ctx;
   AVOutputFormat *out_fmt;
   const AVOutputFormat *guessed_fmt;
-  AVCodecContext *codec_context_video;
-  AVCodecContext *codec_context_audio;
+  AVCodecContext *codec_context_video = NULL;
+  AVCodecContext *codec_context_audio = NULL;
 
   guessed_fmt = av_guess_format("mpegts", NULL, NULL);
   if (!guessed_fmt) {

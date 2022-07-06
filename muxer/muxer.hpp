@@ -68,7 +68,7 @@ class Muxer
     AVFormatContext *rec_format_ctx;
     time_t rec_start_time;
 
-    char recording_filepath[270];
+    char recording_filepath[300];
     char recording_tmp_filepath[259];
     char recording_archive_filepath[1024];
     char recording_basename[256];
