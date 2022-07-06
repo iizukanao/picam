@@ -35,6 +35,7 @@ Version 2.0.0 *(2022-07-06)*
 
 - There are some noise in audio preview (`--audiopreview` option) if video resolution is 1920x1080.
 - If X Window System (desktop environment) is running, fps will drop due to system load.
+- EGL preview does not work in 64-bit OS.
 
 Version 1.4.11 *(2021-04-29)*
 -----------------------------
