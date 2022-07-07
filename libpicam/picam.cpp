@@ -2060,6 +2060,11 @@ void Picam::setupCapture()
 		throw std::runtime_error("failed to configure streams");
 	log_debug("Camera streams configured\n");
 
+	log_debug("Available controls:\n");
+	for (auto const &[id, info] : camera_->controls()) {
+		log_debug("    %s : %s\n", id->name().c_str(), info.toString().c_str());
+	}
+
 	// Next allocate all the buffers we need, mmap them and store them on a free list.
 
 	allocator_ = new libcamera::FrameBufferAllocator(camera_);
