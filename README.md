@@ -333,7 +333,9 @@ $ touch hooks/wb_fluorescent
 
 For the list of available white balance modes, see `picam --help`.
 
-#### NoIR camera
+#### Using a tuning file (for NoIR camera, etc.)
+
+*Added in version 2.0.0*
 
 picam versions prior to 2.0.0 had `--wb greyworld` option for NoIR camera, but it is no longer available. Instead, use `LIBCAMERA_RPI_TUNING_FILE` environment variable to specify a correct tuning file that corresponds to the camera sensor.
 
