@@ -273,7 +273,7 @@ Options:
                         spot: Spot metering mode
                         matrix: Matrix metering mode
                         custom: Custom metering mode
-  --evcomp <num>      Set Exposure Value compensation (-24..24) (default: 0)
+  --evcomp <num>      Set Exposure Value compensation (-8..8) (default: 0)
   --shutter <num>     Set shutter speed in microseconds (default: auto).
                       Implies --vfr.
   --roi <x,y,w,h>     Set region of interest (crop rect) in ratio (0.0-1.0).
