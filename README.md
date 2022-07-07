@@ -450,32 +450,16 @@ $ cat example1 > hooks/subtitle
 [<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_example1_small.png" alt="Subtitle example 1" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_example1.png)
 
 ```sh
-$ cat example3
+$ cat example2
 text=♨☀♻♥⚠
 font_file=/home/pi/NotoSansCJKjp-Regular.otf
 pt=120
 layout_align=middle,center
 letter_spacing=40
-$ cat example3 > hooks/subtitle
+$ cat example2 > hooks/subtitle
 ```
 
-[<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_example3_small.png" alt="Subtitle example 3" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_example3.png)
-
-```sh
-$ cat example4
-text=●REC
-font_name=FreeSans
-pt=40
-layout_align=top,right
-horizontal_margin=30
-vertical_margin=30
-color=000000
-stroke_width=0
-duration=0
-$ cat example4 > hooks/subtitle
-```
-
-[<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_example4_small.png" alt="Subtitle example 4" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_example4.png)
+[<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_example2_small.png" alt="Subtitle example 3" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_example2.png)
 
 #### Changing the filename for recording
 
