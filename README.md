@@ -4,64 +4,39 @@
 
 - Generate H.264/AAC encoded MPEG-TS file from Raspberry Pi Camera (v1/v2) and optionally USB microphone or Wolfson Audio Card
 - Generate HTTP Live Streaming files with optional encryption
-- Add timestamp
+- Display timestamp on video image
 - Display Unicode text with arbitrary font
-
-### Performance (Latency)
-
-Time from real motion to playback on Strobe Media Player over RTMP:
-
-| Video bitrate | Minimum latency |
-| ------------: | --------------: |
-| 300 Kbps      |         0.3 sec |
-| 500 Kbps      |         0.6 sec |
-|   1 Mbps      |         0.8 sec |
-|   2 Mbps      |         1.0 sec |
-|   3 Mbps      |         1.3 sec |
-
-**In HTTP Live Streaming (HLS), the latency will never go below 3-4 seconds.** This limitation stems from the design of HLS.
-
-The above results were tested with:
-
-- Video: 1280x720, 30 fps, GOP size 30
-- Audio: 48 Khz mono, 40 Kbps
-- RTMP Server: [node-rtsp-rtmp-server](https://github.com/iizukanao/node-rtsp-rtmp-server)
-- Client: Flash Player 14,0,0,145 on Firefox 31.0 for Mac, using [test/strobe_media_playback.html](https://github.com/iizukanao/picam/blob/master/test/strobe_media_playback.html)
-- Network: Wi-Fi network created by a USB dongle attached to Raspberry Pi
 
 
 ### Required hardware
 
 - Raspberry Pi
-- Raspberry Pi Camera Board v1 or v2
+- Raspberry Pi Camera Board (v1 or v2) or compatible cameras
 - (optionally) USB microphone or Wolfson Audio Card
 
 
-### Supported operating systems
+### Supported operating system
 
-- Raspbian
-- Arch Linux
+- Raspberry Pi OS (with libcamera enabled)
 
 ### Installation
 
 Binary release is available at https://github.com/iizukanao/picam/releases/latest
-
-Also, out-of-the-box SD card image for live streaming (picam + Raspbian + live streaming server) is available at https://github.com/iizukanao/picam-streamer
 
 If you want to build picam yourself, see [BUILDING.md](BUILDING.md).
 
 
 ### Using a binary release
 
-The fastest way to use picam is to use a binary release. To set up and use it, run the following commands on your Raspberry Pi (Raspbian). It will set up picam in `~/picam/`.
+The fastest way to use picam is to use a binary release. To set up and use it, run the following commands on your Raspberry Pi OS. It will set up picam in `~/picam/`.
 
-```bash
-# If you have not enabled camera, enable it with raspi-config then reboot
+```sh
+# If you have enabled legacy camera support, disable it with raspi-config then reboot
 sudo raspi-config
 
 # Install dependencies
-sudo apt-get update
-sudo apt-get install libharfbuzz0b libfontconfig1
+sudo apt update
+sudo apt install libharfbuzz libfontconfig
 
 # Create directories and symbolic links
 cat > make_dirs.sh <<'EOF'
@@ -87,9 +62,9 @@ chmod +x make_dirs.sh
 alsamixer
 
 # Install picam binary
-wget https://github.com/iizukanao/picam/releases/download/v1.4.11/picam-1.4.11-binary.tar.xz
-tar xvf picam-1.4.11-binary.tar.xz
-cp picam-1.4.11-binary/picam ~/picam/
+wget https://github.com/iizukanao/picam/releases/download/v2.0.0/picam-2.0.0-`uname -m`.tar.xz
+tar xvf picam-2.0.0-*.tar.xz
+cp picam-2.0.0-*/picam ~/picam/
 
 # Run picam
 cd ~/picam
@@ -130,46 +105,56 @@ Result:
 
 First, find ALSA device name of your microphone.
 
-    $ arecord -l
-    **** List of CAPTURE Hardware Devices ****
-    card 1: Device [USB PnP Sound Device], device 0: USB Audio [USB Audio]
-      Subdevices: 1/1
-      Subdevice #0: subdevice #0
+```sh
+$ arecord -l
+**** List of CAPTURE Hardware Devices ****
+card 1: Device [USB PnP Sound Device], device 0: USB Audio [USB Audio]
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+```
 
 ALSA device name is consisted of `hw:<card>,<device>`. In the above example, the ALSA device name is `hw:1,0`.
 
 If you got `no soundcards found` error, try `sudo arecord -l`. If that output looks good, you might want to add your user to `audio` group.
 
-    $ sudo usermod -a -G audio $USER
-    (once logout, then login)
-    $ groups
-    wheel audio pi  <-- (make sure that 'audio' is in the list)
-    $ arecord -l
-    **** List of CAPTURE Hardware Devices ****
-    card 1: Device [USB PnP Sound Device], device 0: USB Audio [USB Audio]
-      Subdevices: 1/1
-      Subdevice #0: subdevice #0
+```sh
+$ sudo usermod -a -G audio $USER
+(once logout, then login)
+$ groups
+wheel audio pi  <-- (make sure that 'audio' is in the list)
+$ arecord -l
+**** List of CAPTURE Hardware Devices ****
+card 1: Device [USB PnP Sound Device], device 0: USB Audio [USB Audio]
+  Subdevices: 1/1
+  Subdevice #0: subdevice #0
+```
 
 #### Starting picam
 
 Run picam with your ALSA device name.
 
-    $ ./picam --alsadev hw:1,0
-    configuring devices
-    capturing started
+```sh
+$ ./picam --alsadev hw:1,0
+configuring devices
+capturing started
+```
 
 
 #### Recording
 
 To start recording, create a file named `hooks/start_record` while picam command is running.
 
-    $ touch hooks/start_record
+```sh
+$ touch hooks/start_record
+```
 
 You will see smth like `disk_usage=23% start rec to rec/archive/2017-08-05_16-41-52.ts` in the picam command output.
 
 To stop recording, create a file named `hooks/stop_record`.
 
-    $ touch hooks/stop_record
+```sh
+$ touch hooks/stop_record
+```
 
 You will see `stop rec` in the picam command output.
 
@@ -177,58 +162,57 @@ The recorded MPEG-TS file is in `rec/archive/` directory.
 
 To convert MPEG-TS to MP4, run:
 
-```bash
-ffmpeg -i test.ts -c:v copy -c:a copy -bsf:a aac_adtstoasc test.mp4
+```sh
+$ ffmpeg -i test.ts -c:v copy -c:a copy -bsf:a aac_adtstoasc test.mp4
 # or
-avconv -i test.ts -c:v copy -c:a copy -bsf:a aac_adtstoasc test.mp4
+$ avconv -i test.ts -c:v copy -c:a copy -bsf:a aac_adtstoasc test.mp4
 ```
 
 #### Mute/Unmute
 
 To mute microphone temporarily, create a file named `hooks/mute`.
 
-    $ touch hooks/mute
+```sh
+$ touch hooks/mute
+```
 
 To unmute microphone, create a file named `hooks/unmute`.
 
-    $ touch hooks/unmute
+```sh
+$ touch hooks/unmute
+```
 
 #### Command options
 
-```
-picam version 1.4.11
+```txt
+picam version 2.0.0
 Usage: picam [options]
 
 Options:
  [video]
-  -w, --width <num>   Width in pixels (default: 1280)
-  -h, --height <num>  Height in pixels (default: 720)
-  -v, --videobitrate <num>  Video bit rate (default: 2000000)
+  -w, --width <num>   Width in pixels (default: 1920)
+  -h, --height <num>  Height in pixels (default: 1080)
+  -v, --videobitrate <num>  Video bit rate (default: 4500000)
                       Set 0 to disable rate control
   -f, --fps <num>     Frame rate (default: 30.0)
   -g, --gopsize <num>  GOP size (default: same value as fps)
   --vfr               Enable variable frame rate. GOP size will be
                       dynamically controlled.
   --minfps <num>      Minimum frames per second. Implies --vfr.
-                      It might not work if width / height >= 1.45.
   --maxfps <num>      Maximum frames per second. Implies --vfr.
-                      It might not work if width / height >= 1.45.
-  --rotation <num>    Image rotation in clockwise degrees
-                      (0, 90, 180, 270)
   --hflip             Flip image horizontally
   --vflip             Flip image vertically
   --avcprofile <str>  Set AVC/H.264 profile to one of:
                       constrained_baseline/baseline/main/high
-                      (default: constrained_baseline)
-  --avclevel <value>  Set AVC/H.264 level (default: 3.1)
-  --qpmin <num>       Minimum quantization level (0..51)
-  --qpmax <num>       Maximum quantization level (0..51)
-  --qpinit <num>      Initial quantization level
-  --dquant <num>      Slice DQuant level
+                      (default: baseline)
+  --avclevel <value>  Set AVC/H.264 level (default: 4.1)
  [audio]
   -c, --channels <num>  Audio channels (1=mono, 2=stereo)
                       Default is mono. If it fails, stereo is used.
   -r, --samplerate <num>  Audio sample rate (default: 48000)
+                      The sample rates supported by libfdk_aac encoder are:
+                      8000, 11025, 12000, 16000, 22050, 24000,
+                      32000, 44100, 48000, 64000, 88200, 96000
   -a, --audiobitrate <num>  Audio bit rate (default: 40000)
   --alsadev <dev>     ALSA microphone device (default: hw:0,0)
   --volume <num>      Amplify audio by multiplying the volume by <num>
@@ -270,42 +254,36 @@ Options:
                       If --verbose option is enabled as well, average value of
                       Y is printed like y=28.0.
   --ex <value>        Set camera exposure. Implies --vfr. <value> is one of:
-                        off auto night nightpreview backlight spotlight sports
-                        snow beach verylong fixedfps antishake fireworks
-                        largeaperture smallaperture
+                        normal short long custom
   --wb <value>        Set white balance. <value> is one of:
-                        off: Disable white balance control
-                        auto: Automatic white balance control (default)
-                        sun: The sun provides the light source
-                        cloudy: The sun provides the light source through clouds
-                        shade: Light source is the sun and scene is in the shade
-                        tungsten: Light source is tungsten
-                        fluorescent: Light source is fluorescent
-                        incandescent: Light source is incandescent
-                        flash: Light source is a flash
-                        horizon: Light source is the sun on the horizon
-                        greyworld: AWB for NoIR camera
+                        off: Disable auto white balance control
+                        auto: Search over the whole colour temperature range (default)
+                        incandescent: Incandescent AWB lamp mode
+                        tungsten: Tungsten AWB lamp mode
+                        fluorescent: Fluorescent AWB lamp mode
+                        indoor: Indoor AWB lighting mode
+                        daylight: Daylight AWB lighting mode
+                        cloudy: Cloudy AWB lighting mode
+                        custom: Custom AWB mode
   --wbred <num>       Red gain. Implies "--wb off". (0.0 .. 8.0)
   --wbblue <num>      Blue gain. Implies "--wb off". (0.0 .. 8.0)
   --metering <value>  Set metering type. <value> is one of:
-                        average: Center weight average metering (default)
-                        spot: Spot (partial) metering
-                        matrix: Matrix or evaluative metering
-                        backlit: Assume a backlit image
-  --evcomp <num>      Set Exposure Value compensation (-24..24) (default: 0)
+                        center: Center-weighted metering mode (default)
+                        spot: Spot metering mode
+                        matrix: Matrix metering mode
+                        custom: Custom metering mode
+  --evcomp <num>      Set Exposure Value compensation (-8..8) (default: 0)
   --shutter <num>     Set shutter speed in microseconds (default: auto).
                       Implies --vfr.
-  --iso <num>         Set ISO sensitivity (100..800) (default: auto)
-  --roi <x,y,w,h>     Set region of interest (crop rect) in ratio (0.0-1.0)
+  --roi <x,y,w,h>     Set region of interest (crop rect) in ratio (0.0-1.0).
                       (default: 0,0,1,1)
+                      --roi affects performance and may reduce fps.
   -p, --preview       Display fullscreen preview
   --previewrect <x,y,width,height>
                       Display preview window at specified position
-  --opacity           Preview window opacity
-                      (0=transparent..255=opaque; default=255)
-  --blank[=0xAARRGGBB]  Set the video background color to black (or optional ARGB value)
+  --hdmi              Preview output HDMI port (0 or 1; default=0)
+                      HDMI port selection only works in console mode (when X is not running)
   --query             Query camera capabilities then exit
-  --mode             Specify the camera sensor mode (values depend on the camera hardware)
  [timestamp] (may be a bit heavy on Raspberry Pi 1)
   --time              Enable timestamp
   --timeformat <spec>  Timestamp format (see "man strftime" for spec)
@@ -344,42 +322,53 @@ Options:
 
 #### White balance
 
-Camera white balance can be set either via command line option (e.g. `--wb sun`) or hooks. To change the white balance while picam is running, create `hooks/wb_<value>`, where `<value>` is the name of white balance.
+Camera white balance can be set either via command line option (e.g. `--wb fluorescent`) or hooks. To change the white balance while picam is running, create `hooks/wb_<value>`, where `<value>` is the name of white balance.
 
-For example, the following command will dynamically change the white balance to **sun**.
+For example, the following command will dynamically change the white balance to **fluorescent**.
 
-    $ touch hooks/wb_sun
+```sh
+$ touch hooks/wb_fluorescent
+```
 
-Available white balance modes are: **off**, **auto**, **sun**, **cloudy**, **shade**, **tungsten**, **fluorescent**, **incandescent**, **flash**, and **horizon**.
+For the list of available white balance modes, see `picam --help`.
+
+#### Using a tuning file (for NoIR camera, etc.)
+
+*Added in version 2.0.0*
+
+picam versions prior to 2.0.0 had `--wb greyworld` option for NoIR camera, but it is no longer available. Instead, use `LIBCAMERA_RPI_TUNING_FILE` environment variable to specify a correct tuning file that corresponds to the camera sensor.
+
+Example for NoIR camera v1:
+```sh
+LIBCAMERA_RPI_TUNING_FILE=/usr/share/libcamera/ipa/raspberrypi/ov5647_noir.json ./picam
+```
+
+To find out the name of camera sensor, run `picam --query`. In the following case, `imx219` is the sensor name.
+
+```sh
+$ ./picam --query
+[0:37:47.327293801] [2412]  INFO Camera camera_manager.cpp:293 libcamera v0.0.0+3700-f30ad033
+[0:37:47.366360221] [2413]  WARN RPI raspberrypi.cpp:1252 Mismatch between Unicam and CamHelper for embedded data usage!
+[0:37:47.367038208] [2413]  INFO RPI raspberrypi.cpp:1368 Registered camera /base/soc/i2c0mux/i2c@1/imx219@10 to Unicam device /dev/media0 and ISP device /dev/media1
+Available cameras
+-----------------
+0 : imx219 [3280x2464] (/base/soc/i2c0mux/i2c@1/imx219@10)
+    Modes: 'SRGGB10_CSI2P' : 640x480 1640x1232 1920x1080 3280x2464
+           'SRGGB8' : 640x480 1640x1232 1920x1080 3280x2464
+```
 
 
 #### Exposure Control
 
-Camera exposure control can be set either via command line option (e.g. `--ex night`) or hooks. To change the exposure control while picam is running, start picam with `--vfr` or `--ex` option, then create `hooks/ex_<value>`, where `<value>` is the name of exposure control.
+Camera exposure control can be set either via command line option (e.g. `--ex long`) or hooks. To change the exposure control while picam is running, start picam with `--vfr` or `--ex` option, then create `hooks/ex_<value>`, where `<value>` is the name of exposure control.
 
-For example, the following command will dynamically change the exposure control to **night**.
+For example, the following command will dynamically change the exposure control to **long**.
 
-    $ touch hooks/ex_night
+```sh
+$ touch hooks/ex_long
+```
 
 For the list of available exposure control values, see `picam --help`.
-
-| Value | Description |
-| ----- | ----------- |
-| `off` | Disable exposure control |
-| `auto` | Automatic exposure |
-| `night` | Exposure at night |
-| `nightpreview` | Shorter exposure than `night` |
-| `backlight` | Exposure with backlight illuminating the subject |
-| `spotlight` | Exposure with a spotlight illuminating the subject |
-| `sports` | Exposure for sports |
-| `snow` | Exposure for the subject in snow |
-| `beach` | Exposure for the subject at a beach |
-| `verylong` | Long exposure |
-| `fixedfps` | Constrain FPS to a fixed value |
-| `antishake` | Antishake mode |
-| `fireworks` | Optimized for fireworks |
-| `largeaperture` | Exposure when using a large aperture on the camera |
-| `smallaperture` | Exposure when using a small aperture on the camera |
 
 
 #### Recordbuf
@@ -396,7 +385,7 @@ There are two types of recordbuf; global and per-recording. Global recordbuf is 
 
 Global recordbuf can be specified by either `--recordbuf` option or hooks/set_recordbuf.
 
-```bash
+```sh
 # Set global recordbuf to 30
 echo 30 > hooks/set_recordbuf
 ```
@@ -405,8 +394,10 @@ echo 30 > hooks/set_recordbuf
 
 Per-recording recordbuf has a default value which is the same value as global recordbuf. Per-recording recordbuf can be specified via `hooks/start_record`.
 
-    # Start recording with per-recording recordbuf set to 2
-    $ echo recordbuf=2 > hooks/start_record
+```sh
+# Start recording with per-recording recordbuf set to 2
+$ echo recordbuf=2 > hooks/start_record
+```
 
 #### Overlaying text (subtitle)
 
@@ -414,7 +405,9 @@ Per-recording recordbuf has a default value which is the same value as global re
 
 picam can display text with correct ligatures and kerning, with a font of your choice. To display a text, create hooks/subtitle.
 
-    $ echo 'text=Houston, we have a problem' > hooks/subtitle
+```sh
+$ echo 'text=Houston, we have a problem' > hooks/subtitle
+```
 
 [<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_intro_small.png" alt="Subtitle example image" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_intro.png)
 
@@ -447,45 +440,27 @@ NOTE: On the first generation models of Raspberry Pi (before Pi 2), subtitles ca
 
 ##### Examples
 
-    $ cat example1
-    text=What goes up\nmust come down\nfinally floor AV Wa
-    font_name=serif
-    pt=40
-    $ cat example1 > hooks/subtitle
+```sh
+$ cat example1
+text=What goes up\nmust come down\nfinally floor AV Wa
+font_name=serif
+pt=40
+$ cat example1 > hooks/subtitle
+```
 
 [<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_example1_small.png" alt="Subtitle example 1" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_example1.png)
 
-    $ cat example2
-    text=お気の毒ですが\n冒険の書は\n消えちゃいました☆
-    font_file=/home/pi/uzura.ttf
-    pt=46
-    $ cat example2 > hooks/subtitle
+```sh
+$ cat example2
+text=♨☀♻♥⚠
+font_file=/home/pi/NotoSansCJKjp-Regular.otf
+pt=120
+layout_align=middle,center
+letter_spacing=40
+$ cat example2 > hooks/subtitle
+```
 
-[<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_example2_small.png" alt="Subtitle example 2" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_example2.png)
-
-    $ cat example3
-    text=♨☀♻♥⚠
-    font_file=/home/pi/NotoSansCJKjp-Regular.otf
-    pt=120
-    layout_align=middle,center
-    letter_spacing=40
-    $ cat example3 > hooks/subtitle
-
-[<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_example3_small.png" alt="Subtitle example 3" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_example3.png)
-
-    $ cat example4
-    text=●REC
-    font_name=FreeSans
-    pt=40
-    layout_align=top,right
-    horizontal_margin=30
-    vertical_margin=30
-    color=000000
-    stroke_width=0
-    duration=0
-    $ cat example4 > hooks/subtitle
-
-[<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_example4_small.png" alt="Subtitle example 4" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_example4.png)
+[<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_example2_small.png" alt="Subtitle example 3" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_example2.png)
 
 #### Changing the filename for recording
 
@@ -493,8 +468,10 @@ NOTE: On the first generation models of Raspberry Pi (before Pi 2), subtitles ca
 
 To change the directory and/or filename for the recorded file, specify `dir` and/or `filename` parameters in `hooks/start_record`.
 
-    # Start recording to /tmp/myout.ts
-    $ echo -e "dir=/tmp\nfilename=myout.ts" > hooks/start_record
+```sh
+# Start recording to /tmp/myout.ts
+$ echo -e "dir=/tmp\nfilename=myout.ts" > hooks/start_record
+```
 
 #### Determine the length of a recorded file
 
@@ -502,9 +479,11 @@ To change the directory and/or filename for the recorded file, specify `dir` and
 
 The file state/*recorded_filename* has some info about the recording.
 
-    $ cat state/2015-11-19_01-18-09.ts
-    duration_pts=2083530
-    duration_sec=23.150333
+```sh
+$ cat state/2015-11-19_01-18-09.ts
+duration_pts=2083530
+duration_sec=23.150333
+```
 
 You can remove `state/*.ts` files if you do not need them.
 
@@ -513,16 +492,18 @@ You can remove `state/*.ts` files if you do not need them.
 
 HTTP Live Streaming is disabled by default. To enable HTTP Live Streaming and generate files in /run/shm/hls, run:
 
-    $ ./picam -o /run/shm/hls
+```sh
+$ ./picam -o /run/shm/hls
+```
 
 #### Serving HLS
 
 [Set up nginx](https://www.raspberrypi.org/documentation/remote-access/web-server/nginx.md) (ignore "Additional - Install PHP" step), then open */etc/nginx/sites-available/default* with a text editor and add the following code inside `server { ... }` block.
 
-```
-	location /hls/ {
-		root /run/shm;
-	}
+```txt
+location /hls/ {
+	root /run/shm;
+}
 ```
 
 Restart the nginx server with `sudo service nginx restart` then run picam with `-o /run/shm/hls` option. The HLS will be available at http://YOUR-PI-IP/hls/index.m3u8
@@ -538,13 +519,17 @@ Optionally you can enable encryption for HTTP Live Streaming. We will use the fo
 
 First you have to create a file named `enc.key` which contains 16-byte encryption key. To create such file, run:
 
-    $ echo -n $'\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff' > enc.key
+```sh
+$ echo -n $'\xf0\xf1\xf2\xf3\xf4\xf5\xf6\xf7\xf8\xf9\xfa\xfb\xfc\xfd\xfe\xff' > enc.key
+```
 
 Put `enc.key` in `/run/shm/hls/` directory. Then, run picam with the following options:
 
-    $ ./picam -o /run/shm/hls --hlsenc --hlsenckeyuri enc.key \
-      --hlsenckey f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff \
-      --hlsenciv 000102030405060708090a0b0c0d0e0f
+```sh
+$ ./picam -o /run/shm/hls --hlsenc --hlsenckeyuri enc.key \
+  --hlsenckey f0f1f2f3f4f5f6f7f8f9fafbfcfdfeff \
+  --hlsenciv 000102030405060708090a0b0c0d0e0f
+```
 
 You can watch the HTTP Live Streaming by accessing `/run/shm/hls/index.m3u8` via HTTP or HTTPS with QuickTime Player.
 
@@ -553,40 +538,51 @@ You can watch the HTTP Live Streaming by accessing `/run/shm/hls/index.m3u8` via
 
 To use picam with [nginx-rtmp-module](https://github.com/arut/nginx-rtmp-module), add the following lines to `nginx.conf`:
 
-    rtmp {
-        server {
-            listen 1935;
-            chunk_size 4000;
-            application webcam {
-                live on;
+```txt
+rtmp {
+    server {
+        listen 1935;
+        chunk_size 4000;
+        application webcam {
+            live on;
 
-                exec_static /path/to/ffmpeg -i tcp://127.0.0.1:8181?listen
-                                            -c:v copy -ar 44100 -ab 40000
-                                            -f flv rtmp://localhost:1935/webcam/mystream;
-            }
+            exec_static /path/to/ffmpeg -i tcp://127.0.0.1:8181?listen
+                                        -c:v copy -ar 44100 -ab 40000
+                                        -f flv rtmp://localhost:1935/webcam/mystream;
         }
     }
+}
+```
 
 Note that `/path/to/ffmpeg` should be replaced with the actual absolute path to ffmpeg command.
 
 Start nginx server, then run:
 
-    $ ./picam --tcpout tcp://127.0.0.1:8181
+```sh
+$ ./picam --tcpout tcp://127.0.0.1:8181
+```
 
 You can access your live stream at `rtmp://YOUR_RASPBERRYPI_IP/webcam/mystream`.
 
 
-### Publishing to Ustream
+### Publishing live stream to YouTube
 
-To upload streams from picam to Ustream, run ffmpeg with the following options. `RTMP_URL` and `STREAM_KEY` can be obtained from Ustream's Channel settings &rarr; Broadcast settings &rarr; Encoder settings.
+To upload streams from picam to YouTube, take the following steps.
 
-    $ ffmpeg -i tcp://127.0.0.1:8181?listen -c:v copy -c:a aac -strict -2 -ar 44100 -ab 40000 -f flv RTMP_URL/STREAM_KEY
+1. Open [YouTube Studio](https://studio.youtube.com/) and click on the top-right corner **CREATE** button &rarr; **Go live**.
+2. When streaming console appears, copy the "Stream URL" and "Stream key" and run the following ffmpeg command. Replace `STREAM_URL` and `STREAM_KEY` with the strings provided by YouTube.
 
-<img src="https://github.com/iizukanao/picam/raw/master/images/ustream.png" alt="Encoder settings on Ustream" style="max-width:100%;" width="600" height="459">
+```sh
+$ ffmpeg -i tcp://127.0.0.1:8181?listen -c:v copy -c:a copy -f flv STREAM_URL/STREAM_KEY
+```
+
+<img src="https://raw.githubusercontent.com/iizukanao/picam/libcamera/images/youtube.png" alt="YouTube Live console" style="max-width:100%;" width="600">
 
 Then, run picam to start streaming.
 
-    $ picam --tcpout tcp://127.0.0.1:8181
+```sh
+$ picam --tcpout tcp://127.0.0.1:8181
+```
 
 
 ### Recommended hardware

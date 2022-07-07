@@ -1,6 +1,43 @@
 Change Log
 ==========
 
+Version 2.0.0 *(2022-07-07)*
+----------------------------
+
+- Built with libcamera
+- Stopped using legacy camera libraries (OpenMAX IL and MMAL).
+- Added support for higher video resolutions up to 1920x1080 at 30 fps.
+- Changed the default values for the following options:
+  + `-w, --width` default is `1920` (previously `1280`)
+  + `-h, --height` default is `1080` (previously `720`)
+  + `-v, --videobitrate` default is `4500000` (previously `2000000`)
+  + `--avcprofile` default is `baseline` (previously `constrained_baseline`)
+  + `--avclevel` default is `4.1` (previously `3.1`)
+- Added command line option `--hdmi` which selects HDMI port for video preview. Only works in console mode.
+- Removed the following options due to technical limitations:
+  + `--rotation` (For 180 degree rotation, use `--hflip --vflip` instead)
+  + `--qpmin`
+  + `--qpmax`
+  + `--qpinit`
+  + `--dquant`
+  + `--aperture`
+  + `--iso`
+  + `--opacity`
+  + `--blank`
+  + `--mode`
+- Changed the values for the following options. For the available values, please run `picam --help`.
+  + `--ex`
+  + `--wb`
+  + `--metering`
+- For NoIR camera users, `--wb greyworld` option is no longer available. Instead, pass `LIBCAMERA_RPI_TUNING_FILE` environment variable to picam like this: `LIBCAMERA_RPI_TUNING_FILE=/usr/share/libcamera/ipa/raspberrypi/ov5647_noir.json ./picam`
+
+### Known issues
+
+- There are some noise in audio preview (`--audiopreview` option) if video resolution is 1920x1080.
+- If X Window System (desktop environment) is running, video fps will drop due to system load.
+- EGL preview does not work on Raspberry Pi 3.
+- Some problems may occur in the EGL preview.
+
 Version 1.4.11 *(2021-04-29)*
 -----------------------------
 
