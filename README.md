@@ -450,16 +450,6 @@ $ cat example1 > hooks/subtitle
 [<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_example1_small.png" alt="Subtitle example 1" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_example1.png)
 
 ```sh
-$ cat example2
-text=お気の毒ですが\n冒険の書は\n消えちゃいました☆
-font_file=/home/pi/uzura.ttf
-pt=46
-$ cat example2 > hooks/subtitle
-```
-
-[<img src="https://github.com/iizukanao/picam/raw/master/images/subtitle_example2_small.png" alt="Subtitle example 2" style="max-width:100%;" width="500" height="281"></a>](https://github.com/iizukanao/picam/raw/master/images/subtitle_example2.png)
-
-```sh
 $ cat example3
 text=♨☀♻♥⚠
 font_file=/home/pi/NotoSansCJKjp-Regular.otf
