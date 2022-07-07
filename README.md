@@ -17,7 +17,7 @@
 
 ### Supported operating system
 
-- Raspberry Pi OS (with libcamera enabled)
+- Raspberry Pi OS 32-bit or 64-bit (with libcamera enabled)
 
 ### Installation
 
