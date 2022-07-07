@@ -1,5 +1,0 @@
-#!/bin/bash
-grep -q BCM2708 /proc/cpuinfo
-if [ $? = 0 ]; then
-  echo Pi1
-fi
