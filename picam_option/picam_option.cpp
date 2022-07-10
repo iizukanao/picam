@@ -304,7 +304,6 @@ int PicamOption::parse(int argc, char **argv) {
           }
           video_pts_step = value;
           is_video_pts_step_specified = 1;
-          break;
         // } else if (strcmp(long_options[option_index].name, "rotation") == 0) {
         //   char *end;
         //   int value = strtol(optarg, &end, 10);
@@ -314,13 +313,10 @@ int PicamOption::parse(int argc, char **argv) {
         //     return EXIT_FAILURE;
         //   }
         //   video_rotation = value;
-        //   break;
         } else if (strcmp(long_options[option_index].name, "hflip") == 0) {
           video_hflip = 1;
-          break;
         } else if (strcmp(long_options[option_index].name, "vflip") == 0) {
           video_vflip = 1;
-          break;
         } else if (strcmp(long_options[option_index].name, "avcprofile") == 0) {
           strncpy(video_avc_profile, optarg, sizeof(video_avc_profile) - 1);
           video_avc_profile[sizeof(video_avc_profile) - 1] = '\0';
@@ -831,11 +827,9 @@ int PicamOption::parse(int argc, char **argv) {
           disable_audio_capturing = 1;
         } else if (strcmp(long_options[option_index].name, "audiopreview") == 0) {
           is_audio_preview_enabled = 1;
-          break;
         } else if (strcmp(long_options[option_index].name, "audiopreviewdev") == 0) {
           strncpy(audio_preview_dev, optarg, sizeof(audio_preview_dev) - 1);
           audio_preview_dev[sizeof(audio_preview_dev) - 1] = '\0';
-          break;
         } else if (strcmp(long_options[option_index].name, "hlskeyframespersegment") == 0) { 
           char *end;
           long value = strtol(optarg, &end, 10);
@@ -945,10 +939,8 @@ int PicamOption::parse(int argc, char **argv) {
             return EXIT_FAILURE;
           }
           preview_hdmi = value;
-          break;
         // } else if (strcmp(long_options[option_index].name, "blank") == 0) {
         //   blank_background_color = optarg ? strtoul(optarg, NULL, 0) : BLANK_BACKGROUND_DEFAULT;
-        //   break;
         // } else if (strcmp(long_options[option_index].name, "opacity") == 0) {
         //   char *end;
         //   int value = strtol(optarg, &end, 10);
@@ -958,7 +950,6 @@ int PicamOption::parse(int argc, char **argv) {
         //     return EXIT_FAILURE;
         //   }
         //   preview_opacity = value;
-        //   break;
         } else if (strcmp(long_options[option_index].name, "recordbuf") == 0) {
           char *end;
           long value = strtol(optarg, &end, 10);
