@@ -481,7 +481,7 @@ int PicamOption::parse(int argc, char **argv) {
           char *end;
           double value = strtod(optarg, &end);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
-            log_fatal("error: invalid camrg: %s\n", optarg);
+            log_fatal("error: invalid --wbred: %s\n", optarg);
             return EXIT_FAILURE;
           }
           awb_red_gain = value;
@@ -490,7 +490,7 @@ int PicamOption::parse(int argc, char **argv) {
           char *end;
           double value = strtod(optarg, &end);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
-            log_fatal("error: invalid cambg: %s\n", optarg);
+            log_fatal("error: invalid --wbblue: %s\n", optarg);
             return EXIT_FAILURE;
           }
           awb_blue_gain = value;
