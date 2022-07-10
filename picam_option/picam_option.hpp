@@ -143,6 +143,7 @@ public:
     char tcp_output_dest[256];
     int is_auto_exposure_enabled = 0;
     int is_vfr_enabled = 0;
+    unsigned int camera_id = 0;
     float auto_exposure_threshold = 5.0f;
 
     float roi_left = 0.0f;

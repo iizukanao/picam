@@ -1265,6 +1265,7 @@ void Picam::queryCameras()
 			unsigned int idx = 0;
 			std::cerr << "Available cameras" << std::endl
 					  << "-----------------" << std::endl;
+			std::cerr << "<num> : <model> [<max_resolution>] (<id>)" << std::endl;
 			for (auto const &cam : cameras)
 			{
 				std::cerr << idx++ << " : " << cam->properties().get(libcamera::properties::Model);
@@ -1598,14 +1599,12 @@ void Picam::OpenCamera()
 							  [](auto &cam) { return cam->id().find("/usb") != std::string::npos; });
 	cameras.erase(rem, cameras.end());
 
-	unsigned int cameraId = 0;
-
 	if (cameras.size() == 0)
 		throw std::runtime_error("no cameras available");
-	if (cameraId >= cameras.size())
+	if (this->option->camera_id >= cameras.size())
 		throw std::runtime_error("selected camera is not available");
 
-	std::string const &cam_id = cameras[cameraId]->id();
+	std::string const &cam_id = cameras[this->option->camera_id]->id();
 	camera_ = camera_manager_->get(cam_id);
 	if (!camera_)
 		throw std::runtime_error("failed to find camera " + cam_id);

@@ -82,6 +82,7 @@ void PicamOption::print_usage() {
   log_info("  --tcpout <url>      Enable TCP output to <url>\n");
   log_info("                      (e.g. --tcpout tcp://127.0.0.1:8181)\n");
   log_info(" [camera]\n");
+  log_info("  --camera <num>      Choose the camera to use. Use --query to list the cameras.\n");
   log_info("  --autoex            Enable automatic control of camera exposure between\n");
   log_info("                      daylight and night modes. This forces --vfr enabled.\n");
   log_info("  --autoexthreshold <num>  When average value of Y (brightness) for\n");
@@ -214,6 +215,7 @@ int PicamOption::parse(int argc, char **argv) {
     { "vfr", no_argument, NULL, 0 },
     { "minfps", required_argument, NULL, 0 },
     { "maxfps", required_argument, NULL, 0 },
+    { "camera", required_argument, NULL, 0 },
     { "autoex", no_argument, NULL, 0 },
     { "autoexthreshold", required_argument, NULL, 0 },
     { "ex", required_argument, NULL, 0 },
@@ -416,6 +418,20 @@ int PicamOption::parse(int argc, char **argv) {
           tcp_output_dest[sizeof(tcp_output_dest) - 1] = '\0';
         } else if (strcmp(long_options[option_index].name, "vfr") == 0) {
           is_vfr_enabled = 1;
+        } else if (strcmp(long_options[option_index].name, "camera") == 0) {
+          char *end;
+          // todo
+          int value = strtol(optarg, &end, 10);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid --camera: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          // We allow only >= 0
+          if (value < 0) {
+            log_fatal("error: invalid --camera: %d (must be 0 or greater)\n", value);
+            return EXIT_FAILURE;
+          }
+          camera_id = value;
         } else if (strcmp(long_options[option_index].name, "autoex") == 0) {
           is_auto_exposure_enabled = 1;
           is_vfr_enabled = 1;
