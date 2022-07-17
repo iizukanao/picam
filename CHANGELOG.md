@@ -1,10 +1,16 @@
 Change Log
 ==========
 
+Version 2.0.1 *(2022-07-17)*
+----------------------------
+
+- Added `--camera` option.
+- Fixed `--version` option.
+
 Version 2.0.0 *(2022-07-07)*
 ----------------------------
 
-- Built with libcamera
+- Built with libcamera.
 - Stopped using legacy camera libraries (OpenMAX IL and MMAL).
 - Added support for higher video resolutions up to 1920x1080 at 30 fps.
 - Changed the default values for the following options:
