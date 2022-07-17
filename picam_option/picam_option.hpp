@@ -85,6 +85,7 @@ class PicamOption {
 public:
     PicamOption();
     ~PicamOption();
+    void print_program_version();
     void print_usage();
     int parse(int argc, char **argv);
 
@@ -215,6 +216,7 @@ public:
     int timestamp_stroke_color = 0x000000;
     float timestamp_stroke_width = 1.3f;
     int timestamp_letter_spacing = 0;
+    bool show_version = false;
     bool show_help = false;
 
 private:

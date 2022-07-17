@@ -5,7 +5,7 @@
 #include "dispmanx/dispmanx.h"
 #include "picam_option.hpp"
 
-void print_program_version() {
+void PicamOption::print_program_version() {
   log_info(PROGRAM_VERSION "\n");
 }
 
@@ -966,11 +966,11 @@ int PicamOption::parse(int argc, char **argv) {
         } else if (strcmp(long_options[option_index].name, "verbose") == 0) {
           log_set_level(LOG_LEVEL_DEBUG);
         } else if (strcmp(long_options[option_index].name, "version") == 0) {
-          print_program_version();
-          return EXIT_SUCCESS;
+          this->show_version = true;
+          return 0;
         } else if (strcmp(long_options[option_index].name, "help") == 0) {
           this->show_help = true;
-          return EXIT_SUCCESS;
+          return 0;
         }
         break;
       case 'w':

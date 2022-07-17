@@ -1473,6 +1473,10 @@ int Picam::run(int argc, char *argv[])
     if (ret != 0) {
       exit(ret);
     }
+		if (option.show_version) {
+			option.print_program_version();
+			return EXIT_SUCCESS;
+		}
 		if (option.show_help) {
 			option.print_usage();
 			return EXIT_SUCCESS;
