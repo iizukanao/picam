@@ -62,9 +62,9 @@ chmod +x make_dirs.sh
 alsamixer
 
 # Install picam binary
-wget https://github.com/iizukanao/picam/releases/download/v2.0.0/picam-2.0.0-`uname -m`.tar.xz
-tar xvf picam-2.0.0-*.tar.xz
-cp picam-2.0.0-*/picam ~/picam/
+wget https://github.com/iizukanao/picam/releases/download/v2.0.1/picam-2.0.1-`uname -m`.tar.xz
+tar xvf picam-2.0.1-*.tar.xz
+cp picam-2.0.1-*/picam ~/picam/
 
 # Run picam
 cd ~/picam
@@ -185,7 +185,7 @@ $ touch hooks/unmute
 #### Command options
 
 ```txt
-picam version 2.0.0
+picam version 2.0.1
 Usage: picam [options]
 
 Options:
@@ -244,6 +244,7 @@ Options:
   --tcpout <url>      Enable TCP output to <url>
                       (e.g. --tcpout tcp://127.0.0.1:8181)
  [camera]
+  --camera <num>      Choose the camera to use. Use --query to list the cameras.
   --autoex            Enable automatic control of camera exposure between
                       daylight and night modes. This forces --vfr enabled.
   --autoexthreshold <num>  When average value of Y (brightness) for
