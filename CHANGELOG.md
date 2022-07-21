@@ -1,6 +1,15 @@
 Change Log
 ==========
 
+Version 2.0.2 *(2022-07-21)*
+----------------------------
+
+- Added the following options. (by @cstillwell89)
+  + `--brightness`
+  + `--contrast`
+  + `--saturation`
+  + `--sharpness`
+
 Version 2.0.1 *(2022-07-17)*
 ----------------------------
 

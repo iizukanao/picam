@@ -62,9 +62,9 @@ chmod +x make_dirs.sh
 alsamixer
 
 # Install picam binary
-wget https://github.com/iizukanao/picam/releases/download/v2.0.1/picam-2.0.1-`uname -m`.tar.xz
-tar xvf picam-2.0.1-*.tar.xz
-cp picam-2.0.1-*/picam ~/picam/
+wget https://github.com/iizukanao/picam/releases/download/v2.0.2/picam-2.0.2-`uname -m`.tar.xz
+tar xvf picam-2.0.2-*.tar.xz
+cp picam-2.0.2-*/picam ~/picam/
 
 # Run picam
 cd ~/picam
@@ -185,7 +185,7 @@ $ touch hooks/unmute
 #### Command options
 
 ```txt
-picam version 2.0.1
+picam version 2.0.2
 Usage: picam [options]
 
 Options:
@@ -206,22 +206,14 @@ Options:
                       constrained_baseline/baseline/main/high
                       (default: baseline)
   --avclevel <value>  Set AVC/H.264 level (default: 4.1)
-  --brightness <num>  Adjusts the image brightness. The value -1.0 
-					  produces an (almost) black image, the value 1.0 
-					  produces an almost entirely white image and the 
-					  value 0.0 produces standard image brightness.
-  --contrast <num>    Adjusts the image contrast. The value zero produces 
-                      minimum contrast, the value 1.0 uses the default 
-					  amount of contrast, and values greater than 1.0 apply 
-					  extra contrast.
-  --sharpness <num>   Adjusts the image sharpness. The value zero means that no 
-					  sharpening is applied, the value 1.0 uses the default 
-					  amount of sharpening, and values greater than 1.0 use 
-					  extra sharpening.					  
-  --saturation <num>  Adjusts the colour saturation. The value zero 
-					  produces a greyscale image, the value 1.0 uses 
-					  the default amount of sautration, and values greater 
-					  than 1.0 apply extra colour saturation.
+  --brightness <num>  Adjust image brightness (default: 0.0)
+                      0.0=unchanged / -1.0=darkest / 1.0=brightest
+  --contrast <num>    Adjust image contrast (default: 1.0)
+                      1.0=normal / >1.0=more contrast
+  --saturation <num>  Adjust image color saturation (default: 1.0)
+                      1.0=normal / 0.0=grayscale / >1.0=more saturated
+  --sharpness <num>   Adjust image sharpness (default: 0.0)
+                      0.0=no sharpening / >0.0=sharpened
  [audio]
   -c, --channels <num>  Audio channels (1=mono, 2=stereo)
                       Default is mono. If it fails, stereo is used.

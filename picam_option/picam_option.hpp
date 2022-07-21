@@ -11,7 +11,7 @@ extern "C" {
 #include "text/text.h"
 
 #define PROGRAM_NAME     "picam"
-#define PROGRAM_VERSION  "2.0.1"
+#define PROGRAM_VERSION  "2.0.2"
 
 typedef struct white_balance_option {
   const char *name;
