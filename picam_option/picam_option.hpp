@@ -171,6 +171,11 @@ public:
     unsigned int exposure_shutter_speed = 0;
     int manual_exposure_sensitivity = 0; // ISO
     unsigned int exposure_sensitivity = 0;
+	
+	float video_brightness = 0.0f;
+	float video_contrast = 1.0f;
+	float video_saturation = 1.0f;
+	float video_sharpness = 0.0f;
 
     char state_dir[256] = "state";
     char hooks_dir[256] = "hooks";

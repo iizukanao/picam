@@ -206,6 +206,22 @@ Options:
                       constrained_baseline/baseline/main/high
                       (default: baseline)
   --avclevel <value>  Set AVC/H.264 level (default: 4.1)
+  --brightness <num>  Adjusts the image brightness. The value -1.0 
+					  produces an (almost) black image, the value 1.0 
+					  produces an almost entirely white image and the 
+					  value 0.0 produces standard image brightness.
+  --contrast <num>    Adjusts the image contrast. The value zero produces 
+                      minimum contrast, the value 1.0 uses the default 
+					  amount of contrast, and values greater than 1.0 apply 
+					  extra contrast.
+  --sharpness <num>   Adjusts the image sharpness. The value zero means that no 
+					  sharpening is applied, the value 1.0 uses the default 
+					  amount of sharpening, and values greater than 1.0 use 
+					  extra sharpening.					  
+  --saturation <num>  Adjusts the colour saturation. The value zero 
+					  produces a greyscale image, the value 1.0 uses 
+					  the default amount of sautration, and values greater 
+					  than 1.0 apply extra colour saturation.
  [audio]
   -c, --channels <num>  Audio channels (1=mono, 2=stereo)
                       Default is mono. If it fails, stereo is used.

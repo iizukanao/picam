@@ -206,6 +206,11 @@ private:
 	int camera_set_exposure_value();
 	int camera_set_white_balance(char *wb);
 	int camera_set_custom_awb_gains();
+	
+	int camera_set_brightness();
+	int camera_set_contrast();
+	int camera_set_saturation();
+	int camera_set_sharpness();
 
     // >>> libcamera_app.hpp
 	template <typename T>
