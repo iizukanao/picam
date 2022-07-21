@@ -173,9 +173,19 @@ public:
   int manual_exposure_sensitivity = 0; // ISO
   unsigned int exposure_sensitivity = 0;
 
+  // https://libcamera.org/api-html/namespacelibcamera_1_1controls.html
+  // Positive values (up to 1.0) produce brighter images;
+  // negative values (up to -1.0) produce darker images and 0.0 leaves pixels unchanged.
   float video_brightness = 0.0f;
+
+  // 1.0 = Normal contrast; larger values produce images with more contrast
   float video_contrast = 1.0f;
+
+  // 1.0 = Normal saturation; larger values produce more saturated colours;
+  // 0.0 produces a greyscale image.
   float video_saturation = 1.0f;
+
+  // 0.0 means no sharpening
   float video_sharpness = 0.0f;
 
   char state_dir[256] = "state";
