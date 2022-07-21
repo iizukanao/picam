@@ -319,6 +319,30 @@ int Picam::camera_set_exposure_control(char *ex) {
   return 0;
 }
 
+int Picam::camera_set_brightness() {
+	log_debug("camera_set_brightness: %.1f\n", this->option->video_brightness);
+	controls_.set(libcamera::controls::Brightness, this->option->video_brightness);
+  return 0;
+}
+
+int Picam::camera_set_contrast() {
+	log_debug("camera_set_contrast: %.1f\n", this->option->video_contrast);
+	controls_.set(libcamera::controls::Contrast, this->option->video_contrast);
+  return 0;
+}
+
+int Picam::camera_set_saturation() {
+	log_debug("camera_set_saturation: %.1f\n", this->option->video_saturation);
+	controls_.set(libcamera::controls::Saturation, this->option->video_saturation);
+  return 0;
+}
+
+int Picam::camera_set_sharpness() {
+	log_debug("camera_set_sharpness: %.1f\n", this->option->video_sharpness);
+	controls_.set(libcamera::controls::Sharpness, this->option->video_sharpness);
+  return 0;
+}
+
 /**
  * Reads a file and returns the contents.
  * file_contents argument will be set to the pointer to the
@@ -1886,24 +1910,24 @@ void Picam::StartCamera()
   }
 
 	// Brightness
-	float brightness = 0;
-	if (!controls_.contains(libcamera::controls::Brightness))
-		controls_.set(libcamera::controls::Brightness, brightness);
+	if (this->camera_set_brightness() != 0) {
+		exit(EXIT_FAILURE);
+	}
 
 	// Contrast
-	float contrast = 1.0;
-	if (!controls_.contains(libcamera::controls::Contrast))
-		controls_.set(libcamera::controls::Contrast, contrast);
+	if (this->camera_set_contrast() != 0) {
+		exit(EXIT_FAILURE);
+	}
 
 	// Saturation
-	float saturation = 1.0;
-	if (!controls_.contains(libcamera::controls::Saturation))
-		controls_.set(libcamera::controls::Saturation, saturation);
+	if (this->camera_set_saturation() != 0) {
+		exit(EXIT_FAILURE);
+	}
 
 	// Sharpness
-	float sharpness = 1.0;
-	if (!controls_.contains(libcamera::controls::Sharpness))
-		controls_.set(libcamera::controls::Sharpness, sharpness);
+	if (this->camera_set_sharpness() != 0) {
+		exit(EXIT_FAILURE);
+	}
 
 	if (camera_->start(&controls_))
 		throw std::runtime_error("failed to start camera");

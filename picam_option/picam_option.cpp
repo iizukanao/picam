@@ -36,6 +36,11 @@ void PicamOption::print_usage() {
   log_info("                      constrained_baseline/baseline/main/high\n");
   log_info("                      (default: %s)\n", defaultOption.video_avc_profile);
   log_info("  --avclevel <value>  Set AVC/H.264 level (default: %s)\n", defaultOption.video_avc_level);
+  
+  log_info("  --brightness <num>   Set image brightness (default: %d)\n", defaultOption.video_brightness);
+  log_info("  --contrast <num>  Set image contrast (default: %d)\n", defaultOption.video_contrast);
+  log_info("  --saturation <num>  Set image color saturation (default: %d)\n", defaultOption.video_saturation);
+  log_info("  --sharpness <num>  Set image sharpness (default: %d)\n", defaultOption.video_sharpness);
   // log_info("  --qpmin <num>       Minimum quantization level (0..51)\n");
   // log_info("  --qpmax <num>       Maximum quantization level (0..51)\n");
   // log_info("  --qpinit <num>      Initial quantization level\n");
@@ -265,6 +270,10 @@ int PicamOption::parse(int argc, char **argv) {
     { "verbose", no_argument, NULL, 0 },
     { "version", no_argument, NULL, 0 },
     { "help", no_argument, NULL, 0 },
+    { "brightness", required_argument, NULL, 0 },
+    { "contrast", required_argument, NULL, 0 },
+    { "saturation", required_argument, NULL, 0 },
+    { "sharpness", required_argument, NULL, 0 },
     { 0, 0, 0, 0 },
   };
   int option_index = 0;
@@ -971,7 +980,39 @@ int PicamOption::parse(int argc, char **argv) {
         } else if (strcmp(long_options[option_index].name, "help") == 0) {
           this->show_help = true;
           return 0;
-        }
+        } else if (strcmp(long_options[option_index].name, "brightness") == 0) {			
+          char *end;
+          double value = strtod(optarg, &end);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid --brightness: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          video_brightness = value;			
+        } else if (strcmp(long_options[option_index].name, "contrast") == 0) {			
+          char *end;
+          double value = strtod(optarg, &end);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid --contrast: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          video_contrast = value;			
+        } else if (strcmp(long_options[option_index].name, "saturation") == 0) {			
+          char *end;
+          double value = strtod(optarg, &end);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid --saturation: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          video_saturation = value;			
+        }else if (strcmp(long_options[option_index].name, "sharpness") == 0) {			
+          char *end;
+          double value = strtod(optarg, &end);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid --sharpness: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          video_sharpness = value;
+        } 
         break;
       case 'w':
         {
@@ -1156,6 +1197,10 @@ int PicamOption::parse(int argc, char **argv) {
   log_debug("video_qp_max=%d\n", video_qp_max);
   log_debug("video_qp_initial=%d\n", video_qp_initial);
   log_debug("video_slice_dquant=%d\n", video_slice_dquant);
+  log_debug("video_brightness=%d\n", video_brightness);
+  log_debug("video_contrast=%d\n", video_contrast);
+  log_debug("video_saturation=%d\n", video_saturation);
+  log_debug("video_sharpness=%d\n", video_sharpness);
   log_debug("alsa_dev=%s\n", alsa_dev);
   log_debug("audio_channels=%d\n", audio_channels);
   log_debug("audio_sample_rate=%d\n", audio_sample_rate);
