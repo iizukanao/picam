@@ -37,10 +37,10 @@ void PicamOption::print_usage() {
   log_info("                      (default: %s)\n", defaultOption.video_avc_profile);
   log_info("  --avclevel <value>  Set AVC/H.264 level (default: %s)\n", defaultOption.video_avc_level);
   
-  log_info("  --brightness <num>   Set image brightness (default: %d)\n", defaultOption.video_brightness);
-  log_info("  --contrast <num>  Set image contrast (default: %d)\n", defaultOption.video_contrast);
-  log_info("  --saturation <num>  Set image color saturation (default: %d)\n", defaultOption.video_saturation);
-  log_info("  --sharpness <num>  Set image sharpness (default: %d)\n", defaultOption.video_sharpness);
+  log_info("  --brightness <num>  Set image brightness (-1.0 .. 1.0) (default: %.1f)\n", defaultOption.video_brightness);
+  log_info("  --contrast <num>    Set image contrast (default: %.1f)\n", defaultOption.video_contrast);
+  log_info("  --saturation <num>  Set image color saturation (default: %.1f)\n", defaultOption.video_saturation);
+  log_info("  --sharpness <num>   Set image sharpness (>= 0.0) (default: %.1f)\n", defaultOption.video_sharpness);
   // log_info("  --qpmin <num>       Minimum quantization level (0..51)\n");
   // log_info("  --qpmax <num>       Maximum quantization level (0..51)\n");
   // log_info("  --qpinit <num>      Initial quantization level\n");
