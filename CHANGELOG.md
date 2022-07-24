@@ -1,6 +1,11 @@
 Change Log
 ==========
 
+Version 2.0.3 *(2022-07-24)*
+----------------------------
+
+- Fixed bug where sending SIGTERM does not stop picam.
+
 Version 2.0.2 *(2022-07-21)*
 ----------------------------
 
