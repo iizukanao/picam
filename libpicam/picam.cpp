@@ -292,9 +292,7 @@ int Picam::camera_set_white_balance(char *wb) {
 	} else {
 		libcamera::controls::AwbModeEnum control = libcamera::controls::AwbAuto;
 		for (unsigned int i = 0; i < sizeof(white_balance_options) / sizeof(white_balance_option); i++) {
-			log_debug("strcmp(%s,%s)=%d\n", white_balance_options[i].name, wb, strcmp(white_balance_options[i].name, wb));
 			if (strcmp(white_balance_options[i].name, wb) == 0) {
-				log_debug("found\n");
 				control = white_balance_options[i].control;
 				break;
 			}
