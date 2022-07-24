@@ -28,6 +28,7 @@ static int keep_watching = 1;
 static pthread_t *watcher_thread;
 
 void sig_handler(int signum) {
+  // nop (since we just want to interrupt read())
 }
 
 // Create hooks dir if it does not exist
@@ -129,8 +130,9 @@ void *watch_for_file_creation(watch_target *target) {
   free(target);
   dir_strlen = strlen(dir);
 
+  // Catch signal sent by stop_watching_hooks()
   struct sigaction term_handler = {.sa_handler = sig_handler};
-  sigaction(SIGTERM, &term_handler, NULL);
+  sigaction(SIGUSR1, &term_handler, NULL);
 
   fd = inotify_init();
   if (fd < 0) {
@@ -242,5 +244,8 @@ void start_watching_hooks(pthread_t *thread, char *dir, void (*callback)(char *,
 
 void stop_watching_hooks() {
   keep_watching = 0;
-  pthread_kill(*watcher_thread, SIGTERM);
+
+  // When a signal is sent to the pthread,
+  // blocking read() returns immediately and errno is set to EINTR.
+  pthread_kill(*watcher_thread, SIGUSR1);
 }
