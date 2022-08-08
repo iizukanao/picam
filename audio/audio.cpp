@@ -640,6 +640,7 @@ void Audio::encode_and_send_audio() {
   } else {
     log_error("error: not getting audio output");
   }
+  av_packet_free(&pkt);
 }
 
 float Audio::get_fps() {
