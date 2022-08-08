@@ -496,6 +496,7 @@ void Audio::preconfigure() {
       exit(EXIT_FAILURE);
     }
   }
+  log_debug("disable_audio_capturing: %d\n", this->option->disable_audio_capturing);
   if (!this->option->disable_audio_capturing) {
     this->preconfigure_microphone();
   }
