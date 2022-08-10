@@ -116,8 +116,8 @@ public:
   // int video_rotation = 0;
   int video_hflip = 0;
   int video_vflip = 0;
-  long video_bitrate = 4500 * 1000; // 4.5 Mbps
-  char video_avc_profile[21] = "baseline";
+  long video_bitrate = 3000 * 1000; // 3 Mbps
+  char video_avc_profile[21] = "high";
   char video_avc_level[4] = "4.1";
   int video_qp_min = -1;
   int video_qp_max = -1;
