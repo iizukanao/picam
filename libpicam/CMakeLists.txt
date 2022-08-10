@@ -27,7 +27,7 @@ string(REPLACE fdk-aac "" LIBAV_WITHOUT_FDK "${LIBAV_LIBRARIES}")
 include_directories(${LIBAV_INCLUDE_DIRS})
 
 add_executable(picam main.cpp picam.cpp)
-target_link_libraries(picam picam_option video_encoder timestamp audio log httplivestreaming muxer libstate libhook preview rtsp asound ${LIBFONT_LIBRARIES} lzma pthread ${LIBCAMERA_LINK_LIBRARIES} ${LIBAV_WITHOUT_FDK})
+target_link_libraries(picam picam_option video_encoder timestamp audio log httplivestreaming muxer libstate libhook preview rtsp asound ${LIBFONT_LIBRARIES} ${LIBCAMERA_LINK_LIBRARIES} ${LIBAV_WITHOUT_FDK} lzma pthread)
 
 # statically link libfdk-aac
 target_link_libraries(picam fdk-aac.a)
