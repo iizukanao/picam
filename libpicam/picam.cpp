@@ -1491,23 +1491,23 @@ int Picam::run(int argc, char *argv[])
 
   try
   {
-    PicamOption option;
-    int ret = option.parse(argc, argv);
+    PicamOption picam_option;
+    int ret = picam_option.parse(argc, argv);
     if (ret != 0)
     {
       exit(ret);
     }
-    if (option.show_version)
+    if (picam_option.show_version)
     {
-      option.print_program_version();
+      picam_option.print_program_version();
       return EXIT_SUCCESS;
     }
-    if (option.show_help)
+    if (picam_option.show_help)
     {
-      option.print_usage();
+      picam_option.print_usage();
       return EXIT_SUCCESS;
     }
-    this->setOption(&option);
+    this->setOption(&picam_option);
 
     struct sigaction int_handler;
     int_handler.sa_handler = stopSignalHandler;
