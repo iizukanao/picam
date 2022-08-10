@@ -1331,8 +1331,8 @@ void Picam::event_loop()
 
   // audio->preconfigure() has to be executed before using codec_settings
   // because it adjusts this->option->audio_channels
-  audio = new Audio(this->option);
-  audio->preconfigure();
+  this->audio = new Audio(this->option);
+  this->audio->preconfigure();
 
   MpegTSCodecSettings codec_settings;
   if (this->option->disable_audio_capturing) {
@@ -1406,7 +1406,7 @@ void Picam::event_loop()
 
   state_default_dir("state");
 
-  audio->setup(hls);
+  this->audio->setup(hls);
 
   this->muxer = new Muxer(this->option);
   this->muxer->setup(&codec_settings, hls);
@@ -1415,7 +1415,7 @@ void Picam::event_loop()
     this->muxer->setup_tcp_output();
   }
 
-  audio->set_encode_callback([=](int64_t _pts, uint8_t *data, int size, int stream_index, int flags) -> void {
+  this->audio->set_encode_callback([=](int64_t _pts, uint8_t *data, int size, int stream_index, int flags) -> void {
     if (!this->is_audio_started) {
       this->is_audio_started = true;
       this->check_video_and_audio_started();
@@ -1425,9 +1425,9 @@ void Picam::event_loop()
     this->muxer->add_encoded_packet(audio_pts, data, size, stream_index, flags);
   });
 
-  this->muxer->prepare_encoded_packets(this->option->video_fps, audio->get_fps());
+  this->muxer->prepare_encoded_packets(this->option->video_fps, this->audio->get_fps());
 
-  audioThread = std::thread(audioLoop, audio);
+  audioThread = std::thread(audioLoop, this->audio);
 
   while (true)
   {
