@@ -1462,6 +1462,7 @@ void Picam::event_loop()
   this->stopAudioThread();
   log_debug("hls_destroy\n");
   hls_destroy(hls);
+  delete this->muxer;
 }
 
 void Picam::setOption(PicamOption *option)
