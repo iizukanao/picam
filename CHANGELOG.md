@@ -1,6 +1,15 @@
 Change Log
 ==========
 
+Version 2.0.4 *(2022-08-10)*
+----------------------------
+
+- Changed the default values for the following options:
+  + `--avcprofile` default is `high` (previously `main`)
+  + `-v, --videobitrate` default is `3000000` (previously `4500000`)
+- Fixed memory leak. (#175)
+- Fixed bug where HLS was not working on 64-bit OS. (#172)
+
 Version 2.0.3 *(2022-07-25)*
 ----------------------------
 

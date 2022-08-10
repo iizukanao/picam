@@ -62,9 +62,9 @@ chmod +x make_dirs.sh
 alsamixer
 
 # Install picam binary
-wget https://github.com/iizukanao/picam/releases/download/v2.0.3/picam-2.0.3-`uname -m`.tar.xz
-tar xvf picam-2.0.3-*.tar.xz
-cp picam-2.0.3-*/picam ~/picam/
+wget https://github.com/iizukanao/picam/releases/download/v2.0.4/picam-2.0.4-`uname -m`.tar.xz
+tar xvf picam-2.0.4-*.tar.xz
+cp picam-2.0.4-*/picam ~/picam/
 
 # Run picam
 cd ~/picam
@@ -185,14 +185,14 @@ $ touch hooks/unmute
 #### Command options
 
 ```txt
-picam version 2.0.3
+picam version 2.0.4
 Usage: picam [options]
 
 Options:
  [video]
   -w, --width <num>   Width in pixels (default: 1920)
   -h, --height <num>  Height in pixels (default: 1080)
-  -v, --videobitrate <num>  Video bit rate (default: 4500000)
+  -v, --videobitrate <num>  Video bit rate (default: 3000000)
                       Set 0 to disable rate control
   -f, --fps <num>     Frame rate (default: 30.0)
   -g, --gopsize <num>  GOP size (default: same value as fps)
@@ -204,7 +204,7 @@ Options:
   --vflip             Flip image vertically
   --avcprofile <str>  Set AVC/H.264 profile to one of:
                       constrained_baseline/baseline/main/high
-                      (default: baseline)
+                      (default: high)
   --avclevel <value>  Set AVC/H.264 level (default: 4.1)
   --brightness <num>  Adjust image brightness (default: 0.0)
                       0.0=unchanged / -1.0=darkest / 1.0=brightest
