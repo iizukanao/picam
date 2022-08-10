@@ -421,12 +421,20 @@ int Audio::configure_audio_capture_device() {
   log_debug("microphone: setting period size to %d\n", this->option->audio_period_size);
   dir = 0;
   // set the period size
+  // NOTE: On 64-bit OS, passing &this->option->audio_period_size to
+  // snd_pcm_hw_params_set_period_size_near() will overwrite the next
+  // member in the PicamOption. This is because
+  // this->option->audio_period_size is int (4 bytes) while
+  // snd_pcm_uframes_t is unsigned long (8 bytes on 64-bit OS).
+  snd_pcm_uframes_t audio_period_size = this->option->audio_period_size;
   err = snd_pcm_hw_params_set_period_size_near(capture_handle, alsa_hw_params,
-      (snd_pcm_uframes_t *)&this->option->audio_period_size, &dir);
+      &audio_period_size, &dir);
   if (err < 0) {
     log_fatal("error: failed to set period size for microphone (%s)\n", snd_strerror(err));
     exit(EXIT_FAILURE);
   }
+  assert(audio_period_size <= INT_MAX);
+  this->option->audio_period_size = audio_period_size;
 
   snd_pcm_uframes_t actual_period_size;
   err = snd_pcm_hw_params_get_period_size(alsa_hw_params, &actual_period_size, &dir);
