@@ -1,6 +1,11 @@
 Change Log
 ==========
 
+Version 2.0.5 *(2022-08-15)*
+----------------------------
+
+- Fixed a bug that caused segmentation fault when filename was specified in `hooks/start_record` file. (#177)
+
 Version 2.0.4 *(2022-08-10)*
 ----------------------------
 
