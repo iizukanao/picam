@@ -81,11 +81,11 @@ void *Muxer::rec_thread_stop(int skip_cleanup) {
 
     // Create a symlink
     char symlink_dest_path[2048];
-    size_t rec_dir_len = strlen(this->rec_settings.rec_dir);
+    size_t rec_dir_len = strlen(this->rec_settings->rec_dir);
     struct stat file_stat;
 
     // If recording_archive_filepath starts with "rec/", then remove it
-    if (strncmp(recording_archive_filepath, this->rec_settings.rec_dir, rec_dir_len) == 0 &&
+    if (strncmp(recording_archive_filepath, this->rec_settings->rec_dir, rec_dir_len) == 0 &&
         recording_archive_filepath[rec_dir_len] == '/') {
       snprintf(symlink_dest_path, sizeof(symlink_dest_path),
           recording_archive_filepath + rec_dir_len + 1);
@@ -196,7 +196,7 @@ void *rec_thread_start(void *self) {
   return muxer->rec_start();
 }
 
-void Muxer::start_record(RecSettings settings) {
+void Muxer::start_record(RecSettings *settings) {
   if (this->is_recording) {
     log_warn("recording is already started\n");
     return;
@@ -323,45 +323,45 @@ void *Muxer::rec_start() {
   this->rec_start_time = time(NULL);
   rec_start_pts = -1;
 
-  if (this->rec_settings.recording_dest_dir[0] != 0) {
-    dest_dir = this->rec_settings.recording_dest_dir;
+  if (this->rec_settings->recording_dest_dir[0] != '\0') {
+    dest_dir = this->rec_settings->recording_dest_dir;
   } else {
-    dest_dir = this->rec_settings.rec_archive_dir;
+    dest_dir = this->rec_settings->rec_archive_dir;
   }
 
-  if (this->rec_settings.recording_basename[0] != 0) { // basename is already decided
-    strncpy(this->recording_basename, this->rec_settings.recording_basename, sizeof(this->recording_basename)-1);
+  if (this->rec_settings->recording_basename[0] != 0) { // basename is already decided
+    strncpy(this->recording_basename, this->rec_settings->recording_basename, sizeof(this->recording_basename)-1);
     this->recording_basename[sizeof(this->recording_basename)-1] = '\0';
 
     snprintf(this->recording_filepath, sizeof(this->recording_filepath),
-        "%s/%s", this->rec_settings.rec_dir, this->recording_basename);
+        "%s/%s", this->rec_settings->rec_dir, this->recording_basename);
     snprintf(recording_archive_filepath, sizeof(recording_archive_filepath),
         "%s/%s", dest_dir, this->recording_basename);
     snprintf(recording_tmp_filepath, sizeof(recording_tmp_filepath),
-        "%s/%s", this->rec_settings.rec_tmp_dir, this->recording_basename);
+        "%s/%s", this->rec_settings->rec_tmp_dir, this->recording_basename);
     filename_decided = 1;
   } else {
     strftime(this->recording_basename, sizeof(this->recording_basename), "%Y-%m-%d_%H-%M-%S", timeinfo);
     snprintf(recording_filepath, sizeof(recording_filepath),
-        "%s/%s.ts", this->rec_settings.rec_dir, this->recording_basename);
+        "%s/%s.ts", this->rec_settings->rec_dir, this->recording_basename);
     if (access(recording_filepath, F_OK) != 0) { // filename is decided
       sprintf(this->recording_basename + strlen(recording_basename), ".ts"); // add ".ts"
       snprintf(recording_archive_filepath, sizeof(recording_archive_filepath),
           "%s/%s", dest_dir, this->recording_basename);
       snprintf(recording_tmp_filepath, sizeof(recording_tmp_filepath),
-          "%s/%s", this->rec_settings.rec_tmp_dir, this->recording_basename);
+          "%s/%s", this->rec_settings->rec_tmp_dir, this->recording_basename);
       filename_decided = 1;
     }
     while (!filename_decided) {
       unique_number++;
       snprintf(recording_filepath, sizeof(recording_filepath),
-          "%s/%s-%d.ts", this->rec_settings.rec_dir, recording_basename, unique_number);
+          "%s/%s-%d.ts", this->rec_settings->rec_dir, this->recording_basename, unique_number);
       if (access(recording_filepath, F_OK) != 0) { // filename is decided
         sprintf(recording_basename + strlen(recording_basename), "-%d.ts", unique_number);
         snprintf(recording_archive_filepath, sizeof(recording_archive_filepath),
             "%s/%s", dest_dir, recording_basename);
         snprintf(recording_tmp_filepath, sizeof(recording_tmp_filepath),
-            "%s/%s", this->rec_settings.rec_tmp_dir, recording_basename);
+            "%s/%s", this->rec_settings->rec_tmp_dir, recording_basename);
         filename_decided = 1;
       }
     }

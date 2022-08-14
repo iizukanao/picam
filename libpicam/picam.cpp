@@ -440,8 +440,8 @@ void Picam::ensure_hls_dir_exists() {
 void Picam::parse_start_record_file(char *full_filename) {
   char buf[1024];
 
-  this->rec_settings.recording_basename = (char *)""; // empties the basename used for this recording
-  this->rec_settings.recording_dest_dir = (char *)""; // empties the directory the result file will be put in
+  this->rec_settings.recording_basename[0] = '\0'; // empties the basename used for this recording
+  this->rec_settings.recording_dest_dir[0] = '\0'; // empties the directory the result file will be put in
   this->muxer->recording_look_back_keyframes = -1;
 
   FILE *fp = fopen(full_filename, "r");
@@ -481,6 +481,7 @@ void Picam::parse_start_record_file(char *full_filename) {
         strncpy(this->rec_settings.recording_dest_dir, sep_p + 1, len);
         this->rec_settings.recording_dest_dir[len] = '\0';
         // Create the directory if it does not exist
+        // We do not handle create_dir() errors
         create_dir(this->rec_settings.recording_dest_dir);
       } else if (strncmp(buf, "filename", sep_p - buf) == 0) { // basename
         size_t len = strcspn(sep_p + 1, "\r\n");
@@ -511,7 +512,7 @@ void Picam::handleHook(char *filename, char *content) {
     snprintf(buf, sizeof(buf), "%s/%s", this->option->hooks_dir, filename);
     this->parse_start_record_file(buf);
 
-    this->muxer->start_record(this->rec_settings);
+    this->muxer->start_record(&this->rec_settings);
   } else if (strcmp(filename, "stop_record") == 0) {
     this->muxer->stop_record();
   } else if (strcmp(filename, "mute") == 0) {
@@ -1576,13 +1577,14 @@ int Picam::run(int argc, char *argv[])
       });
     }
 
-    this->rec_settings = {
-        (char *)"",                    // recording_dest_dir
-        (char *)"",                    // recording_basename
-        this->option->rec_dir,         // rec_dir
-        this->option->rec_tmp_dir,     // rec_tmp_dir
-        this->option->rec_archive_dir, // rec_archive_dir
-    };
+    memset(this->rec_settings.recording_dest_dir, '\0', sizeof(this->rec_settings.recording_dest_dir));
+    memset(this->rec_settings.recording_basename, '\0', sizeof(this->rec_settings.recording_basename));
+    memset(this->rec_settings.rec_dir, '\0', sizeof(this->rec_settings.rec_dir));
+    memset(this->rec_settings.rec_tmp_dir, '\0', sizeof(this->rec_settings.rec_tmp_dir));
+    memset(this->rec_settings.rec_archive_dir, '\0', sizeof(this->rec_settings.rec_archive_dir));
+    strncpy(this->rec_settings.rec_dir, this->option->rec_dir, sizeof(this->rec_settings.rec_dir)-1);
+    strncpy(this->rec_settings.rec_tmp_dir, this->option->rec_tmp_dir, sizeof(this->rec_settings.rec_tmp_dir)-1);
+    strncpy(this->rec_settings.rec_archive_dir, this->option->rec_archive_dir, sizeof(this->rec_settings.rec_archive_dir)-1);
 
     if (this->option->is_timestamp_enabled)
     {

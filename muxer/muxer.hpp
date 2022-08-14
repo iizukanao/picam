@@ -5,6 +5,8 @@
 #include "httplivestreaming/httplivestreaming.h"
 #include "picam_option/picam_option.hpp"
 
+#define sizeof_member(type, member) sizeof(((type *)0)->member)
+
 typedef struct EncodedPacket {
   int64_t pts; // AVPacket.pts (presentation timestamp)
   uint8_t *data; // AVPacket.data (payload)
@@ -15,12 +17,12 @@ typedef struct EncodedPacket {
 
 // Recording settings
 typedef struct RecSettings {
-  char *recording_dest_dir;
-  char *recording_basename;
+  char recording_dest_dir[1024];
+  char recording_basename[256];
   // Directory to put recorded MPEG-TS files
-  char *rec_dir;
-  char *rec_tmp_dir;
-  char *rec_archive_dir;
+  char rec_dir[256];
+  char rec_tmp_dir[256];
+  char rec_archive_dir[1024];
 } RecSettings;
 
 class Muxer
@@ -30,7 +32,7 @@ class Muxer
     ~Muxer();
     void setup(MpegTSCodecSettings *codec_settings, HTTPLiveStreaming *hls);
     int write_encoded_packets(int max_packets, int origin_pts);
-    void start_record(RecSettings rec_settings);
+    void start_record(RecSettings *rec_settings);
     void *rec_start();
     void write_frame(AVPacket *pkt);
     void add_encoded_packet(int64_t pts, uint8_t *data, int size, int stream_index, int flags);
@@ -57,7 +59,7 @@ class Muxer
     void *rec_thread_stop(int skip_cleanup);
     void flush_record();
     HTTPLiveStreaming *hls;
-    RecSettings rec_settings;
+    RecSettings *rec_settings;
     EncodedPacket **encoded_packets; // circular buffer that stores encoded audio and video
     int encoded_packets_size; // the number of EncodedPacket that can be stored in encoded_packets
     int current_encoded_packet = -1; // write pointer of encoded_packets array that holds latest encoded audio or video
@@ -68,11 +70,26 @@ class Muxer
     AVFormatContext *rec_format_ctx;
     time_t rec_start_time;
 
-    char recording_filepath[300];
-    char recording_tmp_filepath[259];
-    char recording_archive_filepath[1024];
-    char recording_basename[256];
-    char recording_dest_dir[1024];
+    char recording_basename[sizeof_member(RecSettings, recording_basename)] = {};
+    char recording_filepath[
+      sizeof_member(RecSettings, rec_dir) - 1 +
+      sizeof(recording_basename) - 1 +
+      10 + // %d
+      5 + // "/-.ts"
+      1 // '\0'
+      ] = {}; // 526
+    char recording_tmp_filepath[
+      sizeof_member(RecSettings, rec_tmp_dir) - 1 +
+      sizeof(recording_basename) - 1 +
+      1 + // "/"
+      1 // '\0'
+      ] = {}; // 512
+    char recording_archive_filepath[
+      sizeof_member(RecSettings, recording_dest_dir) - 1 +
+      sizeof(recording_basename) - 1 +
+      1 + // "/"
+      1 // '\0'
+      ] = {}; // 1280
     int is_recording = 0;
 
     MpegTSCodecSettings *codec_settings;
