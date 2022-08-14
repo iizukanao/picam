@@ -1543,9 +1543,15 @@ int Picam::run(int argc, char *argv[])
       return EXIT_FAILURE;
     }
 
-    create_dir(this->option->rec_dir);
-    create_dir(this->option->rec_tmp_dir);
-    create_dir(this->option->rec_archive_dir);
+    if (create_dir(this->option->rec_dir) != 0) {
+      return EXIT_FAILURE;
+    }
+    if (create_dir(this->option->rec_tmp_dir) != 0) {
+      return EXIT_FAILURE;
+    }
+    if (create_dir(this->option->rec_archive_dir) != 0) {
+      return EXIT_FAILURE;
+    }
 
     if (this->option->is_hlsout_enabled)
     {
