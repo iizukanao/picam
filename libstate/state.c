@@ -17,6 +17,13 @@ int state_create_dir(char *dir) {
   err = stat(dir, &st);
   if (err == -1) {
     if (errno == ENOENT) {
+      // Check if this is a broken symbolic link
+      err = lstat(dir, &st);
+      if (err == 0 && S_ISLNK(st.st_mode)) {
+        fprintf(stderr, "error: ./%s is a broken symbolic link\n", dir);
+        return -1;
+      }
+
       // create directory
       if (mkdir(dir, 0755) == 0) { // success
         fprintf(stderr, "created state dir: ./%s\n", dir);
@@ -31,7 +38,7 @@ int state_create_dir(char *dir) {
     }
   } else {
     if (!S_ISDIR(st.st_mode)) {
-      fprintf(stderr, "state dir (./%s) is not a directory\n",
+      fprintf(stderr, "error: state dir (./%s) is not a directory. remove it or replace it with a directory.\n",
           dir);
       return -1;
     }

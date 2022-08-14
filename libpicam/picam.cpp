@@ -224,6 +224,13 @@ int create_dir(const char *dir) {
   err = stat(dir, &st);
   if (err == -1) {
     if (errno == ENOENT) {
+      // Check if this is a broken symbolic link
+      err = lstat(dir, &st);
+      if (err == 0 && S_ISLNK(st.st_mode)) {
+        fprintf(stderr, "error: ./%s is a broken symbolic link\n", dir);
+        return -1;
+      }
+
       // create directory
       if (mkdir(dir, 0755) == 0) { // success
         log_info("created directory: ./%s\n", dir);
@@ -238,7 +245,7 @@ int create_dir(const char *dir) {
     }
   } else {
     if (!S_ISDIR(st.st_mode)) {
-      log_error("error: ./%s is not a directory\n", dir);
+      log_error("error: ./%s is not a directory. remove it or replace it with a directory.\n", dir);
       return -1;
     }
   }
@@ -395,28 +402,35 @@ void Picam::ensure_hls_dir_exists() {
   err = stat(this->option->hls_output_dir, &st);
   if (err == -1) {
     if (errno == ENOENT) {
+      // Check if this is a broken symbolic link
+      err = lstat(this->option->hls_output_dir, &st);
+      if (err == 0 && S_ISLNK(st.st_mode)) {
+        fprintf(stderr, "error: HLS directory (%s) is a broken symbolic link\n", this->option->hls_output_dir);
+        exit(EXIT_FAILURE);
+      }
+
       // create directory
       if (mkdir(this->option->hls_output_dir, 0755) == 0) { // success
-        log_info("created HLS output directory: %s\n", this->option->hls_output_dir);
+        log_info("created HLS directory: %s\n", this->option->hls_output_dir);
       } else { // error
-        log_error("error creating hls_output_dir (%s): %s\n",
+        log_error("error creating HLS directory (%s): %s\n",
             this->option->hls_output_dir, strerror(errno));
         exit(EXIT_FAILURE);
       }
     } else {
-      perror("stat hls_output_dir");
+      perror("stat HLS directory");
       exit(EXIT_FAILURE);
     }
   } else {
     if (!S_ISDIR(st.st_mode)) {
-      log_error("error: hls_output_dir (%s) is not a directory\n",
+      log_error("error: HLS directory (%s) is not a directory. remove it or replace it with a directory.\n",
           this->option->hls_output_dir);
       exit(EXIT_FAILURE);
     }
   }
 
   if (access(this->option->hls_output_dir, R_OK) != 0) {
-    log_error("error: cannot access hls_output_dir (%s): %s\n",
+    log_error("error: cannot access HLS directory (%s): %s\n",
         this->option->hls_output_dir, strerror(errno));
     exit(EXIT_FAILURE);
   }

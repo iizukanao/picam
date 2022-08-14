@@ -39,6 +39,13 @@ int hooks_create_dir(char *dir) {
   err = stat(dir, &st);
   if (err == -1) {
     if (errno == ENOENT) {
+      // Check if this is a broken symbolic link
+      err = lstat(dir, &st);
+      if (err == 0 && S_ISLNK(st.st_mode)) {
+        fprintf(stderr, "error: ./%s is a broken symbolic link\n", dir);
+        return -1;
+      }
+
       // create directory
       if (mkdir(dir, 0755) == 0) { // success
         fprintf(stderr, "created hooks dir: ./%s\n", dir);
@@ -53,7 +60,7 @@ int hooks_create_dir(char *dir) {
     }
   } else {
     if (!S_ISDIR(st.st_mode)) {
-      fprintf(stderr, "hooks dir (./%s) is not a directory\n",
+      fprintf(stderr, "hooks dir (./%s) is not a directory. remove it or replace it with a directory.\n",
           dir);
       return -1;
     }
@@ -144,20 +151,20 @@ void *watch_for_file_creation(watch_target *target) {
   int err = stat(dir, &st);
   if (err == -1) {
     if (errno == ENOENT) {
-      fprintf(stderr, "Error: %s directory does not exist\n", dir);
+      fprintf(stderr, "error: %s directory does not exist\n", dir);
     } else {
       perror("stat error");
     }
     exit(EXIT_FAILURE);
   } else {
     if (!S_ISDIR(st.st_mode)) {
-      fprintf(stderr, "Error: %s is not a directory\n", dir);
+      fprintf(stderr, "error: %s is not a directory. remove it or replace it with a directory.\n", dir);
       exit(EXIT_FAILURE);
     }
   }
 
   if (access(dir, R_OK) != 0) {
-    perror("Can't access hook target directory");
+    perror("error: cannot access hook target directory");
     exit(EXIT_FAILURE);
   }
 
