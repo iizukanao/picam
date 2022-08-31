@@ -582,7 +582,7 @@ To upload streams from picam to YouTube, take the following steps.
 2. When streaming console appears, copy the "Stream URL" and "Stream key" and run the following ffmpeg command. Replace `STREAM_URL` and `STREAM_KEY` with the strings provided by YouTube.
 
 ```sh
-$ ffmpeg -i tcp://127.0.0.1:8181?listen -c:v copy -c:a copy -f flv STREAM_URL/STREAM_KEY
+$ ffmpeg -i tcp://127.0.0.1:8181?listen -c:v copy -c:a aac -f flv STREAM_URL/STREAM_KEY
 ```
 
 <img src="https://raw.githubusercontent.com/iizukanao/picam/libcamera/images/youtube.png" alt="YouTube Live console" style="max-width:100%;" width="600">
