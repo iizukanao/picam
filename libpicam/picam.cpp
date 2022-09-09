@@ -1793,7 +1793,7 @@ void Picam::ConfigureVideo(unsigned int flags)
   cfg.size.width = this->option->video_width;
   cfg.size.height = this->option->video_height;
   if (flags & FLAG_VIDEO_JPEG_COLOURSPACE)
-    cfg.colorSpace = libcamera::ColorSpace::Jpeg;
+    cfg.colorSpace = libcamera::ColorSpace::Sycc;
   else if (cfg.size.width >= 1280 || cfg.size.height >= 720)
     cfg.colorSpace = libcamera::ColorSpace::Rec709;
   else
