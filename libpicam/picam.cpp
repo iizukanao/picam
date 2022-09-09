@@ -4,6 +4,7 @@
  */
 
 #include <iostream>
+#include <iomanip>
 #include <chrono>
 #include <poll.h>
 #include <signal.h>
@@ -14,6 +15,7 @@
 #include <linux/videodev2.h>
 #include <libcamera/transform.h>
 #include <libcamera/control_ids.h>
+#include <libcamera/logging.h>
 
 #include "timestamp/timestamp.h"
 #include "subtitle/subtitle.h"
@@ -263,10 +265,11 @@ int create_dir(const char *dir) {
 int Picam::camera_set_custom_awb_gains() {
   log_debug("camera_set_custom_awb_gains: red=%.1f, blue=%.1f\n",
     this->option->awb_red_gain, this->option->awb_blue_gain);
-  controls_.set(libcamera::controls::ColourGains, {
-    this->option->awb_red_gain,
-    this->option->awb_blue_gain
-  });
+  controls_.set(libcamera::controls::ColourGains,
+                libcamera::Span<const float, 2>({
+                  this->option->awb_red_gain,
+                  this->option->awb_blue_gain
+                }));
 
   return 0;
 }
@@ -1286,13 +1289,16 @@ float Picam::calc_current_real_fps()
 
 void Picam::queryCameras()
 {
+    // Disable any libcamera logging for this bit.
+    libcamera::logSetTarget(libcamera::LoggingTargetNone);
+
     std::unique_ptr<libcamera::CameraManager> cm = std::make_unique<libcamera::CameraManager>();
     int ret = cm->start();
     if (ret)
       throw std::runtime_error("camera manager failed to start, code " + std::to_string(-ret));
 
     std::vector<std::shared_ptr<libcamera::Camera>> cameras = cm->cameras();
-    // Do not show USB webcams as these are not supported in libcamera-apps!
+    // Do not show USB webcams as these are not supported in picam
     auto rem = std::remove_if(cameras.begin(), cameras.end(),
                   [](auto &cam) { return cam->id().find("/usb") != std::string::npos; });
     cameras.erase(rem, cameras.end());
@@ -1300,17 +1306,16 @@ void Picam::queryCameras()
     if (cameras.size() != 0)
     {
       unsigned int idx = 0;
-      std::cerr << "Available cameras" << std::endl
+      std::cout << "Available cameras" << std::endl
             << "-----------------" << std::endl;
-      std::cerr << "<num> : <model> [<max_resolution>] (<id>)" << std::endl;
       for (auto const &cam : cameras)
       {
-        std::cerr << idx++ << " : " << cam->properties().get(libcamera::properties::Model);
-        if (cam->properties().contains(libcamera::properties::PixelArrayActiveAreas))
-          std::cerr << " ["
-                << cam->properties().get(libcamera::properties::PixelArrayActiveAreas)[0].size().toString()
-                << "]";
-        std::cerr << " (" << cam->id() << ")" << std::endl;
+        cam->acquire();
+        std::cout << idx++ << " : " << *cam->properties().get(libcamera::properties::Model);
+        auto area = cam->properties().get(libcamera::properties::PixelArrayActiveAreas);
+        if (area)
+          std::cout << " [" << (*area)[0].size().toString() << "]";
+        std::cout << " (" << cam->id() << ")" << std::endl;
 
         std::unique_ptr<libcamera::CameraConfiguration> config = cam->generateConfiguration({libcamera::StreamRole::Raw});
         if (!config)
@@ -1320,20 +1325,42 @@ void Picam::queryCameras()
         if (!formats.pixelformats().size())
           continue;
 
-        std::cerr << "    Modes: ";
+        std::cout << "    Modes: ";
         unsigned int i = 0;
         for (const auto &pix : formats.pixelformats())
         {
-          if (i++) std::cerr << "           ";
-          std::cerr << "'" << pix.toString() << "' : ";
+          if (i++) std::cout << "           ";
+          std::string mode("'" + pix.toString() + "' : ");
+          std::cout << mode;
+          unsigned int num = formats.sizes(pix).size();
           for (const auto &size : formats.sizes(pix))
-            std::cerr << size.toString() << " ";
-          std::cerr << std::endl;
+          {
+            std::cout << size.toString() << " ";
+
+            config->at(0).size = size;
+            config->at(0).pixelFormat = pix;
+            config->validate();
+            cam->configure(config.get());
+
+            auto fd_ctrl = cam->controls().find(&libcamera::controls::FrameDurationLimits);
+            auto crop_ctrl = cam->properties().get(libcamera::properties::ScalerCropMaximum);
+            double fps = 1e6 / fd_ctrl->second.min().get<int64_t>();
+            std::cout << std::fixed << std::setprecision(2) << "["
+                  << fps << " fps - " << crop_ctrl->toString() << " crop" << "]";
+            if (--num)
+            {
+              std::cout << std::endl;
+              for (std::size_t s = 0; s < mode.length() + 11; std::cout << " ", s++);
+            }
+          }
+          std::cout << std::endl;
         }
+
+        cam->release();
       }
     }
     else
-      std::cerr << "No cameras available!" << std::endl;
+      std::cout << "No cameras available!" << std::endl;
 
     cameras.clear();
     cm->stop();
@@ -1870,9 +1897,9 @@ void Picam::StartCamera()
 
   // Build a list of initial controls that we must set in the camera before starting it.
   // We don't overwrite anything the application may have set before calling us.
-  if (!controls_.contains(libcamera::controls::ScalerCrop) && this->option->roi_width != 0 && this->option->roi_height != 0)
+  if (!controls_.get(libcamera::controls::ScalerCrop) && this->option->roi_width != 0 && this->option->roi_height != 0)
   {
-    libcamera::Rectangle sensor_area = camera_->properties().get(libcamera::properties::ScalerCropMaximum);
+    libcamera::Rectangle sensor_area = *camera_->properties().get(libcamera::properties::ScalerCropMaximum);
     int x = this->option->roi_left * sensor_area.width;
     int y = this->option->roi_top * sensor_area.height;
     int w = this->option->roi_width * sensor_area.width;
@@ -1886,7 +1913,7 @@ void Picam::StartCamera()
   // Framerate is a bit weird. If it was set programmatically, we go with that, but
   // otherwise it applies only to preview/video modes. For stills capture we set it
   // as long as possible so that we get whatever the exposure profile wants.
-  if (!controls_.contains(libcamera::controls::FrameDurationLimits))
+  if (!controls_.get(libcamera::controls::FrameDurationLimits))
   {
     if (this->option->is_vfr_enabled) {
       float min_fps = this->option->min_fps;
@@ -1901,11 +1928,13 @@ void Picam::StartCamera()
       int64_t frame_time_at_min_fps = 1000000 / min_fps; // in us
       int64_t frame_time_at_max_fps = 1000000 / max_fps; // in us
       log_debug("vfr frame_time=%" PRId64 "..%" PRId64 "\n", frame_time_at_max_fps, frame_time_at_min_fps);
-      controls_.set(libcamera::controls::FrameDurationLimits, { frame_time_at_max_fps, frame_time_at_min_fps });
+      controls_.set(libcamera::controls::FrameDurationLimits,
+                    libcamera::Span<const int64_t, 2>({ frame_time_at_max_fps, frame_time_at_min_fps }));
     } else if (this->option->video_fps > 0) {
       int64_t frame_time = 1000000 / this->option->video_fps; // in us
       log_debug("cfr frame_time=%" PRId64 "\n", frame_time);
-      controls_.set(libcamera::controls::FrameDurationLimits, { frame_time, frame_time });
+      controls_.set(libcamera::controls::FrameDurationLimits,
+                    libcamera::Span<const int64_t, 2>({ frame_time, frame_time }));
     }
   }
 
@@ -1920,7 +1949,7 @@ void Picam::StartCamera()
 
   // Analogue gain
   float gain = 0;
-  if (!controls_.contains(libcamera::controls::AnalogueGain) && gain)
+  if (!controls_.get(libcamera::controls::AnalogueGain) && gain)
     controls_.set(libcamera::controls::AnalogueGain, gain);
 
   // Auto exposure metering mode

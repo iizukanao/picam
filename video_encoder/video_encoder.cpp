@@ -129,6 +129,13 @@ VideoEncoder::VideoEncoder(PicamOption const *options, StreamInfo const &info)
 	if (xioctl(fd_, VIDIOC_S_FMT, &fmt) < 0)
 		throw std::runtime_error("failed to set capture format");
 
+	struct v4l2_streamparm parm = {};
+	parm.type = V4L2_BUF_TYPE_VIDEO_OUTPUT_MPLANE;
+	parm.parm.output.timeperframe.numerator = 1000 / options->video_fps;
+	parm.parm.output.timeperframe.denominator = 1000;
+	if (xioctl(fd_, VIDIOC_S_PARM, &parm) < 0)
+			throw std::runtime_error("failed to set streamparm");
+
 	// Request that the necessary buffers are allocated. The output queue
 	// (input to the encoder) shares buffers from our caller, these must be
 	// DMABUFs. Buffers for the encoded bitstream must be allocated and
