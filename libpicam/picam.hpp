@@ -56,6 +56,7 @@ public:
 	enum class MsgType
 	{
 		RequestComplete,
+		Timeout,
 		Quit
 	};
 	typedef std::variant<CompletedRequestPtr> MsgPayload;

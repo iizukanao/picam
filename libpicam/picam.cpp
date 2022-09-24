@@ -1474,6 +1474,13 @@ void Picam::event_loop()
   while (true)
   {
     Picam::Msg msg = this->Wait();
+    if (msg.type == MsgType::Timeout)
+    {
+        log_error("ERROR: Device timeout detected, attempting a restart!!!\n");
+        this->StopCamera();
+        this->StartCamera();
+        continue;
+    }
     if (msg.type == Picam::MsgType::Quit) {
       this->stop();
     } else if (msg.type != Picam::MsgType::RequestComplete) {
@@ -2239,7 +2246,14 @@ void Picam::makeRequests()
 void Picam::requestComplete(libcamera::Request *request)
 {
   if (request->status() == libcamera::Request::RequestCancelled)
-    return;
+  {
+      // If the request is cancelled while the camera is still running, it indicates
+      // a hardware timeout. Let the application handle this error.
+      if (camera_started_)
+          msg_queue_.Post(Msg(MsgType::Timeout));
+
+      return;
+  }
 
   CompletedRequest *r = new CompletedRequest(0, request); // We don't use the sequence parameter
   CompletedRequestPtr payload(r, [this](CompletedRequest *cr) { this->queueRequest(cr); });
@@ -2295,6 +2309,7 @@ void Picam::stopPreview()
   }
   preview_thread_.join();
   preview_item_ = PreviewItem();
+  preview_completed_requests_.clear();
   log_debug("preview: stopPreview end\n");
 }
 
