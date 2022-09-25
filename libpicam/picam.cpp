@@ -681,6 +681,29 @@ void Picam::handleHook(char *filename, char *content) {
         free(file_buf);
       }
     }
+  } else if (strcmp(filename, "saturation") == 0) {
+    char buf[sizeof(this->option->hooks_dir) + 11]; // 11 == strlen("/saturation")
+    snprintf(buf, sizeof(buf), "%s/%s", this->option->hooks_dir, filename);
+    char *file_buf;
+    size_t file_buf_len;
+    if (read_file(buf, &file_buf, &file_buf_len) == 0) {
+      if (file_buf != NULL) {
+        // read a floating number
+        char *end;
+        double value = strtod(file_buf, &end);
+        if (end == file_buf || errno == ERANGE) { // parse error
+          log_error("error parsing file %s\n", buf);
+        } else { // parse ok
+          this->option->video_saturation = value;
+          if (camera_set_saturation() == 0) {
+            log_info("changed saturation to %.2f\n", this->option->video_saturation);
+          } else {
+            log_error("error: failed to set saturation\n");
+          }
+        }
+        free(file_buf);
+      }
+    }
   } else if (strcmp(filename, "set_recordbuf") == 0) { // set global recordbuf
     char buf[270]; // sizeof(hooks_dir) + strlen("/set_recordbuf")
     snprintf(buf, sizeof(buf), "%s/%s", this->option->hooks_dir, filename);
