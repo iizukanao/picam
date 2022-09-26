@@ -367,7 +367,7 @@ Available cameras
 ```
 
 
-#### Exposure Control
+#### Exposure control
 
 Camera exposure control can be set either via command line option (e.g. `--ex long`) or hooks. To change the exposure control while picam is running, start picam with `--vfr` or `--ex` option, then create `hooks/ex_<value>`, where `<value>` is the name of exposure control.
 
@@ -495,6 +495,37 @@ duration_sec=23.150333
 ```
 
 You can remove `state/*.ts` files if you do not need them.
+
+### Hooks
+
+The hooks allows you to dynamically change the states or settings while picam is running. To use the hooks, create a file in the `hooks` directory with the appropriate filename and contents as shown below.
+
+| Filename | Contents | Description |
+| :------- | :------- | :---------- |
+| `start_record` | empty | Start recording (See [Recording](#recording)) |
+| `stop_record` | empty | Stop recording (See [Recording](#recording)) |
+| `mute` | empty | Mute audio (See [Mute/Unmute](#muteunmute)) |
+| `unmute` | empty | Unmute audio (See [Mute/Unmute](#muteunmute)) |
+| `wbred` | decimal | Set red gain (Same as `--wbred`) |
+| `wbblue` | decimal | Set blue gain (Same as `--wbblue`) |
+| `wb_*` | empty | Set white balance (See [White balance](#white-balance)) |
+| `ex_*` | empty | Set exposure (See [Exposure control](#exposure-control)) |
+| `brightness` | decimal | Set brightness (Same as `--brightness`) |
+| `contrast` | decimal | Set contrast (Same as `--contrast`) |
+| `saturation` | decimal | Set saturation (Same as `--saturation`) |
+| `sharpness` | decimal | Set sharpness (Same as `--sharpness`) |
+| `set_recordbuf` | integer | Set global recordbuf (See [Recordbuf](#recordbuf)) |
+| `subtitle` | text | Display a subtitle (See [Overlaying text](#overlaying-text-subtitle)) |
+
+For example, to change the sharpness value, create `hooks/sharpness` file as follows.
+
+```sh
+# Change sharpness to 1.5
+$ echo 1.5 > hooks/sharpness
+
+# Revert to default sharpness
+$ echo 0 > hooks/sharpness
+```
 
 
 ### HTTP Live Streaming (HLS)
