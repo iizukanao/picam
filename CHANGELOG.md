@@ -1,6 +1,14 @@
 Change Log
 ==========
 
+Version 2.0.7 *(2022-09-26)*
+----------------------------
+
+- Added "brightness" hook.
+- Added "contrast" hook.
+- Added "saturation" hook.
+- Added "sharpness" hook.
+
 Version 2.0.6 *(2022-09-09)*
 ----------------------------
 
