@@ -56,6 +56,8 @@ ln -sfn $SHM_DIR/state $DEST_DIR/state
 EOF
 
 chmod +x make_dirs.sh
+
+# Run this script each time the OS is rebooted.
 ./make_dirs.sh
 
 # Optionally, increase microphone volume with alsamixer
