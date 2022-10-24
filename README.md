@@ -57,7 +57,7 @@ EOF
 
 chmod +x make_dirs.sh
 
-# Run this script each time the OS is rebooted.
+# Run make_dirs.sh each time the OS is rebooted
 ./make_dirs.sh
 
 # Optionally, increase microphone volume with alsamixer
