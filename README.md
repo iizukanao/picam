@@ -36,7 +36,7 @@ sudo raspi-config
 
 # Install dependencies
 sudo apt update
-sudo apt install libharfbuzz0b libfontconfig
+sudo apt install libharfbuzz0b libfontconfig libepoxy0
 
 # Create directories and symbolic links
 cat > make_dirs.sh <<'EOF'
