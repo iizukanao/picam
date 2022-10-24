@@ -62,7 +62,7 @@ chmod +x make_dirs.sh
 alsamixer
 
 # Install picam binary
-wget https://github.com/iizukanao/picam/releases/download/v2.0.8/picam-2.0.7-`uname -m`.tar.xz
+wget https://github.com/iizukanao/picam/releases/download/v2.0.8/picam-2.0.8-`uname -m`.tar.xz
 tar xvf picam-2.0.8-*.tar.xz
 cp picam-2.0.8-*/picam ~/picam/
 
