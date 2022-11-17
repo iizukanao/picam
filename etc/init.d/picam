@@ -46,11 +46,7 @@ PICAM_OPTIONS="--quiet \
   --fps $VIDEO_FRAMERATE \
   --width $VIDEO_WIDTH \
   --height $VIDEO_HEIGHT \
-  --rotation $VIDEO_ROTATION \
   --videobitrate $VIDEO_BITRATE \
-  --qpmin $VIDEO_QPMIN \
-  --qpmax $VIDEO_QPMAX \
-  --qpinit $VIDEO_QPINIT \
   --alsadev $ALSADEV \
   $OTHER_OPTIONS"
 if [ "$ENABLE_HLS" = "true" ]; then

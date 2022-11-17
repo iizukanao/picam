@@ -23,9 +23,6 @@ VIDEO_WIDTH=1280
 ## image height in pixels
 VIDEO_HEIGHT=720
 
-## image rotation in clockwise degrees
-VIDEO_ROTATION=0
-
 ## flip image horizontally
 VIDEO_HORIZONTAL_FLIP=false
 
@@ -34,15 +31,6 @@ VIDEO_VERTICAL_FLIP=false
 
 ## video stream bitrate in bits/s
 VIDEO_BITRATE=2000000
-
-## minimum quantization level for video encoding
-VIDEO_QPMIN="1"
-
-## maximum quantization level for video encoding
-VIDEO_QPMAX="24"
-
-## initial quantization level for video encoding
-VIDEO_QPINIT="1"
 
 ## alsa device name
 ALSADEV="hw:0,0"
