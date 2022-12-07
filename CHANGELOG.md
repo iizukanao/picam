@@ -1,6 +1,11 @@
 Change Log
 ==========
 
+Version 2.0.9 *(2022-12-07)*
+----------------------------
+
+- Built binary for the latest version of libcamera. (#193)
+
 Version 2.0.8 *(2022-10-22)*
 ----------------------------
 
