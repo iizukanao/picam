@@ -351,6 +351,27 @@ int Picam::camera_set_sharpness() {
   return 0;
 }
 
+int Picam::camera_set_autofocus_mode(char *mode) {
+  log_debug("camera_set_autofocus_mode: %s\n", mode);
+  libcamera::controls::AfModeEnum af_mode = libcamera::controls::AfModeContinuous;
+  for (unsigned int i = 0; i < sizeof(video_autofocus_mode_options) / sizeof(video_autofocus_mode_option); i++) {
+    if (strcmp(video_autofocus_mode_options[i].name, mode) == 0) {
+      af_mode = video_autofocus_mode_options[i].af_mode;
+      break;
+    }
+  }
+  controls_.set(libcamera::controls::AfMode, af_mode);
+  return 0;
+}
+
+int Picam::camera_set_lens_position() {
+  if (this->option->video_lens_position != -1.0f) {
+    log_debug("camera_set_lens_position: %f\n", this->option->video_lens_position);
+    controls_.set(libcamera::controls::LensPosition, this->option->video_lens_position);
+  }
+  return 0;
+}
+
 /**
  * Reads a file and returns the contents.
  * file_contents argument will be set to the pointer to the
@@ -2095,6 +2116,16 @@ void Picam::StartCamera()
 
   // Sharpness
   if (this->camera_set_sharpness() != 0) {
+    exit(EXIT_FAILURE);
+  }
+
+  // Auto focus mode
+  if (this->camera_set_autofocus_mode(this->option->video_autofocus_mode) != 0) {
+    exit(EXIT_FAILURE);
+  }
+
+  // Lens position for manual focus mode
+  if (this->camera_set_lens_position() != 0) {
     exit(EXIT_FAILURE);
   }
 
