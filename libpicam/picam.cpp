@@ -351,6 +351,37 @@ int Picam::camera_set_sharpness() {
   return 0;
 }
 
+int Picam::camera_set_autofocus_mode(char *mode) {
+  if (camera_->controls().count(&libcamera::controls::AfMode) == 0) {
+    // When we try to set the AF Mode on a camera that does not support AF, libcamera crashes.
+    log_debug("skipping autofocus because it is not supported by the camera\n");
+    return 0;
+  }
+
+  libcamera::controls::AfModeEnum af_mode = libcamera::controls::AfModeContinuous;
+  for (unsigned int i = 0; i < sizeof(video_autofocus_mode_options) / sizeof(video_autofocus_mode_option); i++) {
+    if (strcmp(video_autofocus_mode_options[i].name, mode) == 0) {
+      af_mode = video_autofocus_mode_options[i].af_mode;
+      break;
+    }
+  }
+  log_debug("camera_set_autofocus_mode: %s\n", mode);
+  controls_.set(libcamera::controls::AfMode, af_mode);
+  return 0;
+}
+
+int Picam::camera_set_lens_position() {
+  if (this->option->video_lens_position != -1.0f) {
+    if (camera_->controls().count(&libcamera::controls::LensPosition) == 0) {
+      log_debug("skipping lens position because it is not supported by the camera\n");
+      return 0;
+    }
+    log_debug("camera_set_lens_position: %f\n", this->option->video_lens_position);
+    controls_.set(libcamera::controls::LensPosition, this->option->video_lens_position);
+  }
+  return 0;
+}
+
 /**
  * Reads a file and returns the contents.
  * file_contents argument will be set to the pointer to the
@@ -2095,6 +2126,16 @@ void Picam::StartCamera()
 
   // Sharpness
   if (this->camera_set_sharpness() != 0) {
+    exit(EXIT_FAILURE);
+  }
+
+  // Auto focus mode
+  if (this->camera_set_autofocus_mode(this->option->video_autofocus_mode) != 0) {
+    exit(EXIT_FAILURE);
+  }
+
+  // Lens position for manual focus mode
+  if (this->camera_set_lens_position() != 0) {
     exit(EXIT_FAILURE);
   }
 

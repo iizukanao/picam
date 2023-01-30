@@ -81,6 +81,15 @@ const video_avc_level_option video_avc_level_options[] = {
   // Level >= 5.0 is not supported by the encoder
 };
 
+typedef struct video_autofocus_mode_option {
+  const char *name;
+  libcamera::controls::AfModeEnum af_mode;
+} video_autofocus_mode_option;
+const video_autofocus_mode_option video_autofocus_mode_options[] = {
+  { "manual", libcamera::controls::AfModeManual },
+  { "continuous", libcamera::controls::AfModeContinuous },
+};
+
 class PicamOption
 {
 public:
@@ -187,6 +196,12 @@ public:
 
   // 0.0 means no sharpening
   float video_sharpness = 0.0f;
+
+  // The default is to initiate autofocus at any moment
+  char video_autofocus_mode[11] = "continuous";
+
+  // -1.0f means lens position is not specified.
+  float video_lens_position = -1.0f;
 
   char state_dir[256] = "state";
   char hooks_dir[256] = "hooks";

@@ -211,6 +211,8 @@ private:
 	int camera_set_contrast();
 	int camera_set_saturation();
 	int camera_set_sharpness();
+	int camera_set_autofocus_mode(char *mode);
+	int camera_set_lens_position();
 
     // >>> libcamera_app.hpp
 	template <typename T>

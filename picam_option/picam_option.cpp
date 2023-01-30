@@ -141,6 +141,15 @@ void PicamOption::print_usage() {
   // log_info("  --blank[=0xAARRGGBB]  Set the video background color to black (or optional ARGB value)\n");
   log_info("  --query             Query camera capabilities then exit\n");
   // log_info("  --mode             Specify the camera sensor mode (values depend on the camera hardware)\n");
+  log_info(" [autofocus] (available on Camera Module 3)\n");
+  log_info("  --autofocus-mode <mode>  AF (autofocus) algorithm. <mode> is one of:\n");
+  log_info("                      continuous: Continuous autofocus (default)\n");
+  log_info("                      manual: Manual mode\n");
+  log_info("  --lens-position <num>  Move lens to the reciprocal of the focal distance in\n");
+  log_info("                      meters, also known as diopters. Implies \"--autofocus-mode manual\".\n");
+  log_info("                      To focus on objects 2m away, use 0.5 (1m / 0.5 = 2m).\n");
+  log_info("                      To focus on objects 25cm away, use 4 (1m / 4 = 0.25m).\n");
+  log_info("                      Use 0 for maximum focus distance.\n");
   log_info(" [timestamp] (may be a bit heavy on Raspberry Pi 1)\n");
   log_info("  --time              Enable timestamp\n");
   log_info("  --timeformat <spec>  Timestamp format (see \"man strftime\" for spec)\n");
@@ -278,6 +287,8 @@ int PicamOption::parse(int argc, char **argv) {
     { "contrast", required_argument, NULL, 0 },
     { "saturation", required_argument, NULL, 0 },
     { "sharpness", required_argument, NULL, 0 },
+    { "autofocus-mode", required_argument, NULL, 0 },
+    { "lens-position", required_argument, NULL, 0 },
     { 0, 0, 0, 0 },
   };
   int option_index = 0;
@@ -984,7 +995,7 @@ int PicamOption::parse(int argc, char **argv) {
         } else if (strcmp(long_options[option_index].name, "help") == 0) {
           this->show_help = true;
           return 0;
-        } else if (strcmp(long_options[option_index].name, "brightness") == 0) {			
+        } else if (strcmp(long_options[option_index].name, "brightness") == 0) {
           char *end;
           double value = strtod(optarg, &end);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
@@ -992,7 +1003,7 @@ int PicamOption::parse(int argc, char **argv) {
             return EXIT_FAILURE;
           }
           video_brightness = value;			
-        } else if (strcmp(long_options[option_index].name, "contrast") == 0) {			
+        } else if (strcmp(long_options[option_index].name, "contrast") == 0) {
           char *end;
           double value = strtod(optarg, &end);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
@@ -1000,7 +1011,7 @@ int PicamOption::parse(int argc, char **argv) {
             return EXIT_FAILURE;
           }
           video_contrast = value;			
-        } else if (strcmp(long_options[option_index].name, "saturation") == 0) {			
+        } else if (strcmp(long_options[option_index].name, "saturation") == 0) {
           char *end;
           double value = strtod(optarg, &end);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
@@ -1008,7 +1019,7 @@ int PicamOption::parse(int argc, char **argv) {
             return EXIT_FAILURE;
           }
           video_saturation = value;			
-        }else if (strcmp(long_options[option_index].name, "sharpness") == 0) {			
+        } else if (strcmp(long_options[option_index].name, "sharpness") == 0) {
           char *end;
           double value = strtod(optarg, &end);
           if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
@@ -1016,6 +1027,35 @@ int PicamOption::parse(int argc, char **argv) {
             return EXIT_FAILURE;
           }
           video_sharpness = value;
+        } else if (strcmp(long_options[option_index].name, "autofocus-mode") == 0) {
+          strncpy(video_autofocus_mode, optarg, sizeof(video_autofocus_mode) - 1);
+          video_autofocus_mode[sizeof(video_autofocus_mode) - 1] = '\0';
+          int matched = 0;
+          unsigned int i;
+          for (i = 0; i < sizeof(video_autofocus_mode_options) / sizeof(video_autofocus_mode_option); i++) {
+            if (strcmp(video_autofocus_mode_options[i].name, video_autofocus_mode) == 0) {
+              matched = 1;
+              break;
+            }
+          }
+          if (!matched) {
+            log_fatal("error: invalid autofocus-mode: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+        } else if (strcmp(long_options[option_index].name, "lens-position") == 0) {
+          char *end;
+          double value = strtod(optarg, &end);
+          if (end == optarg || *end != '\0' || errno == ERANGE) { // parse error
+            log_fatal("error: invalid --lens-position: %s\n", optarg);
+            return EXIT_FAILURE;
+          }
+          if (value < 0.0f) {
+            log_fatal("error: --lens-position must be greater than or equal to 0");
+            return EXIT_FAILURE;
+          }
+          video_lens_position = value;
+          strncpy(video_autofocus_mode, "manual", sizeof(video_autofocus_mode) - 1);
+          video_autofocus_mode[sizeof(video_autofocus_mode) - 1] = '\0';
         } 
         break;
       case 'w':
@@ -1205,6 +1245,8 @@ int PicamOption::parse(int argc, char **argv) {
   log_debug("video_contrast=%d\n", video_contrast);
   log_debug("video_saturation=%d\n", video_saturation);
   log_debug("video_sharpness=%d\n", video_sharpness);
+  log_debug("video_autofocus_mode=%s\n", video_autofocus_mode);
+  log_debug("video_lens_position=%f\n", video_lens_position);
   log_debug("alsa_dev=%s\n", alsa_dev);
   log_debug("audio_channels=%d\n", audio_channels);
   log_debug("audio_sample_rate=%d\n", audio_sample_rate);
