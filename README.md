@@ -64,9 +64,9 @@ chmod +x make_dirs.sh
 alsamixer
 
 # Install picam binary
-wget https://github.com/iizukanao/picam/releases/download/v2.0.9/picam-2.0.9-`uname -m`.tar.xz
-tar xvf picam-2.0.9-*.tar.xz
-cp picam-2.0.9-*/picam ~/picam/
+wget https://github.com/iizukanao/picam/releases/download/v2.0.10/picam-2.0.10-`uname -m`.tar.xz
+tar xvf picam-2.0.10-*.tar.xz
+cp picam-2.0.10-*/picam ~/picam/
 
 # Run picam
 cd ~/picam
@@ -187,7 +187,7 @@ $ touch hooks/unmute
 #### Command options
 
 ```txt
-picam version 2.0.9
+picam version 2.0.10
 Usage: picam [options]
 
 Options:
@@ -295,6 +295,15 @@ Options:
   --hdmi              Preview output HDMI port (0 or 1; default=0)
                       HDMI port selection only works in console mode (when X is not running)
   --query             Query camera capabilities then exit
+ [autofocus] (available on Camera Module 3)
+  --autofocus-mode <mode>  AF (autofocus) algorithm. <mode> is one of:
+                      continuous: Continuous autofocus (default)
+                      manual: Manual mode
+  --lens-position <num>  Move lens to the reciprocal of the focal distance in
+                      meters, also known as diopters. Implies "--autofocus-mode manual".
+                      To focus on objects 2m away, use 0.5 (1m / 0.5 = 2m).
+                      To focus on objects 25cm away, use 4 (1m / 4 = 0.25m).
+                      Use 0 for maximum focus distance.
  [timestamp] (may be a bit heavy on Raspberry Pi 1)
   --time              Enable timestamp
   --timeformat <spec>  Timestamp format (see "man strftime" for spec)

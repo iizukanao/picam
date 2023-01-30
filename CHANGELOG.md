@@ -1,6 +1,11 @@
 Change Log
 ==========
 
+Version 2.0.10 *(2023-01-30)*
+----------------------------
+
+- Added `--autofocus-mode` and `--lens-position` options for Camera Module 3.
+
 Version 2.0.9 *(2022-12-07)*
 ----------------------------
 
