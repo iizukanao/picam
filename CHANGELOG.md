@@ -1,6 +1,12 @@
 Change Log
 ==========
 
+Version 2.0.11 *(2023-01-31)*
+----------------------------
+
+- Enable HDR mode by default on Camera Module 3.
+- Added `--nohdr` option (only affects if Camera Module 3 is used).
+
 Version 2.0.10 *(2023-01-30)*
 ----------------------------
 

@@ -64,9 +64,9 @@ chmod +x make_dirs.sh
 alsamixer
 
 # Install picam binary
-wget https://github.com/iizukanao/picam/releases/download/v2.0.10/picam-2.0.10-`uname -m`.tar.xz
-tar xvf picam-2.0.10-*.tar.xz
-cp picam-2.0.10-*/picam ~/picam/
+wget https://github.com/iizukanao/picam/releases/download/v2.0.11/picam-2.0.11-`uname -m`.tar.xz
+tar xvf picam-2.0.11-*.tar.xz
+cp picam-2.0.11-*/picam ~/picam/
 
 # Run picam
 cd ~/picam
@@ -187,7 +187,7 @@ $ touch hooks/unmute
 #### Command options
 
 ```txt
-picam version 2.0.10
+picam version 2.0.11
 Usage: picam [options]
 
 Options:
@@ -286,6 +286,7 @@ Options:
   --evcomp <num>      Set Exposure Value compensation (-8..8) (default: 0)
   --shutter <num>     Set shutter speed in microseconds (default: auto).
                       Implies --vfr.
+  --nohdr             Disable HDR mode. HDR is enabled by default on Camera Module 3.
   --roi <x,y,w,h>     Set region of interest (crop rect) in ratio (0.0-1.0).
                       (default: 0,0,1,1)
                       --roi affects performance and may reduce fps.
