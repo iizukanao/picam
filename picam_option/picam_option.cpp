@@ -127,6 +127,7 @@ void PicamOption::print_usage() {
   log_info("  --shutter <num>     Set shutter speed in microseconds (default: auto).\n");
   log_info("                      Implies --vfr.\n");
   // log_info("  --iso <num>         Set ISO sensitivity (100..800) (default: auto)\n");
+  log_info("  --nohdr             Disable HDR mode. HDR is enabled by default on Camera Module 3.\n");
   log_info("  --roi <x,y,w,h>     Set region of interest (crop rect) in ratio (0.0-1.0).\n");
   log_info("                      (default: %.0f,%.0f,%.0f,%.0f)\n",
       defaultOption.roi_left, defaultOption.roi_top, defaultOption.roi_width, defaultOption.roi_height);
@@ -289,6 +290,7 @@ int PicamOption::parse(int argc, char **argv) {
     { "sharpness", required_argument, NULL, 0 },
     { "autofocus-mode", required_argument, NULL, 0 },
     { "lens-position", required_argument, NULL, 0 },
+    { "nohdr", no_argument, NULL, 0 },
     { 0, 0, 0, 0 },
   };
   int option_index = 0;
@@ -1056,7 +1058,9 @@ int PicamOption::parse(int argc, char **argv) {
           video_lens_position = value;
           strncpy(video_autofocus_mode, "manual", sizeof(video_autofocus_mode) - 1);
           video_autofocus_mode[sizeof(video_autofocus_mode) - 1] = '\0';
-        } 
+        } else if (strcmp(long_options[option_index].name, "nohdr") == 0) {
+          video_hdr = false;
+        }
         break;
       case 'w':
         {

@@ -197,6 +197,9 @@ public:
   // 0.0 means no sharpening
   float video_sharpness = 0.0f;
 
+  // HDR mode for Camera Module 3
+  bool video_hdr = true;
+
   // The default is to initiate autofocus at any moment
   char video_autofocus_mode[11] = "continuous";
 

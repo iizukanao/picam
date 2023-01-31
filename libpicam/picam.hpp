@@ -185,6 +185,7 @@ private:
 
 	void event_loop();
 	void setOption(PicamOption *option);
+	void setHDR(bool enabled);
 	void setupEncoder();
 	void modifyBuffer(CompletedRequestPtr &completed_request);
 	int64_t get_next_video_pts_vfr();

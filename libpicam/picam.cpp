@@ -64,6 +64,16 @@ static void check_camera_stack()
   exit(-1);
 }
 
+static int xioctl(int fd, unsigned long ctl, void *arg)
+{
+	int ret, num_tries = 10;
+	do
+	{
+		ret = ioctl(fd, ctl, arg);
+	} while (ret == -1 && errno == EINTR && num_tries-- > 0);
+	return ret;
+}
+
 void Picam::set_exposure_to_auto() {
   log_debug("exposure mode: auto\n");
   controls_.set(libcamera::controls::AeExposureMode, libcamera::controls::ExposureNormal);
@@ -1642,6 +1652,29 @@ void Picam::setOption(PicamOption *option)
   this->option = option;
 }
 
+void Picam::setHDR(bool enabled) {
+  bool ok = false;
+  for (int i = 0; i < 4 && !ok; i++)
+  {
+    std::string dev("/dev/v4l-subdev");
+    dev += (char)('0' + i);
+    int fd = open(dev.c_str(), O_RDWR, 0);
+    if (fd < 0)
+      continue;
+
+    v4l2_control ctrl { V4L2_CID_WIDE_DYNAMIC_RANGE, enabled };
+    ok = !xioctl(fd, VIDIOC_S_CTRL, &ctrl);
+    close(fd);
+  }
+  if (enabled) {
+    if (ok) {
+      log_debug("HDR mode enabled\n");
+    } else {
+      log_debug("failed to enable HDR mode\n");
+    }
+  }
+}
+
 void stopSignalHandler(int signo) {
   log_debug("stop requested (signal=%d)\n", signo);
   Picam *picam;
@@ -1685,6 +1718,9 @@ int Picam::run(int argc, char *argv[])
     int_handler.sa_handler = stopSignalHandler;
     sigaction(SIGINT, &int_handler, NULL);
     sigaction(SIGTERM, &int_handler, NULL);
+
+    // HDR control must be done before opening or listing the camera
+    this->setHDR(this->option->video_hdr);
 
     if (this->option->query_and_exit)
     {
