@@ -490,6 +490,23 @@ int Audio::configure_audio_capture_device() {
     snd_pcm_dump(capture_handle, output);
   }
 
+  if (this->option->ng_thresh_volume != 1.0f) {
+    // Noise gate settings
+    this->ng_thresh = INT16_MAX * this->option->ng_thresh_volume;
+    this->ng_attack_rate = this->option->ng_attack_time == 0
+            ? 1.0f
+            : (1.0f / (float) audio_sample_rate / this->option->ng_attack_time);
+    this->ng_release_rate = this->option->ng_release_time == 0
+            ? 1.0f
+            : (1.0f / (float) audio_sample_rate / this->option->ng_release_time);
+
+    this->ng_hold_samples = this->option->ng_hold_time * (float) audio_sample_rate;
+
+    log_debug("Noise gate enabled!\n");
+  } else {
+    this->ng_thresh = 0;
+  }
+
   return 0;
 }
 
@@ -764,8 +781,8 @@ int Audio::read_audio_poll_mmap() {
     }
   }
 
-  if (this->option->audio_volume_multiply != 1.0f) {
-    int total_samples = this->option->audio_period_size * this->get_audio_channels();
+  int total_samples = this->option->audio_period_size * this->get_audio_channels();
+  if (this->option->audio_volume_multiply != 1.0f) {    
     int i;
     for (i = 0; i < total_samples; i++) {
       int16_t value = (int16_t)this_samples[i];
@@ -779,6 +796,34 @@ int Audio::read_audio_poll_mmap() {
         value = (int16_t)(value * this->option->audio_volume_multiply);
       }
       this_samples[i] = (uint16_t)value;
+    }
+  }
+ 
+  if (this->ng_thresh != 0) { // Noise Gate
+    for (int i = 0; i < total_samples; i++) {
+      int16_t sample = (int16_t)this_samples[i];
+      uint16_t s_level = abs(sample);
+
+      if (this->ng_open) {
+        if (s_level < this->ng_thresh) {
+          this->ng_held_samples = this->ng_hold_samples;
+          this->ng_open = false;          
+        }
+      } else {
+        if (s_level >= this->ng_thresh) {
+          this->ng_open = true;
+        }
+      }
+      if ((this->ng_held_samples <= 0) && !this->ng_open) {  // Start release
+        this->ng_attenuation = fmaxf(0.0f, this->ng_attenuation - this->ng_release_rate);
+      } else {
+        if (!this->ng_open) {
+          this->ng_held_samples--;
+        }  // Attack can continue during hold time to reduce gate "chatter"
+        this->ng_attenuation = fminf(1.0f, this->ng_attenuation + this->ng_attack_rate);
+      }
+      sample = (int16_t)(sample * this->ng_attenuation);
+      this_samples[i] = (uint16_t)sample;
     }
   }
 

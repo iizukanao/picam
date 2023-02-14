@@ -211,6 +211,13 @@ public:
   float audio_volume_multiply = 1.0f;
   int audio_min_value = SHRT_MIN; // -32768
   int audio_max_value = SHRT_MAX; // 32767
+
+  // Noise Gate
+  float ng_thresh_volume = 1.0f;
+  float ng_attack_time = 0.2f;
+  float ng_hold_time = 1.0f;
+  float ng_release_time = 0.5f;
+
   int is_hls_encryption_enabled = 0;
   char hls_encryption_key_uri[256] = "stream.key";
   uint8_t hls_encryption_key[16] = {

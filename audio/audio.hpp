@@ -50,4 +50,11 @@ private:
   void setup_av_frame(AVFormatContext *format_ctx);
   HTTPLiveStreaming *hls;
   bool is_muted = false;
+  uint16_t ng_thresh = 0;
+  float ng_attack_rate;
+  float ng_release_rate;
+  int ng_hold_samples;
+  bool ng_open = false;
+  float ng_attenuation = 0.0f;
+  int ng_held_samples;
 };
