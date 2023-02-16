@@ -1,6 +1,11 @@
 Change Log
 ==========
 
+Version 2.0.12 *(2023-02-16)*
+----------------------------
+
+- Added Noise Gate feature (`--ngate` option). (by @francescovannini)
+
 Version 2.0.11 *(2023-01-31)*
 ----------------------------
 
