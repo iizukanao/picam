@@ -676,3 +676,4 @@ LGPL v2.1, as some parts of FFmpeg source is included.
 
 - Linus Styrén ([@Linkaan](https://github.com/Linkaan))
 - White Moustache ([@nalajcie](https://github.com/nalajcie))
+- Francesco Vannini ([@francescovannini](https://github.com/francescovannini))
