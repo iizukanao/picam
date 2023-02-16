@@ -60,6 +60,11 @@ void PicamOption::print_usage() {
   log_info("  --alsadev <dev>     ALSA microphone device (default: %s)\n", defaultOption.alsa_dev);
   log_info("  --volume <num>      Amplify audio by multiplying the volume by <num>\n");
   log_info("                      (default: %.1f)\n", defaultOption.audio_volume_multiply);
+  log_info("  --ngate <t,a,h,r>   Enable noise gate and set <threshold volume, attack/hold/release times>\n");
+  log_info("                      optional parameters. Defaults: %.02f, %.02f, %.02f, %.02f.\n",
+           defaultOption.ng_thresh_volume, defaultOption.ng_attack_time,
+           defaultOption.ng_hold_time, defaultOption.ng_release_time);
+  log_info("                      Enter - to use a parameter default.\n");
   log_info("  --noaudio           Disable audio capturing\n");
   log_info("  --audiopreview      Enable audio preview\n");
   log_info("  --audiopreviewdev <dev>  Audio preview output device (default: %s)\n", defaultOption.audio_preview_dev);
@@ -267,6 +272,7 @@ int PicamOption::parse(int argc, char **argv) {
     { "statedir", required_argument, NULL, 0 },
     { "hooksdir", required_argument, NULL, 0 },
     { "volume", required_argument, NULL, 0 },
+    { "ngate", required_argument, NULL, 0 },
     { "noaudio", no_argument, NULL, 0 },
     { "audiopreview", no_argument, NULL, 0 },
     { "audiopreviewdev", required_argument, NULL, 0 },
@@ -849,6 +855,56 @@ int PicamOption::parse(int argc, char **argv) {
             return EXIT_FAILURE;
           }
           audio_volume_multiply = value;
+        } else if (strcmp(long_options[option_index].name, "ngate") == 0) { // Noise Gate
+          int i = 0;
+          float val;
+          char *str_ptr = optarg;
+          char *parm = strtok(str_ptr, ",");
+          while ((parm != nullptr) && (i < 4)) {
+            if ((parm[0] != '-') && (parm[0] != 0)) {
+              val = strtof(parm, nullptr);
+              if (errno == ERANGE) {  // parse error
+                log_fatal(
+                    "error: invalid --ngate: value must be in t,a,h,r "
+                    "format\n");
+                return EXIT_FAILURE;
+              }
+              if (i > 0) {  // Times can't be negative
+                if (val < 0.0f) {
+                  log_fatal(
+                      "error: invalid --ngate: %f (time cannot be less than "
+                      "zero)\n",
+                      val);
+                  return EXIT_FAILURE;
+                }
+              } else {
+                if (val < 0.0f || val > 1.0f) {
+                  log_fatal(
+                      "error: invalid --ngate: %f (must be between 0.0 and "
+                      "1.0)\n",
+                      val);
+                  return EXIT_FAILURE;
+                }
+              }
+
+              switch (i) {
+                case 0:
+                  ng_thresh_volume = val;
+                  break;
+                case 1:
+                  ng_attack_time = val;
+                  break;
+                case 2:
+                  ng_hold_time = val;
+                  break;
+                case 3:
+                  ng_release_time = val;
+                  break;
+              }
+            }
+            i++;
+            parm = strtok(NULL, ",");
+          }
         } else if (strcmp(long_options[option_index].name, "noaudio") == 0) {
           disable_audio_capturing = 1;
         } else if (strcmp(long_options[option_index].name, "audiopreview") == 0) {
@@ -1256,6 +1312,10 @@ int PicamOption::parse(int argc, char **argv) {
   log_debug("audio_sample_rate=%d\n", audio_sample_rate);
   log_debug("audio_bitrate=%ld\n", audio_bitrate);
   log_debug("audio_volume_multiply=%f\n", audio_volume_multiply);
+  log_debug("ng_thresh_volume=%f\n", ng_thresh_volume);
+  log_debug("ng_attack_time=%f\n", ng_attack_time);
+  log_debug("ng_hold_time=%f\n", ng_hold_time);
+  log_debug("ng_release_time=%f\n", ng_release_time);
   log_debug("is_hlsout_enabled=%d\n", is_hlsout_enabled);
   log_debug("is_hls_encryption_enabled=%d\n", is_hls_encryption_enabled);
   log_debug("hls_keyframes_per_segment=%d\n", hls_keyframes_per_segment);

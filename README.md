@@ -227,6 +227,9 @@ Options:
   --alsadev <dev>     ALSA microphone device (default: hw:0,0)
   --volume <num>      Amplify audio by multiplying the volume by <num>
                       (default: 1.0)
+  --ngate <t,a,h,r>   Enable noise gate and set <threshold volume, attack/hold/release times>
+                      optional parameters. Defaults: 1.00, 0.20, 1.00, 0.50.
+                      Enter - to use a parameter default.
   --noaudio           Disable audio capturing
   --audiopreview      Enable audio preview
   --audiopreviewdev <dev>  Audio preview output device (default: plughw:0,0)
@@ -378,7 +381,6 @@ Available cameras
            'SRGGB8' : 640x480 1640x1232 1920x1080 3280x2464
 ```
 
-
 #### Exposure control
 
 Camera exposure control can be set either via command line option (e.g. `--ex long`) or hooks. To change the exposure control while picam is running, start picam with `--vfr` or `--ex` option, then create `hooks/ex_<value>`, where `<value>` is the name of exposure control.
@@ -390,6 +392,27 @@ $ touch hooks/ex_long
 ```
 
 For the list of available exposure control values, see `picam --help`.
+
+#### Noise Gate
+
+`ngate` parameter allows you to enable and tune the [noise gate](https://en.wikipedia.org/wiki/Noise_gate). The noise gate will close if the input sound level is below a certain threshold for a determined amount of time, effectively muting sound entirely. Similarly, the noise gate will open again if the level raises above the threshold. This is useful to suppress background noise and save streaming bandwidth. Four optional parameters can be set, each parameter accepts '-' meaning default will be used.
+
+| Param | Description                                                                                         | Default value      |
+| :---- | :-------------------------------------------------------------------------------------------------- | :----------------- |
+| t     | Threshold, expressed as volume between 0.0 and 1.0                                                  | 1.0 (ng disabled)  |
+| a     | Attack time; when gate opens, sound is faded in for this duration in seconds                        | 0.20               |
+| h     | Hold time; gate is kept open for this duration in seconds after the level falls below the threshold | 1.0                |
+| r     | Release time; when gate closes, sound is faded out for this duration in seconds                     | 0.50               |
+
+If level goes above threshold again during hold or release time, the hold time restarts and the attack envelope is applied if necessary.
+
+Example: 
+
+```sh
+$ ./picam --ngate 0.3,-,2
+```
+
+Sound will be muted if the volume level is below 30% of the scale; when sound rises above, it will be faded in for 0.2 seconds (the default). Sound is allowed to fall below the threshold for 2 uninterrupted seconds, after which the gate will close and a fade out of 1 second will be applied (the default)
 
 
 #### Recordbuf
@@ -538,7 +561,6 @@ $ echo 1.5 > hooks/sharpness
 # Revert to default sharpness
 $ echo 0 > hooks/sharpness
 ```
-
 
 ### HTTP Live Streaming (HLS)
 
