@@ -80,7 +80,8 @@ void *Muxer::rec_thread_stop(int skip_cleanup) {
     }
 
     // Create a symlink
-    char symlink_dest_path[2048];
+    char symlink_dest_path[1024 // sizeof(cwd)
+      + sizeof(recording_archive_filepath)];
     size_t rec_dir_len = strlen(this->rec_settings->rec_dir);
     struct stat file_stat;
 
