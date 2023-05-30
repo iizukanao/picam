@@ -174,31 +174,19 @@ void mpegts_open_stream_without_header(AVFormatContext *format_ctx, char *output
 
 MpegTSContext _mpegts_create_context(int use_video, int use_audio, MpegTSCodecSettings *settings) {
   AVFormatContext *format_ctx;
-  AVOutputFormat *out_fmt;
-  const AVOutputFormat *guessed_fmt;
   AVCodecContext *codec_context_video = NULL;
   AVCodecContext *codec_context_audio = NULL;
-
-  guessed_fmt = av_guess_format("mpegts", NULL, NULL);
-  if (!guessed_fmt) {
-    fprintf(stderr, "av_guess_format failed\n");
-    exit(EXIT_FAILURE);
-  }
-  out_fmt = malloc(sizeof(AVOutputFormat));
-  if (out_fmt == NULL) {
-    fprintf(stderr, "out_fmt malloc failed\n");
-    exit(EXIT_FAILURE);
-  }
-  memcpy(out_fmt, guessed_fmt, sizeof(AVOutputFormat));
-
-  out_fmt->flags |= ~AVFMT_GLOBALHEADER;
 
   format_ctx = avformat_alloc_context();
   if (!format_ctx) {
     fprintf(stderr, "avformat_alloc_context failed\n");
     exit(EXIT_FAILURE);
   }
-  format_ctx->oformat = out_fmt;
+  format_ctx->oformat = av_guess_format("mpegts", NULL, NULL);
+  if (!format_ctx->oformat) {
+    fprintf(stderr, "av_guess_format failed\n");
+    exit(EXIT_FAILURE);
+  }
 
 #if !(AUDIO_ONLY)
   if (use_video) {
