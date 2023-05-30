@@ -31,7 +31,7 @@ AVCodecContext *setup_video_stream(AVFormatContext *format_ctx, MpegTSCodecSetti
   video_stream->time_base.den = 180000;
   video_codec_ctx->time_base.num = 1;
   video_codec_ctx->time_base.den = 180000;
-  video_codec_ctx->ticks_per_frame = 2;
+  video_codec_ctx->framerate = av_mul_q(video_codec_ctx->time_base, (AVRational){2,1});
   video_codec_ctx->pix_fmt       = 0;
   video_codec_ctx->width         = settings->video_width;
   video_codec_ctx->height        = settings->video_height;
@@ -86,7 +86,7 @@ AVCodecContext *setup_audio_stream(AVFormatContext *format_ctx, MpegTSCodecSetti
   audio_stream->time_base.den = settings->audio_sample_rate;
   audio_codec_ctx->time_base.num = 1;
   audio_codec_ctx->time_base.den = settings->audio_sample_rate;
-  audio_codec_ctx->ticks_per_frame = 1;
+  audio_codec_ctx->framerate = audio_codec_ctx->time_base;
   audio_codec_ctx->bit_rate = settings->audio_bit_rate;
   audio_codec_ctx->codec_type = AVMEDIA_TYPE_AUDIO;
   audio_codec_ctx->profile = settings->audio_profile;
