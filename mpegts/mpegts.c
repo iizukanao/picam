@@ -63,7 +63,7 @@ AVCodecContext *setup_audio_stream(AVFormatContext *format_ctx, MpegTSCodecSetti
 
   aac_codec = avcodec_find_encoder_by_name("libfdk_aac");
   if (!aac_codec) {
-    fprintf(stderr, "codec not found\n");
+    fprintf(stderr, "codec libfdk_aac is not available. Install ffmpeg with libfdk_aac support.\n");
     exit(EXIT_FAILURE);
   }
 
