@@ -1939,7 +1939,7 @@ void Picam::ConfigureVideo(unsigned int flags)
   // bool have_raw_stream = (flags & FLAG_VIDEO_RAW) || options_->mode.bit_depth;
   // bool have_lores_stream = options_->lores_width && options_->lores_height;
 
-  libcamera::StreamRoles stream_roles = { libcamera::StreamRole::VideoRecording };
+  std::vector<libcamera::StreamRole> stream_roles = { libcamera::StreamRole::VideoRecording };
   int lores_index = 1;
   if (have_raw_stream)
   {
