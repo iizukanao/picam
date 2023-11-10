@@ -3,6 +3,7 @@
 extern "C" {
 #include <libavformat/avformat.h>
 }
+#include <functional>
 #include <alsa/asoundlib.h>
 #include "httplivestreaming/httplivestreaming.h"
 #include "muxer/muxer.hpp"
