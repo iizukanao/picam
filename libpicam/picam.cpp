@@ -286,7 +286,7 @@ int Picam::camera_set_custom_awb_gains() {
 
 int Picam::camera_set_ae_metering_mode(char *mode) {
   log_debug("camera_set_metering_mode: %s\n", mode);
-  libcamera::controls::AeMeteringModeEnum metering = libcamera::controls::MeteringCentreWeighted;
+  int32_t metering = libcamera::controls::MeteringCentreWeighted;
   for (unsigned int i = 0; i < sizeof(exposure_metering_options) / sizeof(exposure_metering_option); i++) {
     if (strcmp(exposure_metering_options[i].name, mode) == 0) {
       metering = exposure_metering_options[i].metering;
@@ -310,7 +310,7 @@ int Picam::camera_set_white_balance(char *wb) {
     controls_.set(libcamera::controls::AwbMode, libcamera::controls::AwbCustom);
     controls_.set(libcamera::controls::AwbEnable, false);
   } else {
-    libcamera::controls::AwbModeEnum control = libcamera::controls::AwbAuto;
+    int32_t control = libcamera::controls::AwbAuto;
     for (unsigned int i = 0; i < sizeof(white_balance_options) / sizeof(white_balance_option); i++) {
       if (strcmp(white_balance_options[i].name, wb) == 0) {
         control = white_balance_options[i].control;
@@ -326,7 +326,7 @@ int Picam::camera_set_white_balance(char *wb) {
 
 int Picam::camera_set_exposure_control(char *ex) {
   log_debug("camera_set_exposure_control: %s\n", ex);
-  libcamera::controls::AeExposureModeEnum control = libcamera::controls::ExposureNormal;
+  int32_t control = libcamera::controls::ExposureNormal;
   for (unsigned int i = 0; i < sizeof(exposure_control_options) / sizeof(exposure_control_option); i++) {
     if (strcmp(exposure_control_options[i].name, ex) == 0) {
       control = exposure_control_options[i].control;
@@ -368,7 +368,7 @@ int Picam::camera_set_autofocus_mode(char *mode) {
     return 0;
   }
 
-  libcamera::controls::AfModeEnum af_mode = libcamera::controls::AfModeContinuous;
+  int32_t af_mode = libcamera::controls::AfModeContinuous;
   for (unsigned int i = 0; i < sizeof(video_autofocus_mode_options) / sizeof(video_autofocus_mode_option); i++) {
     if (strcmp(video_autofocus_mode_options[i].name, mode) == 0) {
       af_mode = video_autofocus_mode_options[i].af_mode;

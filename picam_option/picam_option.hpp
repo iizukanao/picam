@@ -15,7 +15,7 @@ extern "C" {
 
 typedef struct white_balance_option {
   const char *name;
-  libcamera::controls::AwbModeEnum control;
+  int32_t control;
 } white_balance_option;
 const white_balance_option white_balance_options[] = {
   { "off",          libcamera::controls::AwbCustom },
@@ -31,7 +31,7 @@ const white_balance_option white_balance_options[] = {
 
 typedef struct exposure_control_option {
   const char *name;
-  libcamera::controls::AeExposureModeEnum control;
+  int32_t control;
 } exposure_control_option;
 const exposure_control_option exposure_control_options[] = {
   { "custom", libcamera::controls::ExposureCustom },
@@ -42,7 +42,7 @@ const exposure_control_option exposure_control_options[] = {
 
 typedef struct exposure_metering_option {
   const char *name;
-  libcamera::controls::AeMeteringModeEnum metering;
+  int32_t metering;
 } exposure_metering_option;
 const exposure_metering_option exposure_metering_options[] = {
   { "center", libcamera::controls::MeteringCentreWeighted },
@@ -83,7 +83,7 @@ const video_avc_level_option video_avc_level_options[] = {
 
 typedef struct video_autofocus_mode_option {
   const char *name;
-  libcamera::controls::AfModeEnum af_mode;
+  int32_t af_mode;
 } video_autofocus_mode_option;
 const video_autofocus_mode_option video_autofocus_mode_options[] = {
   { "manual", libcamera::controls::AfModeManual },
