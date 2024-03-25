@@ -2010,7 +2010,7 @@ void Picam::ConfigureVideo(unsigned int flags)
     configuration_->at(lores_index).size = lores_size;
     configuration_->at(lores_index).bufferCount = configuration_->at(0).bufferCount;
   }
-  configuration_->transform = transform;
+  configuration_->orientation = libcamera::Orientation::Rotate0 * transform;
 
   configureDenoise(denoise == "auto" ? "cdn_fast" : denoise);
   setupCapture();
