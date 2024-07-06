@@ -19,9 +19,9 @@ $ sudo apt-get install git cmake libcamera-dev libharfbuzz-dev libfontconfig-dev
 Install [fdk-aac](https://sourceforge.net/projects/opencore-amr/files/fdk-aac/) with the following commands.
 
 ```sh
-$ wget https://downloads.sourceforge.net/project/opencore-amr/fdk-aac/fdk-aac-2.0.2.tar.gz
-$ tar zxvf fdk-aac-2.0.2.tar.gz
-$ cd fdk-aac-2.0.2
+$ wget https://downloads.sourceforge.net/project/opencore-amr/fdk-aac/fdk-aac-2.0.3.tar.gz
+$ tar zxvf fdk-aac-2.0.3.tar.gz
+$ cd fdk-aac-2.0.3
 $ ./configure
 $ make -j4
 (takes 3-4 minutes)
