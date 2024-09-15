@@ -17,7 +17,8 @@
 
 ### Supported operating system
 
-- Raspberry Pi OS (bullseye) 32-bit or 64-bit (with libcamera enabled)
+- Raspberry Pi OS 32-bit or 64-bit (with libcamera enabled)
+- Raspberry Pi 5 is not supported
 
 ### Installation
 
@@ -63,15 +64,9 @@ chmod +x make_dirs.sh
 # Optionally, increase microphone volume with alsamixer
 alsamixer
 
-# For bullseye version - separate build is used
-is_bullseye=""
-if [ "$(cat /etc/*-release | grep VERSION_CODENAME | awk -F '=' '{ print $2 }')" == "bullseye" ]; then
-  is_bullseye="bullseye-"
-fi
-
 # Install picam binary
-wget https://github.com/iizukanao/picam/releases/download/v2.0.12/picam-2.0.12-$is_bullseye`uname -m`.tar.xz
-tar xvf picam-2.0.12-*.tar.xz
+wget https://github.com/iizukanao/picam/releases/download/v2.0.12/picam-2.0.12-`uname -m`.tar.gz
+tar zxvf picam-2.0.12-*.tar.gz
 cp picam-2.0.12-*/picam ~/picam/
 
 # Run picam
