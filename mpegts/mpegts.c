@@ -42,16 +42,22 @@ AVCodecContext *setup_video_stream(AVFormatContext *format_ctx, MpegTSCodecSetti
   return video_codec_ctx;
 }
 
-static int is_sample_fmt_supported(const AVCodec *codec, enum AVSampleFormat sample_fmt) {
-  const enum AVSampleFormat *p = codec->sample_fmts;
+static int is_sample_fmt_supported(const AVCodecContext *codec_ctx) {
+  const enum AVSampleFormat *sample_formats = NULL;
+  int num_sample_formats;
+  int ret;
 
-  while (*p != AV_SAMPLE_FMT_NONE) {
-    if (*p == sample_fmt) {
+  ret = avcodec_get_supported_config(codec_ctx, NULL, AV_CODEC_CONFIG_SAMPLE_FORMAT, 0,
+    (const void**)&sample_formats, &num_sample_formats);
+  if (ret < 0) {
+    fprintf(stderr, "avcodec_get_supported_config failed: %s\n", av_err2str(ret));
+    exit(EXIT_FAILURE);
+  }
+  for (int i = 0; i < num_sample_formats; i++) {
+    if (sample_formats[i] == codec_ctx->sample_fmt) {
       return 1;
     }
-    p++;
   }
-
   return 0;
 }
 
@@ -76,7 +82,7 @@ AVCodecContext *setup_audio_stream(AVFormatContext *format_ctx, MpegTSCodecSetti
   audio_codec_ctx = avcodec_alloc_context3(aac_codec);
 
   audio_codec_ctx->sample_fmt = AV_SAMPLE_FMT_S16;
-  if ( ! is_sample_fmt_supported(aac_codec, audio_codec_ctx->sample_fmt) ) {
+  if ( ! is_sample_fmt_supported(audio_codec_ctx) ) {
     fprintf(stderr, "Sample format %s is not supported\n",
         av_get_sample_fmt_name(audio_codec_ctx->sample_fmt));
     exit(EXIT_FAILURE);
