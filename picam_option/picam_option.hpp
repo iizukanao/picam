@@ -57,10 +57,10 @@ typedef struct video_avc_profile_option {
   int ff_profile; // AVCodecContext.profile
 } video_avc_profile_option;
 const video_avc_profile_option video_avc_profile_options[] = {
-  { "constrained_baseline", V4L2_MPEG_VIDEO_H264_PROFILE_CONSTRAINED_BASELINE, FF_PROFILE_H264_CONSTRAINED_BASELINE },
-  { "baseline",             V4L2_MPEG_VIDEO_H264_PROFILE_BASELINE, FF_PROFILE_H264_BASELINE },
-  { "main",                 V4L2_MPEG_VIDEO_H264_PROFILE_MAIN, FF_PROFILE_H264_MAIN },
-  { "high",                 V4L2_MPEG_VIDEO_H264_PROFILE_HIGH, FF_PROFILE_H264_HIGH },
+  { "constrained_baseline", V4L2_MPEG_VIDEO_H264_PROFILE_CONSTRAINED_BASELINE, AV_PROFILE_H264_CONSTRAINED_BASELINE },
+  { "baseline",             V4L2_MPEG_VIDEO_H264_PROFILE_BASELINE, AV_PROFILE_H264_BASELINE },
+  { "main",                 V4L2_MPEG_VIDEO_H264_PROFILE_MAIN, AV_PROFILE_H264_MAIN },
+  { "high",                 V4L2_MPEG_VIDEO_H264_PROFILE_HIGH, AV_PROFILE_H264_HIGH },
 };
 
 typedef struct video_avc_level_option {

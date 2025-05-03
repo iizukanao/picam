@@ -1516,12 +1516,12 @@ void Picam::event_loop()
     codec_settings.audio_sample_rate = this->option->audio_sample_rate;
     codec_settings.audio_bit_rate = 1000;
     codec_settings.audio_channels = this->option->audio_channels;
-    codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
+    codec_settings.audio_profile = AV_PROFILE_AAC_LOW;
   } else {
     codec_settings.audio_sample_rate = this->option->audio_sample_rate;
     codec_settings.audio_bit_rate = this->option->audio_bitrate;
     codec_settings.audio_channels = this->option->audio_channels;
-    codec_settings.audio_profile = FF_PROFILE_AAC_LOW;
+    codec_settings.audio_profile = AV_PROFILE_AAC_LOW;
   }
   codec_settings.video_bitrate = this->option->video_bitrate;
   codec_settings.video_width = this->option->video_width;
