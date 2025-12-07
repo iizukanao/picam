@@ -1,6 +1,11 @@
 Change Log
 ==========
 
+Version 2.0.13 *(2025-12-07)*
+----------------------------
+
+- Fix build error on the latest Raspberry Pi OS
+
 Version 2.0.12 *(2023-02-16)*
 ----------------------------
 

@@ -65,9 +65,9 @@ chmod +x make_dirs.sh
 alsamixer
 
 # Install picam binary
-wget https://github.com/iizukanao/picam/releases/download/v2.0.12/picam-2.0.12-`uname -m`.tar.gz
-tar zxvf picam-2.0.12-*.tar.gz
-cp picam-2.0.12-*/picam ~/picam/
+wget https://github.com/iizukanao/picam/releases/download/v2.0.13/picam-2.0.13-`uname -m`.tar.gz
+tar zxvf picam-2.0.13-*.tar.gz
+cp picam-2.0.13-*/picam ~/picam/
 
 # Run picam
 cd ~/picam
@@ -188,7 +188,7 @@ $ touch hooks/unmute
 #### Command options
 
 ```txt
-picam version 2.0.12
+picam version 2.0.13
 Usage: picam [options]
 
 Options:
