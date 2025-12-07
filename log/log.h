@@ -6,6 +6,7 @@ extern "C" {
 #define _LOG_H_
 
 #include <stdio.h>
+#include <stdint.h>
 #include <stdarg.h>
 
 enum {
